@@ -1,14 +1,16 @@
-# Phase 1 — Auth + Upload + OCR + Session Storage
+# Phase 1 — Auth + Upload + OCR + Prep Storage
 
 ## Goal
-User can sign in, upload a photo of a textbook page, see the extracted text, and have it saved as a session.
+User can sign in, upload a photo of a textbook page, and have it saved as a Prep — ready to study in Phase 2.
 
 ## Scope
 - Project scaffold
 - Google sign-in
-- Image upload + in-browser OCR
-- Save raw text as a session
-- Basic session list
+- Image upload + in-browser OCR (background)
+- Save raw text as a Prep
+- Marketing home page
+- My Preps list
+- Prep detail page
 
 ---
 
@@ -29,52 +31,57 @@ User can sign in, upload a photo of a textbook page, see the extracted text, and
 ## Database (Supabase)
 
 ```sql
--- sessions only, no questions yet
-create table sessions (
+create table preps (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null,
-  title text not null default 'Test #1',
+  title text not null default 'Prep #1',
   raw_text text not null,
   created_at timestamptz default now()
 );
 
-alter table sessions enable row level security;
-create policy "users see own sessions"
-  on sessions for all using (auth.uid() = user_id);
+alter table preps enable row level security;
+create policy "users see own preps"
+  on preps for all using (auth.uid() = user_id);
 ```
 
 ---
 
 ## Screens
 
-### 1. Login screen
-- "Sign in with Google" button
-- Redirect to home after auth
+### 1. Home (marketing, public)
+- App name, tagline, short description
+- "Sign in with Google" CTA
+- Redirects authenticated users straight to My Preps
 
-### 2. Home screen
-- List of past sessions (title + date)
-- "New session" button → Upload screen
+### 2. My Preps (authenticated)
+- List of preps: title + date created
+- "New Prep" button → opens Upload Modal
+- Empty state with prompt to create first prep
 
-### 3. Upload screen
-- File input (accept image/*, capture=camera for mobile)
-- On file select → run Tesseract.js → show extracted text in a textarea
-- User can correct text if needed
-- "Save & Continue" button → saves session → redirects to session page (placeholder for Phase 2)
+### 3. Upload Modal
+- Triggered by "New Prep" button
+- File input (accept image/*, capture=camera on mobile)
+- On file select → OCR starts immediately in background (Tesseract.js Web Worker)
+- Modal shows progress indicator ("Recognising text…")
+- On complete → auto-save Prep → close modal → navigate to Prep page
+- No text preview or correction — fully automatic
 
-### 4. Session page (placeholder)
-- Shows session title + raw text
-- "Study" button (disabled — coming Phase 2)
+### 4. Prep Page
+- Shows prep title + creation date
+- Raw text displayed (read-only, collapsible)
+- "Study" button — disabled, coming Phase 2
 
 ---
 
 ## Key Implementation Notes
 
-- Tesseract.js runs in a Web Worker — show a progress indicator while it processes
-- Session title auto-increments ("Test #1", "Test #2") based on session count — LLM naming comes in Phase 3
-- No question generation yet — session is just raw text storage
-- Keep styling minimal but mobile-friendly (single column, large tap targets)
+- Tesseract.js runs in a Web Worker — UI stays responsive during OCR
+- Prep title auto-increments ("Prep #1", "Prep #2") based on user's prep count — LLM naming in Phase 3
+- No text editing by user — keep the flow fast and frictionless
+- Mobile-first: modal should be full-screen on small screens
+- Keep styling minimal but polished enough for a public product
 
 ---
 
 ## Deliverable
-User can sign in → upload photo → see OCR text → save session → see it in history.
+User lands on marketing page → signs in → sees Prep list → uploads photo → OCR runs in background → Prep saved → lands on Prep page.

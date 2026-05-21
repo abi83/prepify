@@ -15,7 +15,7 @@ Make the product publicly usable for free users. Add Gemini support. Deploy to p
 
 Single endpoint: `POST /api/generate`
 
-- Accepts: `{ session_id, raw_text, user_id }`
+- Accepts: `{ prep_id, raw_text, user_id }`
 - Runs the three-agent pipeline server-side using app's `OPENAI_API_KEY`
 - Returns: `{ questions[], title }`
 - App's key never exposed to browser

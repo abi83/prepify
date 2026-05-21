@@ -13,12 +13,20 @@ Adapt question model and UI from existing project. Add a dummy single-agent ques
 
 ---
 
+## Terminology
+- **Prep** — the container created from an uploaded image
+- **Cards** — flashcard-type questions inside a Prep
+- **Practice Test** — the scored test mode
+- **Results** — history of scored attempts
+
+---
+
 ## Database additions
 
 ```sql
 create table questions (
   id uuid primary key default gen_random_uuid(),
-  session_id uuid references sessions not null,
+  prep_id uuid references preps not null,
   type text not null, -- 'flashcard' | 'mcq' | 'fill'
   content jsonb not null,
   -- flashcard: { front, back }
@@ -29,7 +37,7 @@ create table questions (
 
 create table attempts (
   id uuid primary key default gen_random_uuid(),
-  session_id uuid references sessions not null,
+  prep_id uuid references preps not null,
   user_id uuid references auth.users not null,
   score int not null,        -- correct answers
   total int not null,        -- total questions
@@ -41,7 +49,7 @@ alter table attempts enable row level security;
 
 create policy "users see own questions"
   on questions for all
-  using (session_id in (select id from sessions where user_id = auth.uid()));
+  using (prep_id in (select id from preps where user_id = auth.uid()));
 
 create policy "users see own attempts"
   on attempts for all using (auth.uid() = user_id);
