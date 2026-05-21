@@ -1,23 +1,16 @@
 # Phase 2 — Question UI + Study Modes + Scoring
 
 ## Goal
-Adapt question model and UI from existing project. Add a dummy single-agent question generator. User can study flashcards, take a quiz, and get a score saved.
+Adapt question model and UI from existing project. Build a real agent wrapper infrastructure with a dummy single-agent implementation. User can study flashcards, take a quiz, take a test, and have scores saved.
 
 ## Scope
-- Adapt question data model from existing project
-- Dummy single-agent question generation (one LLM call, no pipeline yet)
-- Minimal BYOK: a simple API key input (OpenAI only for now)
+- Adapt question data model and UI components from existing project
+- Real agent wrapper (observability, metrics, logging) with dummy single-agent implementation
+- Minimal BYOK: API key input (OpenAI only, gpt-4o-mini hardcoded)
 - Flashcard mode
-- Test mode with scoring
-- Save score to DB
-
----
-
-## Terminology
-- **Prep** — the container created from an uploaded image
-- **Cards** — flashcard-type questions inside a Prep
-- **Practice Test** — the scored test mode
-- **Results** — history of scored attempts
+- Quiz mode (immediate feedback)
+- Test mode (scored at the end)
+- Save attempts to DB
 
 ---
 
@@ -39,8 +32,9 @@ create table attempts (
   id uuid primary key default gen_random_uuid(),
   prep_id uuid references preps not null,
   user_id uuid references auth.users not null,
-  score int not null,        -- correct answers
-  total int not null,        -- total questions
+  mode text not null,          -- 'quiz' | 'test'
+  score int not null,          -- correct answers
+  total int not null,          -- total questions
   created_at timestamptz default now()
 );
 
@@ -60,64 +54,110 @@ create policy "users see own attempts"
 ## API Key (minimal BYOK)
 
 - Settings icon in header → simple modal with "OpenAI API Key" input
-- Stored in `localStorage` as `byok_openai_key`
+- Provider: OpenAI hardcoded, model: `gpt-4o-mini` hardcoded for now
+- Stored in `localStorage` with shape `{ provider, model, key }`
 - If no key → show prompt to enter one before generating
-- No server involved — key used directly in browser fetch
+- No server involved — key used directly in browser
 
 ---
 
-## Dummy Agent
+## Agent Wrapper
 
-Single LLM call to OpenAI from the browser:
+> **Bring the observability pattern from the Python project and adapt to TypeScript.**
+
+The dummy agent uses a single LLM call, but it must be wrapped in real infrastructure — because Phase 3 will drop in three real agents without changing the wrapper.
+
+### What the wrapper provides
+
+- **Token tracking** — prompt tokens, completion tokens, total per call
+- **Latency** — time per agent call in ms
+- **Structured logging** — agent name, input summary, output summary, metrics
+- **Error handling** — catch API errors, timeouts, malformed JSON responses
+- **Abort support** — cancellable via `AbortController` (user navigates away)
+
+### Interface
+
+```ts
+type AgentResult<T> = {
+  output: T
+  metrics: {
+    latency_ms: number
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+async function runAgent<T>(config: {
+  name: string
+  systemPrompt: string
+  userPrompt: string
+  schema: ZodSchema<T>   // validates + types the JSON response
+  apiKey: string
+  signal?: AbortSignal
+}): Promise<AgentResult<T>>
+```
+
+Metrics logged to console in dev, stored in memory for display in UI (token count shown after generation).
+
+### Dummy Agent prompt
 
 ```
 System: You are a study material generator.
 User:   Given this text, return a JSON array of 10 study items:
         - 3 flashcards (type: flashcard)
-        - 5 multiple choice (type: mcq)
+        - 5 multiple choice questions (type: mcq)
         - 2 fill-in-the-blank (type: fill)
         Text: {raw_text}
 ```
 
-- Returns structured JSON, saved to `questions` table
-- Called once when user opens a session that has no questions yet
-- Replace entirely in Phase 3
+- Single `runAgent` call
+- Output validated with Zod against question schema
+- Saved to `questions` table on success
+- Called once per prep — skipped if questions already exist
+- Replaced entirely in Phase 3 (wrapper stays)
 
 ---
 
 ## Screens
 
-### Session page (updated)
-- Shows session title
-- "Generate questions" button (triggers dummy agent)
-- Loading state while generating
-- Once generated: tabs for Flashcards / Test
+### Prep page (updated)
+- Shows prep title + creation date
+- "Generate" button → triggers dummy agent
+- Shows loading state with progress ("Generating questions…")
+- After generation: shows token count + latency as a subtle stat line
+- Tabs: **Cards** / **Quiz** / **Test**
+- Results section: list of past attempts with date, mode, score
 
-### Flashcard mode
-- One card at a time, tap/click to flip
+### Cards mode (adapt from existing project)
+- One card at a time, tap/click to flip front ↔ back
 - Previous / Next navigation
-- Simple card flip animation
+- Simple flip animation
 
-### Test mode
-- 10 questions (mix of MCQ and fill-in-the-blank)
-- One question per screen, Next button
-- At the end: score screen (X out of 10)
-- Score saved to `attempts` table
+### Quiz mode (adapt from existing project)
+- One question at a time (MCQ + fill)
+- Immediate feedback after each answer — correct/incorrect shown before Next
+- Progress indicator (3 of 10)
+- Summary screen at end (score + review of wrong answers)
+- Attempt saved to DB
+
+### Test mode (adapt from existing project)
+- 10 questions (MCQ + fill), no feedback during
+- One question per screen, answer locked on selection
+- Score screen at end (X out of 10)
+- Attempt saved to DB
 - "Try again" button
-
-### Score history (on session page)
-- List of past attempts: date + score
 
 ---
 
 ## Key Implementation Notes
 
-- Adapt question components from existing project — match to `content` JSON shape above
-- No quiz mode (one-at-a-time with feedback) in MVP — just flashcards + test
-- Flashcard mode uses all flashcard-type questions; test uses MCQ + fill
-- Keep generation behind a manual button — don't auto-trigger
+- Adapt question components from existing project — align to `content` JSON shape above
+- Agent wrapper is the most important deliverable here — it must be extensible for Phase 3
+- Keep generation behind a manual button — never auto-trigger
+- Quiz and Test use MCQ + fill questions; Cards use flashcard type only
 
 ---
 
 ## Deliverable
-User can generate questions for a session, flip flashcards, take a test, and see their score.
+User generates questions for a prep, studies with flashcards, takes a quiz with live feedback, takes a test for a final score — all saved to history.
