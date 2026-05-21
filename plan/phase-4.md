@@ -15,19 +15,28 @@ Make the product publicly usable for free users. Add Gemini support. Deploy to p
 
 Single endpoint: `POST /api/generate`
 
-- Accepts: `{ prep_id, raw_text, user_id }`
-- Runs the three-agent pipeline server-side using app's `OPENAI_API_KEY`
-- Returns: `{ questions[], title }`
-- App's key never exposed to browser
+### Request
+```
+Authorization: Bearer <supabase_jwt>
+Body: { prep_id }
+```
+
+User identity is extracted from the JWT server-side — never trusted from the request body.
+
+### Flow
+1. Verify JWT → extract `user_id`
+2. Check rate limit for `user_id` — return `429` if exceeded
+3. Fetch `raw_text` from `preps` table using `prep_id` + `user_id` (RLS enforced via service role)
+4. Run three-agent pipeline server-side using app's `OPENAI_API_KEY`
+5. Write generated `questions` and updated `title` directly to Supabase
+6. Increment usage counter
+7. Return `{ success: true }`
+
+Frontend receives `{ success: true }` and re-fetches questions and title from Supabase as normal — no payload in the response.
 
 ### Rate limiting
-- Simple DB-based counter per user per day
-- Add column to Supabase:
 
 ```sql
-alter table sessions add column generated_at timestamptz;
-
--- free_usage table
 create table free_usage (
   user_id uuid references auth.users primary key,
   date date not null default current_date,
@@ -36,11 +45,12 @@ create table free_usage (
 ```
 
 - Check + increment on each `/api/generate` call
-- Limit: **3 generations per user per day** (MVP — adjust based on cost)
+- Reset when `date` changes (next day)
+- Limit: **3 generations per user per day** (adjust based on cost)
 - Return `429` with a clear message when exceeded
 
 ### UI behaviour
-- Free users see remaining generations count ("2 of 3 left today")
+- Free users see remaining generations ("2 of 3 left today")
 - When limit hit: prompt to add their own API key (BYOK upsell)
 
 ---
@@ -49,10 +59,10 @@ create table free_usage (
 
 Add to settings screen:
 - Provider toggle: OpenAI | Gemini
-- Gemini API key input (stored in `localStorage` as `byok_gemini_key`)
-- Model selector: `gemini-1.5-flash` | `gemini-1.5-pro`
+- Gemini API key input (stored in `localStorage`)
+- Model selector: `gemini-3.x-flash` | `gemini-3.x-pro`
 
-Use Vercel AI SDK to abstract provider:
+Use Vercel AI SDK to abstract the provider — same pipeline, different model instance:
 
 ```ts
 import { google } from '@ai-sdk/google'
@@ -63,38 +73,41 @@ const model = provider === 'gemini'
   : openai(openaiModel, { apiKey: userKey })
 ```
 
-Same three-agent pipeline, different model instance.
-Gemini is BYOK only — not available on free tier.
+Gemini is BYOK only — not available on the free tier.
 
 ---
 
 ## Deploy
 
-### Vercel
-- Connect GitHub repo → auto-deploy on push to `main`
-- Environment variables:
-  - `OPENAI_API_KEY` — app's free-tier key
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY` — for server-side Supabase calls
+### Vercel environment variables
+- `OPENAI_API_KEY` — app's free-tier key (never exposed to browser)
+- `SUPABASE_URL` — project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — for server-side DB reads/writes (bypasses RLS safely)
+
+> Supabase requires two values (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`), not a single `DATABASE_URL`. The service role key is what allows the function to read any row — keep it server-side only.
 
 ### Supabase
 - Enable Google OAuth redirect URLs for production domain
 - Run all migrations on production project
 
 ### Checklist
-- [ ] Custom domain (optional)
-- [ ] Error tracking (Sentry free tier — optional)
+- [ ] Connect GitHub repo → auto-deploy on push to `main`
+- [ ] Set all env vars in Vercel dashboard
+- [ ] Enable Google OAuth for production domain in Supabase
 - [ ] Test free-tier rate limiting end-to-end
 - [ ] Test BYOK with both OpenAI and Gemini keys
 - [ ] Test on mobile browser (iOS Safari, Android Chrome)
+- [ ] Custom domain (optional)
+- [ ] Error tracking — Sentry free tier (optional)
 
 ---
 
 ## Key Implementation Notes
 
-- The agent pipeline code should be shared between browser (Phase 3) and server (Phase 4) — put it in a `lib/pipeline.ts` module
-- Vercel free tier: 100GB-hours/month — more than sufficient for MVP traffic
-- Do not store API keys server-side — Gemini BYOK stays browser-only
+- Agent pipeline lives in `lib/pipeline.ts` — shared between browser (Phase 3) and this function (Phase 4), only the model instantiation differs
+- The function reads from and writes to Supabase directly — frontend never receives question data from the function response
+- Vercel free tier: 100GB-hours/month — sufficient for MVP traffic
+- Gemini BYOK calls stay browser-only — never routed through the server
 
 ---
 
