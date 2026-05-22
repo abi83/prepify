@@ -3,17 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
+import type { PipelineProgressEvent } from '../types/pipeline'
 import { getApiKey } from '../lib/apiKey'
-import { runPrepContextAgent } from '../lib/agents/PrepContextAgent'
-import { runQuestionsAgent } from '../lib/agents/QuestionsAgent'
-import type { AgentMetrics } from '../lib/agent'
+import { runPipeline } from '../lib/pipeline'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
-import SettingsModal from '../components/SettingsModal'
 import styles from './PrepPage.module.css'
 
 type Tab = 'cards' | 'quiz' | 'test'
-type GenPhase = 'idle' | 'context' | 'approving' | 'generating' | 'done'
+type GenPhase = 'idle' | 'running' | 'done'
+
+function getProgressLabel(progress: PipelineProgressEvent | null): string {
+  if (!progress) return 'Starting…'
+  switch (progress.stage) {
+    case 'concepts': return 'Extracting concepts…'
+    case 'crafting': return `Crafting questions (${progress.done}/${progress.total})…`
+    case 'reviewing': return `Validating questions (${progress.done}/${progress.total})…`
+    case 'done': return 'Done'
+  }
+}
 
 export default function PrepPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,16 +35,14 @@ export default function PrepPage() {
   const [tab, setTab] = useState<Tab>('cards')
   const [activeAttempt, setActiveAttempt] = useState<Tab | null>(null)
 
-  // Generation state
   const [genPhase, setGenPhase] = useState<GenPhase>('idle')
-  const [draftTitle, setDraftTitle] = useState('')
-  const [draftDesc, setDraftDesc] = useState('')
-  const [metrics, setMetrics] = useState<{ context: AgentMetrics | null; questions: AgentMetrics | null }>({ context: null, questions: null })
+  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgressEvent | null>(null)
+  const [genMs, setGenMs] = useState(0)
+  const [totalTokens, setTotalTokens] = useState(0)
   const [genError, setGenError] = useState<string | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const genStartRef = useRef(0)
 
-  // Current user id
   const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -59,46 +65,39 @@ export default function PrepPage() {
 
   async function handleGenerate() {
     const keyConfig = getApiKey()
-    if (!keyConfig) { setShowSettings(true); return }
-
-    setGenError(null)
-    abortRef.current = new AbortController()
-
-    try {
-      // Step 1: summarize
-      setGenPhase('context')
-      const ctxResult = await runPrepContextAgent(prep!.raw_text, keyConfig.key, abortRef.current.signal)
-      setDraftTitle(ctxResult.output.title)
-      setDraftDesc(ctxResult.output.description)
-      setMetrics(m => ({ ...m, context: ctxResult.metrics }))
-      setGenPhase('approving')
-    } catch (e: unknown) {
-      if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
-      setGenPhase('idle')
+    if (!keyConfig) {
+      navigate('/settings', { state: { returnTo: `/preps/${id}` } })
+      return
     }
-  }
 
-  async function handleConfirmContext() {
-    const keyConfig = getApiKey()!
     setGenError(null)
-
-    // Save study_description + title to prep
-    await supabase.from('preps').update({ title: draftTitle, study_description: draftDesc }).eq('id', id!)
-    setPrep(p => p ? { ...p, title: draftTitle, study_description: draftDesc } : p)
+    setPipelineProgress(null)
+    abortRef.current = new AbortController()
+    genStartRef.current = performance.now()
+    setGenPhase('running')
 
     try {
-      setGenPhase('generating')
-      const qResult = await runQuestionsAgent(
-        { title: draftTitle, description: draftDesc, rawText: prep!.raw_text },
-        keyConfig.key,
-        abortRef.current?.signal
-      )
-      setMetrics(m => ({ ...m, questions: qResult.metrics }))
+      const result = await runPipeline({
+        rawText: prep!.raw_text,
+        apiKey: keyConfig.key,
+        model: keyConfig.model,
+        signal: abortRef.current.signal,
+        onProgress: (event) => setPipelineProgress(event),
+      })
 
-      // Save to DB
-      const rows = qResult.output.map(q => ({ prep_id: id!, type: q.type, content: q.content }))
+      const elapsed = Math.round(performance.now() - genStartRef.current)
+
+      const rows = result.questions.map(q => ({ prep_id: id!, type: q.type, content: q.content }))
       const { data: saved } = await supabase.from('questions').insert(rows).select()
       setQuestions((saved ?? []) as Question[])
+
+      if (result.prepTitle) {
+        await supabase.from('preps').update({ title: result.prepTitle }).eq('id', id!)
+        setPrep(p => p ? { ...p, title: result.prepTitle! } : p)
+      }
+
+      setGenMs(elapsed)
+      setTotalTokens(result.totalTokens)
       setGenPhase('done')
     } catch (e: unknown) {
       if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
@@ -108,7 +107,6 @@ export default function PrepPage() {
 
   function handleExitAttempt() {
     setActiveAttempt(null)
-    // Refresh attempts
     supabase.from('attempts').select('*').eq('prep_id', id!).order('created_at', { ascending: false })
       .then(({ data }) => setAttempts((data ?? []) as Attempt[]))
   }
@@ -125,7 +123,6 @@ export default function PrepPage() {
   const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== 'flashcard')
 
-  // If an attempt is in progress, show AttemptFlow full-screen within main
   if (activeAttempt && (activeAttempt === 'quiz' || activeAttempt === 'test') && userId) {
     return (
       <div className={styles.root}>
@@ -145,13 +142,11 @@ export default function PrepPage() {
     )
   }
 
-  const totalMs = (metrics.context?.latency_ms ?? 0) + (metrics.questions?.latency_ms ?? 0)
-  const totalTokens = (metrics.context?.total_tokens ?? 0) + (metrics.questions?.total_tokens ?? 0)
-
   return (
     <div className={styles.root}>
       <header className={styles.header}>
         <button className={styles.back} onClick={() => navigate('/preps')}>← My Preps</button>
+        <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
       </header>
 
       <main className={styles.main}>
@@ -163,7 +158,6 @@ export default function PrepPage() {
           )}
         </div>
 
-        {/* Raw text collapsible */}
         <div className={styles.textCard}>
           <div className={styles.textHeader}>
             <span className={styles.textLabel}>Extracted text</span>
@@ -176,7 +170,6 @@ export default function PrepPage() {
           </div>
         </div>
 
-        {/* Generation area */}
         {!hasQuestions && genPhase === 'idle' && (
           <div className={styles.generateArea}>
             <p className={styles.generateHint}>Generate study questions from this material.</p>
@@ -186,68 +179,34 @@ export default function PrepPage() {
           </div>
         )}
 
-        {genPhase === 'context' && (
+        {genPhase === 'running' && (
           <div className={styles.genStatus}>
             <div className={styles.spinner} />
-            <span>Summarising material…</span>
-          </div>
-        )}
-
-        {genPhase === 'approving' && (
-          <div className={styles.contextCard}>
-            <div className={styles.contextCardHeader}>
-              <span className={styles.textLabel}>Study context</span>
-              <span className={styles.contextHint}>Edit if needed, then confirm</span>
-            </div>
-            <div className={styles.contextFields}>
-              <input
-                className={styles.contextInput}
-                value={draftTitle}
-                onChange={e => setDraftTitle(e.target.value)}
-                placeholder="Title"
-              />
-              <textarea
-                className={styles.contextTextarea}
-                value={draftDesc}
-                onChange={e => setDraftDesc(e.target.value)}
-                placeholder="Description"
-                rows={3}
-              />
-            </div>
-            <div className={styles.contextActions}>
-              <button className={styles.cancelGenBtn} onClick={() => setGenPhase('idle')}>Cancel</button>
-              <button
-                className={styles.generateBtn}
-                onClick={handleConfirmContext}
-                disabled={!draftTitle.trim()}
-              >
-                Confirm &amp; generate questions
-              </button>
-            </div>
-          </div>
-        )}
-
-        {genPhase === 'generating' && (
-          <div className={styles.genStatus}>
-            <div className={styles.spinner} />
-            <span>Generating questions…</span>
+            <span>{getProgressLabel(pipelineProgress)}</span>
+            <button
+              className={styles.cancelGenBtn}
+              onClick={() => abortRef.current?.abort()}
+            >
+              Cancel
+            </button>
           </div>
         )}
 
         {genError && (
           <div className={styles.genError}>
             <strong>Error:</strong> {genError}
-            <button className={styles.retryBtn} onClick={() => setGenPhase('idle')}>Retry</button>
+            <button className={styles.retryBtn} onClick={() => { setGenError(null); setGenPhase('idle') }}>
+              Retry
+            </button>
           </div>
         )}
 
         {(genPhase === 'done' || hasQuestions) && totalTokens > 0 && (
           <div className={styles.statLine}>
-            Generated in {(totalMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
+            Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
           </div>
         )}
 
-        {/* Study tabs */}
         {hasQuestions && (
           <>
             <div className={styles.tabs}>
@@ -272,7 +231,11 @@ export default function PrepPage() {
               {tab === 'quiz' && (
                 <div className={styles.modeCard}>
                   <p className={styles.modeDesc}>Answer questions one at a time — get instant feedback after each.</p>
-                  <button className={styles.startBtn} onClick={() => setActiveAttempt('quiz')} disabled={studyQuestions.length === 0}>
+                  <button
+                    className={styles.startBtn}
+                    onClick={() => setActiveAttempt('quiz')}
+                    disabled={studyQuestions.length === 0}
+                  >
                     Start Quiz ({studyQuestions.length} questions)
                   </button>
                 </div>
@@ -281,14 +244,17 @@ export default function PrepPage() {
               {tab === 'test' && (
                 <div className={styles.modeCard}>
                   <p className={styles.modeDesc}>Answer all questions without hints — results revealed at the end.</p>
-                  <button className={styles.startBtn} onClick={() => setActiveAttempt('test')} disabled={studyQuestions.length === 0}>
+                  <button
+                    className={styles.startBtn}
+                    onClick={() => setActiveAttempt('test')}
+                    disabled={studyQuestions.length === 0}
+                  >
                     Start Test ({studyQuestions.length} questions)
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Attempts history */}
             {attempts.length > 0 && (
               <div className={styles.history}>
                 <h3 className={styles.historyTitle}>Attempt history</h3>
@@ -308,8 +274,6 @@ export default function PrepPage() {
           </>
         )}
       </main>
-
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

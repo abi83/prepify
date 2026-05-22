@@ -19,6 +19,7 @@ interface RunAgentConfig<T> {
   userPrompt: string
   schema: ZodSchema<T>
   apiKey: string
+  model?: string
   signal?: AbortSignal
 }
 
@@ -43,7 +44,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userPrompt, schema, apiKey, signal } = config
+  const { name, systemPrompt, userPrompt, schema, apiKey, model = 'gpt-5-nano', signal } = config
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -55,7 +56,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
     try {
       const response = await client.chat.completions.create(
         {
-          model: 'gpt-5-nano',
+          model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
