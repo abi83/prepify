@@ -1,0 +1,120 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.scoreLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.scoreValue {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scoreValue.good { color: var(--success); }
+.scoreValue.bad { color: var(--danger); }
+
+.fraction {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.reviewSection h3 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+
+.reviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reviewItem {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reviewItem.correct { border-color: var(--success); }
+.reviewItem.incorrect { border-color: var(--danger); }
+
+.reviewItemHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reviewResult {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.reviewResult.correct {
+  background: rgba(99, 214, 141, 0.15);
+  color: var(--success);
+}
+
+.reviewResult.incorrect {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--danger);
+}
+
+.reviewQuestion {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+}
+
+.exitBtn {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 11px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.exitBtn:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}

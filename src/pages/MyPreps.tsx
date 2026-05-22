@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import UploadModal from '../components/UploadModal'
+import SettingsModal from '../components/SettingsModal'
 import styles from './MyPreps.module.css'
 
 export default function MyPreps() {
   const [preps, setPreps] = useState<Prep[]>([])
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -38,7 +40,10 @@ export default function MyPreps() {
     <div className={styles.root}>
       <header className={styles.header}>
         <span className={styles.logo}>Prepify</span>
-        <button className={styles.signOut} onClick={signOut}>Sign out</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button className={styles.signOut} onClick={() => setShowSettings(true)} title="Settings">⚙</button>
+          <button className={styles.signOut} onClick={signOut}>Sign out</button>
+        </div>
       </header>
 
       <main className={styles.main}>
@@ -76,6 +81,9 @@ export default function MyPreps() {
 
       {showUpload && (
         <UploadModal onClose={() => setShowUpload(false)} onDone={handleDone} />
+      )}
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </div>
   )
