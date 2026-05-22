@@ -8,6 +8,7 @@ Replace the dummy agent with a proper multi-agent pipeline. Full BYOK settings s
 - Three-agent pipeline running in-browser (OpenAI only)
 - Per-question parallel execution in configurable batches
 - Prep naming via LLM
+- OCR language selection
 
 ---
 
@@ -22,6 +23,18 @@ Full settings page (replaces the modal from Phase 2):
 - Token usage summary (total tokens consumed across all preps)
 
 No Gemini yet — Phase 4.
+
+---
+
+## OCR Language Selection
+
+Add a language picker to the Upload Modal:
+
+- Dropdown with common languages (English, Spanish, French, German, Russian, Chinese Simplified, Japanese, Korean, Arabic)
+- Default: browser locale (`navigator.language`), fallback to English
+- Selected language stored in `localStorage` so it persists across uploads
+- Tesseract loads the matching `.traineddata` file (~3MB per language, cached after first use)
+- Multiple languages supported via `'eng+fra'` syntax for mixed-language pages
 
 ---
 

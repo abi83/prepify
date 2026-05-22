@@ -1,0 +1,147 @@
+.root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.signOut {
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.signOut:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.main {
+  flex: 1;
+  padding: 40px 24px;
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleRow h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.newBtn {
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.newBtn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 80px 24px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.empty p {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.emptyHint {
+  font-size: 0.88rem !important;
+  color: var(--text-muted);
+  font-weight: 400 !important;
+  max-width: 300px;
+  margin-bottom: 8px;
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  gap: 16px;
+}
+
+.item:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.itemTitle {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.itemDate {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
