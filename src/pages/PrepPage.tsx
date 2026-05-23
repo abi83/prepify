@@ -17,6 +17,7 @@ function getProgressLabel(progress: PipelineProgressEvent | null): string {
   if (!progress) return 'Starting…'
   switch (progress.stage) {
     case 'concepts': return 'Extracting concepts…'
+    case 'resuming': return `Resuming from slot ${progress.done}/${progress.total}…`
     case 'crafting': return `Crafting questions (${progress.done}/${progress.total})…`
     case 'reviewing': return `Validating questions (${progress.done}/${progress.total})…`
     case 'done': return 'Done'
@@ -78,6 +79,7 @@ export default function PrepPage() {
 
     try {
       const result = await runPipeline({
+        prepId: id!,
         rawText: prep!.raw_text,
         apiKey: keyConfig.key,
         model: keyConfig.model,
