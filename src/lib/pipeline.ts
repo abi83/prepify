@@ -10,6 +10,13 @@ import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipe
 import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
 import { addTokenUsage } from './tokenUsage'
+import {
+  loadOrCreateRun,
+  saveConcepts,
+  saveQuestionTasksAndInitSlots,
+  saveQuestionSlot,
+  deleteRun,
+} from './pipelineStore'
 
 const BATCH_SIZE = 5
 
@@ -57,7 +64,6 @@ function buildQuestionTasks(concepts: Concept[]): QuestionTask[] {
   const MAX_PER_CONCEPT = Math.max(2, Math.ceil(types.length / Math.min(sorted.length, 5)))
 
   for (const type of types) {
-    // Prefer concepts that haven't hit the per-concept cap yet
     const capped = new Set(
       [...conceptCounts.entries()]
         .filter(([, count]) => count >= MAX_PER_CONCEPT)
@@ -74,7 +80,6 @@ function buildQuestionTasks(concepts: Concept[]): QuestionTask[] {
     const top = sorted[i]
     if (tasks.some(t => t.concept.name === top.name)) continue
 
-    // Replace a task whose concept appears most often (least coverage-critical)
     const counts = new Map<string, number>()
     tasks.forEach(t => counts.set(t.concept.name, (counts.get(t.concept.name) ?? 0) + 1))
 
@@ -119,6 +124,7 @@ export interface PipelineResult {
 }
 
 export interface PipelineConfig {
+  prepId: string
   rawText: string
   apiKey: string
   model: string
@@ -127,18 +133,50 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { rawText, apiKey, model, signal, onProgress } = config
+  const { prepId, rawText, apiKey, model, signal, onProgress } = config
   let totalTokens = 0
 
-  // Stage 1: Extract concepts
-  onProgress({ stage: 'concepts' })
-  const { output: concepts, metrics: conceptMetrics } = await runConceptExtractor(
-    rawText, apiKey, model, signal
-  )
-  totalTokens += conceptMetrics.total_tokens
+  // Load or create a persistent run record for crash recovery
+  const state = await loadOrCreateRun(prepId)
+  const { runId } = state
 
-  // Build question tasks (deterministic mixer)
-  const tasks = buildQuestionTasks(concepts)
+  // Stage 1: Extract concepts (skip if already stored)
+  let concepts: Concept[]
+  if (state.concepts) {
+    concepts = state.concepts
+  } else {
+    onProgress({ stage: 'concepts' })
+    const { output, metrics } = await runConceptExtractor(rawText, apiKey, model, signal)
+    totalTokens += metrics.total_tokens
+    concepts = output
+    await saveConcepts(runId, concepts)
+  }
+
+  // Stage 2: Build question tasks (skip if already stored)
+  let tasks: QuestionTask[]
+  if (state.questionTasks) {
+    tasks = state.questionTasks
+    // Re-init slots if they were lost (edge case: crashed between saving tasks and inserting slots)
+    if (state.questionSlots.size === 0) {
+      await saveQuestionTasksAndInitSlots(runId, tasks)
+      for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
+    }
+  } else {
+    tasks = buildQuestionTasks(concepts)
+    await saveQuestionTasksAndInitSlots(runId, tasks)
+    for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
+  }
+
+  // Populate already-built questions from stored slots
+  const builtQuestions = new Map<number, GeneratedQuestion>(
+    [...state.questionSlots.entries()]
+      .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
+  )
+
+  const resumedCount = builtQuestions.size
+  if (resumedCount > 0) {
+    onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
+  }
 
   // Start naming in parallel — non-critical, failure is silently ignored
   let prepTitle: string | null = null
@@ -146,51 +184,65 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .then(r => { prepTitle = r.output.title; totalTokens += r.metrics.total_tokens })
     .catch(() => null)
 
-  // Stage 2: Build + review questions in batches
-  const questions: GeneratedQuestion[] = []
-  let craftDone = 0
-  let reviewDone = 0
+  // Stage 3: Build + review missing question slots in batches
+  const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
 
-  onProgress({ stage: 'crafting', done: 0, total: tasks.length })
+  let craftDone = resumedCount
+  let reviewDone = resumedCount
 
-  for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+  onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
+
+  for (let b = 0; b < missingIndices.length; b += BATCH_SIZE) {
     if (signal?.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' })
 
-    const batch = tasks.slice(i, i + BATCH_SIZE)
+    const batchIndices = missingIndices.slice(b, b + BATCH_SIZE)
+    const batchTasks = batchIndices.map(i => tasks[i])
 
     // Build batch in parallel
     const buildResults = await Promise.all(
-      batch.map(task => BUILDERS[task.type](task, rawText, apiKey, model, signal))
+      batchTasks.map(task => BUILDERS[task.type](task, rawText, apiKey, model, signal))
     )
-    craftDone += batch.length
+    craftDone += batchTasks.length
     buildResults.forEach(r => { totalTokens += r.metrics.total_tokens })
     onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-    // Review batch in parallel
+    // Review batch in parallel, persist each result
     const reviewedResults = await Promise.all(
       buildResults.map(async (buildResult, j) => {
+        const taskIdx = batchIndices[j]
         const reviewed = await runQuestionReviewer(
-          buildResult.output, batch[j].concept, apiKey, model, signal
+          buildResult.output, batchTasks[j].concept, apiKey, model, signal
         )
         totalTokens += reviewed.metrics.total_tokens
 
+        let question: GeneratedQuestion
         if (reviewed.output.question === null) {
           // Retry build once on rejection
-          const retry = await BUILDERS[batch[j].type](batch[j], rawText, apiKey, model, signal)
+          const retry = await BUILDERS[batchTasks[j].type](batchTasks[j], rawText, apiKey, model, signal)
           totalTokens += retry.metrics.total_tokens
-          return retry.output
+          question = retry.output
+        } else {
+          question = reviewed.output.question
         }
-        return reviewed.output.question
+
+        await saveQuestionSlot(runId, taskIdx, question)
+        return question
       })
     )
-    reviewDone += batch.length
+    reviewDone += batchTasks.length
     onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
 
-    questions.push(...reviewedResults)
+    reviewedResults.forEach((q, j) => builtQuestions.set(batchIndices[j], q))
   }
 
   await namingPromise
   onProgress({ stage: 'done' })
+
+  // Assemble questions in original task order
+  const questions = tasks.map((_, i) => builtQuestions.get(i)!)
+
+  // Clean up pipeline state now that questions will be persisted to the questions table
+  await deleteRun(prepId)
 
   addTokenUsage(totalTokens)
   return { questions, prepTitle, totalTokens }

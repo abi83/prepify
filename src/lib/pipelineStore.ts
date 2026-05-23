@@ -1,0 +1,78 @@
+import { supabase } from './supabase'
+import type { Concept, QuestionTask } from '../types/pipeline'
+import type { GeneratedQuestion } from '../types/questions'
+
+export interface PipelineRunState {
+  runId: string
+  concepts: Concept[] | null
+  questionTasks: QuestionTask[] | null
+  // Map from task_index → built question (null means not yet built)
+  questionSlots: Map<number, GeneratedQuestion | null>
+}
+
+export async function loadOrCreateRun(prepId: string): Promise<PipelineRunState> {
+  const { data: existing } = await supabase
+    .from('pipeline_runs')
+    .select('id, concepts, question_tasks')
+    .eq('prep_id', prepId)
+    .maybeSingle()
+
+  if (existing) {
+    const { data: slots } = await supabase
+      .from('pipeline_questions')
+      .select('task_index, question')
+      .eq('run_id', existing.id)
+      .order('task_index')
+
+    const questionSlots = new Map<number, GeneratedQuestion | null>(
+      (slots ?? []).map(s => [s.task_index, s.question as GeneratedQuestion | null])
+    )
+
+    return {
+      runId: existing.id,
+      concepts: existing.concepts as Concept[] | null,
+      questionTasks: existing.question_tasks as QuestionTask[] | null,
+      questionSlots,
+    }
+  }
+
+  const { data: created, error } = await supabase
+    .from('pipeline_runs')
+    .insert({ prep_id: prepId })
+    .select('id')
+    .single()
+
+  if (!created) throw new Error(`Failed to create pipeline run: ${error?.message}`)
+
+  return { runId: created.id, concepts: null, questionTasks: null, questionSlots: new Map() }
+}
+
+export async function saveConcepts(runId: string, concepts: Concept[]) {
+  await supabase
+    .from('pipeline_runs')
+    .update({ concepts, updated_at: new Date().toISOString() })
+    .eq('id', runId)
+}
+
+export async function saveQuestionTasksAndInitSlots(runId: string, tasks: QuestionTask[]) {
+  await supabase
+    .from('pipeline_runs')
+    .update({ question_tasks: tasks, updated_at: new Date().toISOString() })
+    .eq('id', runId)
+
+  const rows = tasks.map((task, i) => ({ run_id: runId, task_index: i, task, question: null }))
+  await supabase.from('pipeline_questions').insert(rows)
+}
+
+export async function saveQuestionSlot(runId: string, taskIndex: number, question: GeneratedQuestion) {
+  await supabase
+    .from('pipeline_questions')
+    .update({ question })
+    .eq('run_id', runId)
+    .eq('task_index', taskIndex)
+}
+
+export async function deleteRun(prepId: string) {
+  // pipeline_questions cascade-delete via FK on delete cascade
+  await supabase.from('pipeline_runs').delete().eq('prep_id', prepId)
+}
