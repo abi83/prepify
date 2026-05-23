@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import Tesseract from 'tesseract.js'
 import { supabase } from '../lib/supabase'
+import { getOcrLanguage, setOcrLanguage, OCR_LANGUAGES } from '../lib/ocrLanguage'
 import styles from './UploadModal.module.css'
 
 type Props = {
@@ -15,6 +16,13 @@ export default function UploadModal({ onClose, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
+  const [language, setLanguage] = useState(getOcrLanguage)
+
+  function handleLanguageChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const code = e.target.value
+    setLanguage(code)
+    setOcrLanguage(code)
+  }
 
   async function handleFile(file: File) {
     setPhase('ocr')
@@ -22,7 +30,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
     let rawText = ''
     try {
-      const worker = await Tesseract.createWorker('eng', 1, {
+      const worker = await Tesseract.createWorker(language, 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') {
             setProgress(Math.round(m.progress * 100))
@@ -95,24 +103,40 @@ export default function UploadModal({ onClose, onDone }: Props) {
         </div>
 
         {phase === 'idle' && (
-          <div
-            className={styles.dropzone}
-            onClick={() => inputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-          >
-            <span className={styles.dropIcon}>📄</span>
-            <p className={styles.dropMain}>Upload a photo of a textbook page</p>
-            <p className={styles.dropSub}>Tap to select · or drag & drop</p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: 'none' }}
-              onChange={handleChange}
-            />
-          </div>
+          <>
+            <div className={styles.langRow}>
+              <label className={styles.langLabel} htmlFor="ocr-lang">Language</label>
+              <select
+                id="ocr-lang"
+                className={styles.langSelect}
+                value={language}
+                onChange={handleLanguageChange}
+              >
+                {OCR_LANGUAGES.map(l => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              className={styles.dropzone}
+              onClick={() => inputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={e => e.preventDefault()}
+            >
+              <span className={styles.dropIcon}>📄</span>
+              <p className={styles.dropMain}>Upload a photo of a textbook page</p>
+              <p className={styles.dropSub}>Tap to select · or drag & drop</p>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleChange}
+              />
+            </div>
+          </>
         )}
 
         {phase === 'ocr' && (

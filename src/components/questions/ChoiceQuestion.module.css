@@ -1,0 +1,103 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  width: 100%;
+  background: var(--surface);
+}
+
+.option:hover:not(.disabled) {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.option.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.option.correct {
+  border-color: var(--success);
+  background: rgba(99, 214, 141, 0.08);
+}
+
+.option.incorrect {
+  border-color: var(--danger);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.option.disabled {
+  cursor: default;
+}
+
+.badge {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.option.selected .badge {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.option.correct .badge {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.option.incorrect .badge {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.optionBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.optionText {
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.explanation {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.explanation.correct { color: var(--success); }
+.explanation.incorrect { color: var(--danger); }

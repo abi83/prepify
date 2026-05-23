@@ -143,3 +143,35 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.langRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.langLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.langSelect {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+  max-width: 240px;
+  transition: border-color 0.15s;
+}
+
+.langSelect:focus {
+  border-color: var(--accent);
+}
