@@ -15,5 +15,6 @@ export type Prep = {
   user_id: string
   title: string
   raw_text: string
+  study_description: string | null
   created_at: string
 }

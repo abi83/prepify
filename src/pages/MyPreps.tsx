@@ -38,7 +38,10 @@ export default function MyPreps() {
     <div className={styles.root}>
       <header className={styles.header}>
         <span className={styles.logo}>Prepify</span>
-        <button className={styles.signOut} onClick={signOut}>Sign out</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button className={styles.signOut} onClick={() => navigate('/settings')} title="Settings">⚙</button>
+          <button className={styles.signOut} onClick={signOut}>Sign out</button>
+        </div>
       </header>
 
       <main className={styles.main}>

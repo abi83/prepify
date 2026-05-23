@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import Home from './pages/Home'
 import MyPreps from './pages/MyPreps'
 import PrepPage from './pages/PrepPage'
+import SettingsPage from './pages/SettingsPage'
 
 function AuthGuard({ session, children }: { session: Session | null; children: React.ReactNode }) {
   if (!session) return <Navigate to="/" replace />
@@ -50,6 +51,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key`}
         <Route path="/" element={session ? <Navigate to="/preps" replace /> : <Home />} />
         <Route path="/preps" element={<AuthGuard session={session}><MyPreps /></AuthGuard>} />
         <Route path="/preps/:id" element={<AuthGuard session={session}><PrepPage /></AuthGuard>} />
+        <Route path="/settings" element={<AuthGuard session={session}><SettingsPage /></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
