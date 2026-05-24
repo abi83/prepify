@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { zodResponseFormat } from 'openai/helpers/zod'
 import { ZodSchema } from 'zod'
 
 export interface AgentMetrics {
@@ -61,7 +62,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          response_format: { type: 'json_object' },
+          response_format: zodResponseFormat(schema, config.name),
           service_tier: 'flex',
         },
         { signal }
@@ -73,19 +74,9 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const rawText = response.choices[0]?.message?.content ?? ''
       const parsed = JSON.parse(rawText)
 
-      // Zod validation — unwrap top-level wrapper keys if schema expects array
-      let validated: T
-      try {
-        validated = schema.parse(parsed)
-      } catch {
-        // If schema is an array schema, try common wrapper keys
-        const wrapper = parsed.questions ?? parsed.items ?? parsed.data ?? parsed.flashcards
-        if (wrapper !== undefined) {
-          validated = schema.parse(wrapper)
-        } else {
-          throw new Error(`Response failed schema validation: ${JSON.stringify(parsed).slice(0, 200)}`)
-        }
-      }
+      // Zod validation — model is constrained to match the schema via Structured Outputs,
+      // so this is a cheap type-safety assertion rather than a real fallback path.
+      const validated = schema.parse(parsed)
 
       const metrics: AgentMetrics = {
         latency_ms,
