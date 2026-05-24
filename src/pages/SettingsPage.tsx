@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import OpenAI from 'openai'
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '../lib/apiKey'
 import type { ModelId } from '../lib/apiKey'
+import { estimateCost, formatCost } from '../lib/apiKey'
 import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from '../lib/generationConfig'
 import type { GenerationConfig } from '../lib/generationConfig'
 import type { QuestionType } from '../types/questions'
-import { getTotalTokens, clearTokenUsage } from '../lib/tokenUsage'
+import { getTotalTokensFromDb } from '../lib/tokenUsage'
 import styles from './SettingsPage.module.css'
 
 type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
@@ -34,7 +35,7 @@ export default function SettingsPage() {
       setKeyValue(existing.key)
       setModel(existing.model)
     }
-    setTotalTokens(getTotalTokens())
+      getTotalTokensFromDb().then(setTotalTokens)
   }, [])
 
   function handleGenConfigSave() {
@@ -230,16 +231,16 @@ export default function SettingsPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Usage</h2>
           <div className={styles.usageLine}>
-            <span className={styles.usageLabel}>Total tokens consumed (all generations)</span>
+            <span className={styles.usageLabel}>Total tokens (all preps)</span>
             <span className={styles.usageValue}>{totalTokens.toLocaleString()}</span>
           </div>
-          {totalTokens > 0 && (
-            <button
-              className={styles.clearUsageBtn}
-              onClick={() => { clearTokenUsage(); setTotalTokens(0) }}
-            >
-              Reset counter
-            </button>
+          {totalTokens > 0 && model && (
+            <div className={styles.usageLine}>
+              <span className={styles.usageLabel}>Estimated cost ({model})</span>
+              <span className={styles.usageValue}>
+                ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model))}
+              </span>
+            </div>
           )}
         </section>
       </main>
