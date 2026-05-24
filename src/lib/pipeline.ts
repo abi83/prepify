@@ -130,10 +130,12 @@ export interface PipelineConfig {
   model: string
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
+  /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
+  onTitleReady?: (title: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, rawText, apiKey, model, signal, onProgress } = config
+  const { prepId, rawText, apiKey, model, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
   // Load or create a persistent run record for crash recovery
@@ -178,10 +180,16 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
   }
 
-  // Start naming in parallel — non-critical, failure is silently ignored
+  // Start naming in parallel — non-critical, failure is silently ignored.
+  // onTitleReady fires immediately when naming finishes so the title is saved
+  // even if the pipeline is cancelled later.
   let prepTitle: string | null = null
   const namingPromise = runPrepNamer(concepts, apiKey, model, signal)
-    .then(r => { prepTitle = r.output.title; totalTokens += r.metrics.total_tokens })
+    .then(r => {
+      prepTitle = r.output.title
+      totalTokens += r.metrics.total_tokens
+      onTitleReady?.(r.output.title)
+    })
     .catch(() => null)
 
   // Stage 3: Build + review missing question slots in batches.

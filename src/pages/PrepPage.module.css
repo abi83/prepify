@@ -177,6 +177,80 @@
   font-size: 0.9rem;
 }
 
+/* ── Pipeline checklist ── */
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checklistRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.checklistIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.iconDone {
+  color: var(--accent);
+}
+
+.iconRunning {
+  color: var(--text-muted);
+}
+
+.iconPending {
+  color: var(--border);
+}
+
+.checklistLabel {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.labelMuted {
+  color: var(--text-muted);
+}
+
+.checklistDetail {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.checklistActions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Small inline pulse dot for "running" state */
+.dotPulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+
 .contextCard {
   background: var(--surface);
   border: 1px solid var(--border);

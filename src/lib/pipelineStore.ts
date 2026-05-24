@@ -77,3 +77,33 @@ export async function deleteRun(prepId: string) {
   // pipeline_questions cascade-delete via FK on delete cascade
   await supabase.from('pipeline_runs').delete().eq('prep_id', prepId)
 }
+
+// ── Read-only summary for the UI (no side effects) ──────────────────────────
+
+export interface PartialRunSummary {
+  hasConcepts: boolean
+  totalTasks: number      // 0 until task list is built
+  completedSlots: number  // non-null question slots (craft+review both done)
+}
+
+export async function getExistingRunSummary(prepId: string): Promise<PartialRunSummary | null> {
+  const { data: run } = await supabase
+    .from('pipeline_runs')
+    .select('id, concepts, question_tasks')
+    .eq('prep_id', prepId)
+    .maybeSingle()
+
+  if (!run) return null
+
+  const { count } = await supabase
+    .from('pipeline_questions')
+    .select('*', { count: 'exact', head: true })
+    .eq('run_id', run.id)
+    .not('question', 'is', null)
+
+  return {
+    hasConcepts: run.concepts !== null,
+    totalTasks: Array.isArray(run.question_tasks) ? (run.question_tasks as unknown[]).length : 0,
+    completedSlots: count ?? 0,
+  }
+}
