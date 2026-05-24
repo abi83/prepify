@@ -64,6 +64,11 @@
   color: var(--text-muted);
 }
 
+.tokensBadge {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .textCard {
   background: var(--surface);
   border: 1px solid var(--border);
