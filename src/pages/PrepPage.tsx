@@ -30,11 +30,16 @@ function rowsFromProgress(
   progress: PipelineProgressEvent | null,
   craft: { done: number; total: number } | null,
   review: { done: number; total: number } | null,
+  titleReady: boolean,
 ): ChecklistRowData[] {
   const stage = progress?.stage ?? null
 
   const conceptsDone = stage !== null && stage !== 'concepts'
   const conceptsRunning = stage === 'concepts' || stage === null
+
+  // Naming runs in parallel with question building (starts after concepts)
+  const namingActive = conceptsDone && stage !== 'done'
+  const namingDone = titleReady || stage === 'done'
 
   const craftingDone = stage === 'reviewing' || stage === 'done'
   const craftingRunning = stage === 'crafting' || stage === 'resuming'
@@ -46,6 +51,10 @@ function rowsFromProgress(
     {
       label: 'Extract educational concepts',
       status: conceptsDone ? 'done' : conceptsRunning ? 'running' : 'pending',
+    },
+    {
+      label: 'Name the prep',
+      status: namingDone ? 'done' : namingActive ? 'running' : 'pending',
     },
     {
       label: 'Craft questions',
@@ -60,18 +69,25 @@ function rowsFromProgress(
   ]
 }
 
+const DEFAULT_TITLE_RE = /^Prep #\d+$/
+
 /** Derives checklist rows from stored DB state (idle / resume prompt). */
-function rowsFromSummary(s: PartialRunSummary): ChecklistRowData[] {
+function rowsFromSummary(s: PartialRunSummary, prepTitle: string): ChecklistRowData[] {
   const total = s.totalTasks || 10
   const n = s.completedSlots
+  const titled = !DEFAULT_TITLE_RE.test(prepTitle)
   return [
     {
       label: 'Extract educational concepts',
       status: s.hasConcepts ? 'done' : 'pending',
     },
     {
+      label: 'Name the prep',
+      status: titled ? 'done' : 'pending',
+    },
+    {
       label: 'Craft questions',
-      status: n > 0 ? 'done' : s.hasConcepts ? 'pending' : 'pending',
+      status: n > 0 ? 'done' : 'pending',
       detail: s.totalTasks > 0 ? `${n}/${total}` : undefined,
     },
     {
@@ -122,6 +138,7 @@ export default function PrepPage() {
   const [pipelineProgress, setPipelineProgress] = useState<PipelineProgressEvent | null>(null)
   const [craftProgress, setCraftProgress] = useState<{ done: number; total: number } | null>(null)
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null)
+  const [titleReady, setTitleReady] = useState(false)
   const [runSummary, setRunSummary] = useState<PartialRunSummary | null>(null)
   const [genMs, setGenMs] = useState(0)
   const [totalTokens, setTotalTokens] = useState(0)
@@ -168,6 +185,7 @@ export default function PrepPage() {
     setPipelineProgress(null)
     setCraftProgress(null)
     setReviewProgress(null)
+    setTitleReady(false)
     abortRef.current = new AbortController()
     genStartRef.current = performance.now()
     setGenPhase('running')
@@ -187,6 +205,7 @@ export default function PrepPage() {
         onTitleReady: (title) => {
           supabase.from('preps').update({ title }).eq('id', id!)
           setPrep(p => p ? { ...p, title } : p)
+          setTitleReady(true)
         },
       })
 
@@ -249,9 +268,9 @@ export default function PrepPage() {
 
   // Checklist rows for the current state
   const checklistRows = isRunning
-    ? rowsFromProgress(pipelineProgress, craftProgress, reviewProgress)
+    ? rowsFromProgress(pipelineProgress, craftProgress, reviewProgress, titleReady)
     : hasPartialRun
-    ? rowsFromSummary(runSummary)
+    ? rowsFromSummary(runSummary, prep.title)
     : null
 
   return (
