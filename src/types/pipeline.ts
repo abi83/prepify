@@ -21,6 +21,7 @@ export interface QuestionTask {
 
 export type PipelineProgressEvent =
   | { stage: 'concepts' }
+  | { stage: 'resuming'; done: number; total: number }
   | { stage: 'crafting'; done: number; total: number }
   | { stage: 'reviewing'; done: number; total: number }
   | { stage: 'done' }
