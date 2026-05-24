@@ -11,6 +11,7 @@ import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
 import { addTokenUsage } from './tokenUsage'
 import { buildQuestionTasks } from './taskBuilder'
+import { DEFAULT_GEN_CONFIG } from './generationConfig'
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -78,6 +79,10 @@ export interface PipelineConfig {
   rawText: string
   apiKey: string
   model: string
+  /** Target number of questions to generate (default 10, range 5–20). */
+  questionCount?: number
+  /** Which question types to include (default: all five types). */
+  enabledTypes?: QuestionType[]
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
   /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
@@ -85,7 +90,7 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, rawText, apiKey, model, signal, onProgress, onTitleReady } = config
+  const { prepId, rawText, apiKey, model, questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
   // Load or create a persistent run record for crash recovery
@@ -114,7 +119,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
     }
   } else {
-    tasks = buildQuestionTasks(concepts)
+    tasks = buildQuestionTasks(concepts, {
+      questionCount: questionCount ?? DEFAULT_GEN_CONFIG.questionCount,
+      enabledTypes: enabledTypes ?? DEFAULT_GEN_CONFIG.enabledTypes,
+    })
     await saveQuestionTasksAndInitSlots(runId, tasks)
     for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
   }

@@ -3,6 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import OpenAI from 'openai'
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '../lib/apiKey'
 import type { ModelId } from '../lib/apiKey'
+import {
+  getGenerationConfig, setGenerationConfig,
+  ALL_QUESTION_TYPES, TYPE_LABELS,
+} from '../lib/generationConfig'
+import type { GenerationConfig } from '../lib/generationConfig'
+import type { QuestionType } from '../types/questions'
 import { getTotalTokens, clearTokenUsage } from '../lib/tokenUsage'
 import styles from './SettingsPage.module.css'
 
@@ -19,6 +25,9 @@ export default function SettingsPage() {
   const [testState, setTestState] = useState<TestState>('idle')
   const [totalTokens, setTotalTokens] = useState(0)
 
+  const [genConfig, setGenConfig] = useState<GenerationConfig>(() => getGenerationConfig())
+  const [genConfigSaved, setGenConfigSaved] = useState(false)
+
   useEffect(() => {
     const existing = getApiKey()
     if (existing) {
@@ -27,6 +36,25 @@ export default function SettingsPage() {
     }
     setTotalTokens(getTotalTokens())
   }, [])
+
+  function handleGenConfigSave() {
+    setGenerationConfig(genConfig)
+    setGenConfigSaved(true)
+    setTimeout(() => setGenConfigSaved(false), 1500)
+  }
+
+  function toggleType(type: QuestionType) {
+    setGenConfig(prev => {
+      const already = prev.enabledTypes.includes(type)
+      if (already && prev.enabledTypes.length === 1) return prev // enforce at-least-1
+      return {
+        ...prev,
+        enabledTypes: already
+          ? prev.enabledTypes.filter(t => t !== type)
+          : [...prev.enabledTypes, type],
+      }
+    })
+  }
 
   function handleSave() {
     if (!keyValue.trim()) return
@@ -145,6 +173,58 @@ export default function SettingsPage() {
           {testState === 'error' && (
             <p className={styles.testError}>Connection failed — check your internet connection.</p>
           )}
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Generation defaults</h2>
+          <p className={styles.hint}>
+            These apply to all new generations. You can override them per prep before hitting Generate.
+          </p>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Questions per prep</label>
+            <input
+              type="number"
+              className={styles.input}
+              min={5}
+              max={20}
+              value={genConfig.questionCount}
+              onChange={e => setGenConfig(prev => ({
+                ...prev,
+                questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
+              }))}
+              style={{ maxWidth: 90 }}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Question types</label>
+            <div className={styles.typeToggles}>
+              {ALL_QUESTION_TYPES.map(type => {
+                const isOnly = genConfig.enabledTypes.includes(type) && genConfig.enabledTypes.length === 1
+                return (
+                  <label
+                    key={type}
+                    className={`${styles.typeToggle} ${isOnly ? styles.typeToggleOnly : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={genConfig.enabledTypes.includes(type)}
+                      disabled={isOnly}
+                      onChange={() => toggleType(type)}
+                    />
+                    {TYPE_LABELS[type]}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.saveBtn} onClick={handleGenConfigSave}>
+              {genConfigSaved ? '✓ Saved' : 'Save defaults'}
+            </button>
+          </div>
         </section>
 
         <section className={styles.section}>
