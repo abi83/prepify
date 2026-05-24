@@ -184,7 +184,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .then(r => { prepTitle = r.output.title; totalTokens += r.metrics.total_tokens })
     .catch(() => null)
 
-  // Stage 3: Build + review missing question slots in batches
+  // Stage 3: Build + review missing question slots in batches.
+  // allSettled is used at each phase so a single bad LLM response (schema validation
+  // failure, network blip) only kills that slot — the rest of the batch still saves
+  // and is skipped on the next run.
   const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
 
   let craftDone = resumedCount
@@ -198,26 +201,28 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const batchIndices = missingIndices.slice(b, b + BATCH_SIZE)
     const batchTasks = batchIndices.map(i => tasks[i])
 
-    // Build batch in parallel
-    const buildResults = await Promise.all(
+    // Build batch — failures are isolated per slot
+    const buildSettled = await Promise.allSettled(
       batchTasks.map(task => BUILDERS[task.type](task, rawText, apiKey, model, signal))
     )
     craftDone += batchTasks.length
-    buildResults.forEach(r => { totalTokens += r.metrics.total_tokens })
+    buildSettled.forEach(r => { if (r.status === 'fulfilled') totalTokens += r.value.metrics.total_tokens })
     onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-    // Review batch in parallel, persist each result
-    const reviewedResults = await Promise.all(
-      buildResults.map(async (buildResult, j) => {
+    // Review + persist each slot — failures are isolated per slot
+    const reviewSettled = await Promise.allSettled(
+      buildSettled.map(async (build, j) => {
+        if (build.status === 'rejected') throw build.reason
+
         const taskIdx = batchIndices[j]
         const reviewed = await runQuestionReviewer(
-          buildResult.output, batchTasks[j].concept, apiKey, model, signal
+          build.value.output, batchTasks[j].concept, apiKey, model, signal
         )
         totalTokens += reviewed.metrics.total_tokens
 
         let question: GeneratedQuestion
         if (reviewed.output.question === null) {
-          // Retry build once on rejection
+          // Retry build once on reviewer rejection
           const retry = await BUILDERS[batchTasks[j].type](batchTasks[j], rawText, apiKey, model, signal)
           totalTokens += retry.metrics.total_tokens
           question = retry.output
@@ -225,24 +230,35 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
           question = reviewed.output.question
         }
 
+        // Persist before marking in-memory — if save throws the slot stays null in DB
         await saveQuestionSlot(runId, taskIdx, question)
+        builtQuestions.set(taskIdx, question)
         return question
       })
     )
     reviewDone += batchTasks.length
     onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
 
-    reviewedResults.forEach((q, j) => builtQuestions.set(batchIndices[j], q))
+    reviewSettled.forEach((r, j) => {
+      if (r.status === 'rejected') {
+        console.warn(`[pipeline] slot ${batchIndices[j]} failed, will retry next run:`, r.reason)
+      }
+    })
   }
 
   await namingPromise
   onProgress({ stage: 'done' })
 
-  // Assemble questions in original task order
-  const questions = tasks.map((_, i) => builtQuestions.get(i)!)
+  // Assemble in task order — only slots that completed successfully
+  const questions = tasks
+    .map((_, i) => builtQuestions.get(i))
+    .filter((q): q is GeneratedQuestion => q != null)
 
-  // Clean up pipeline state now that questions will be persisted to the questions table
-  await deleteRun(prepId)
+  // Only clean up the run record once every slot is filled; partial runs persist
+  // so the next generate call can resume from where it left off.
+  if (builtQuestions.size === tasks.length) {
+    await deleteRun(prepId)
+  }
 
   addTokenUsage(totalTokens)
   return { questions, prepTitle, totalTokens }
