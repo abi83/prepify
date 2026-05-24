@@ -4,7 +4,6 @@
  */
 import type { Concept, QuestionTask } from '../types/pipeline'
 import type { QuestionType } from '../types/questions'
-import { ALL_QUESTION_TYPES } from './generationConfig'
 
 /** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
 export function buildTypePool(count: number, enabledTypes: QuestionType[]): QuestionType[] {
@@ -45,18 +44,17 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concep
 
 /**
  * Assigns one question type to each concept slot:
- * - builds a type pool from config (or defaults: 10 questions, all types)
+ * - builds a type pool from config
  * - spreads load across concepts weighted by importance
  * - guarantees each of the top-5 concepts appears at least once
  */
 export function buildQuestionTasks(
   concepts: Concept[],
-  config?: { questionCount: number; enabledTypes: QuestionType[] },
+  config: { questionCount: number; enabledTypes: QuestionType[] },
 ): QuestionTask[] {
   if (concepts.length === 0) throw new Error('No concepts to build tasks from')
 
-  const count = config?.questionCount ?? 10
-  const enabledTypes = config?.enabledTypes ?? ALL_QUESTION_TYPES
+  const { questionCount: count, enabledTypes } = config
 
   const sorted = [...concepts].sort((a, b) => b.importance - a.importance)
   const types = shuffle(buildTypePool(count, enabledTypes))

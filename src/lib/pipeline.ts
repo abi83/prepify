@@ -11,7 +11,7 @@ import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
 import { addTokenUsage } from './tokenUsage'
 import { buildQuestionTasks } from './taskBuilder'
-import { ALL_QUESTION_TYPES } from './generationConfig'
+import { DEFAULT_GEN_CONFIG } from './generationConfig'
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -119,10 +119,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
     }
   } else {
-    const genConfig = (questionCount !== undefined || enabledTypes !== undefined)
-      ? { questionCount: questionCount ?? 10, enabledTypes: enabledTypes ?? ALL_QUESTION_TYPES }
-      : undefined
-    tasks = buildQuestionTasks(concepts, genConfig)
+    tasks = buildQuestionTasks(concepts, {
+      questionCount: questionCount ?? DEFAULT_GEN_CONFIG.questionCount,
+      enabledTypes: enabledTypes ?? DEFAULT_GEN_CONFIG.enabledTypes,
+    })
     await saveQuestionTasksAndInitSlots(runId, tasks)
     for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
   }
