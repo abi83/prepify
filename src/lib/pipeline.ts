@@ -9,7 +9,7 @@ import { runQuestionReviewer } from './agents/QuestionReviewer'
 import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipeline'
 import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
-import { addTokenUsage, incrementPrepTokensInDb } from './tokenUsage'
+import { incrementPrepTokensInDb } from './tokenUsage'
 import { buildQuestionTasks } from './taskBuilder'
 import {
   loadOrCreateRun,
@@ -216,6 +216,5 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     await deleteRun(prepId)
   }
 
-  addTokenUsage(totalTokens)
   return { questions, prepTitle, totalTokens }
 }
