@@ -5,14 +5,18 @@
 import type { Concept, QuestionTask } from '../types/pipeline'
 import type { QuestionType } from '../types/questions'
 
-// Fixed distribution: 2 of each type, shuffled each run
-export const QUESTION_TYPE_POOL: QuestionType[] = [
-  'flashcard', 'flashcard',
-  'single_choice', 'single_choice',
-  'multiple_choice', 'multiple_choice',
-  'fill_the_gap', 'fill_the_gap',
-  'sorting', 'sorting',
-]
+/** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
+export function buildTypePool(count: number, enabledTypes: QuestionType[]): QuestionType[] {
+  if (enabledTypes.length === 0) throw new Error('At least one question type must be enabled')
+  const base = Math.floor(count / enabledTypes.length)
+  const extra = count % enabledTypes.length
+  const pool: QuestionType[] = []
+  for (let i = 0; i < enabledTypes.length; i++) {
+    const n = base + (i < extra ? 1 : 0)
+    for (let j = 0; j < n; j++) pool.push(enabledTypes[i])
+  }
+  return pool
+}
 
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -40,15 +44,20 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concep
 
 /**
  * Assigns one question type to each concept slot:
- * - uses a shuffled copy of QUESTION_TYPE_POOL
+ * - builds a type pool from config
  * - spreads load across concepts weighted by importance
  * - guarantees each of the top-5 concepts appears at least once
  */
-export function buildQuestionTasks(concepts: Concept[]): QuestionTask[] {
+export function buildQuestionTasks(
+  concepts: Concept[],
+  config: { questionCount: number; enabledTypes: QuestionType[] },
+): QuestionTask[] {
   if (concepts.length === 0) throw new Error('No concepts to build tasks from')
 
+  const { questionCount: count, enabledTypes } = config
+
   const sorted = [...concepts].sort((a, b) => b.importance - a.importance)
-  const types = shuffle([...QUESTION_TYPE_POOL])
+  const types = shuffle(buildTypePool(count, enabledTypes))
 
   const tasks: QuestionTask[] = []
   const conceptCounts = new Map<string, number>()
