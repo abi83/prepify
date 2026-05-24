@@ -65,11 +65,12 @@ export async function saveQuestionTasksAndInitSlots(runId: string, tasks: Questi
 }
 
 export async function saveQuestionSlot(runId: string, taskIndex: number, question: GeneratedQuestion) {
-  await supabase
+  const { error } = await supabase
     .from('pipeline_questions')
     .update({ question })
     .eq('run_id', runId)
     .eq('task_index', taskIndex)
+  if (error) throw new Error(`Failed to persist question slot ${taskIndex}: ${error.message}`)
 }
 
 export async function deleteRun(prepId: string) {
