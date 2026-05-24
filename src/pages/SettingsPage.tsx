@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import OpenAI from 'openai'
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '../lib/apiKey'
 import type { ModelId } from '../lib/apiKey'
-import { getTotalTokens, clearTokenUsage } from '../lib/tokenUsage'
+import { getTotalTokens, clearTokenUsage, getTotalTokensFromDb } from '../lib/tokenUsage'
+import { estimateCost, formatCost } from '../lib/apiKey'
 import styles from './SettingsPage.module.css'
 
 type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
@@ -25,7 +26,9 @@ export default function SettingsPage() {
       setKeyValue(existing.key)
       setModel(existing.model)
     }
+    // Show localStorage cache immediately, then replace with authoritative DB value
     setTotalTokens(getTotalTokens())
+    getTotalTokensFromDb().then(setTotalTokens)
   }, [])
 
   function handleSave() {
@@ -150,9 +153,17 @@ export default function SettingsPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Usage</h2>
           <div className={styles.usageLine}>
-            <span className={styles.usageLabel}>Total tokens consumed (all generations)</span>
+            <span className={styles.usageLabel}>Total tokens (all preps)</span>
             <span className={styles.usageValue}>{totalTokens.toLocaleString()}</span>
           </div>
+          {totalTokens > 0 && model && (
+            <div className={styles.usageLine}>
+              <span className={styles.usageLabel}>Estimated cost ({model})</span>
+              <span className={styles.usageValue}>
+                ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model))}
+              </span>
+            </div>
+          )}
           {totalTokens > 0 && (
             <button
               className={styles.clearUsageBtn}

@@ -17,4 +17,5 @@ export type Prep = {
   raw_text: string
   study_description: string | null
   created_at: string
+  tokens_used: number
 }

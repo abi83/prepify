@@ -9,7 +9,7 @@ import { runQuestionReviewer } from './agents/QuestionReviewer'
 import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipeline'
 import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
-import { addTokenUsage } from './tokenUsage'
+import { addTokenUsage, incrementPrepTokensInDb } from './tokenUsage'
 import { buildQuestionTasks } from './taskBuilder'
 import {
   loadOrCreateRun,
@@ -100,6 +100,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'concepts' })
     const { output, metrics } = await runConceptExtractor(rawText, apiKey, model, signal)
     totalTokens += metrics.total_tokens
+    void incrementPrepTokensInDb(prepId, metrics.total_tokens)
     concepts = output
     await saveConcepts(runId, concepts)
   }
@@ -138,6 +139,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .then(r => {
       prepTitle = r.output.title
       totalTokens += r.metrics.total_tokens
+      void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
       onTitleReady?.(r.output.title)
     })
     .catch(() => null)
@@ -165,18 +167,21 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       // Build
       const buildResult = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
       totalTokens += buildResult.metrics.total_tokens
+      void incrementPrepTokensInDb(prepId, buildResult.metrics.total_tokens)
       craftDone++
       onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
       const reviewed = await runQuestionReviewer(buildResult.output, task.concept, apiKey, model, signal)
       totalTokens += reviewed.metrics.total_tokens
+      void incrementPrepTokensInDb(prepId, reviewed.metrics.total_tokens)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
         const retry = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
         totalTokens += retry.metrics.total_tokens
+        void incrementPrepTokensInDb(prepId, retry.metrics.total_tokens)
         question = retry.output
       } else {
         question = reviewed.output.question
