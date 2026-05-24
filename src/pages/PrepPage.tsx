@@ -6,6 +6,9 @@ import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent } from '../types/pipeline'
 import { getApiKey } from '../lib/apiKey'
 import { runPipeline } from '../lib/pipeline'
+import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from '../lib/generationConfig'
+import type { GenerationConfig } from '../lib/generationConfig'
+import type { QuestionType } from '../types/questions'
 import { getExistingRunSummary } from '../lib/pipelineStore'
 import type { PartialRunSummary } from '../lib/pipelineStore'
 import FlashCard from '../components/questions/FlashCard'
@@ -140,6 +143,8 @@ export default function PrepPage() {
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null)
   const [titleReady, setTitleReady] = useState(false)
   const [runSummary, setRunSummary] = useState<PartialRunSummary | null>(null)
+  const [localConfig, setLocalConfig] = useState<GenerationConfig>(() => getGenerationConfig())
+  const [genConfigOpen, setGenConfigOpen] = useState(false)
   const [genMs, setGenMs] = useState(0)
   const [totalTokens, setTotalTokens] = useState(0)
   const [genError, setGenError] = useState<string | null>(null)
@@ -174,6 +179,19 @@ export default function PrepPage() {
     setRunSummary(s)
   }
 
+  function toggleLocalType(type: QuestionType) {
+    setLocalConfig(prev => {
+      const already = prev.enabledTypes.includes(type)
+      if (already && prev.enabledTypes.length === 1) return prev
+      return {
+        ...prev,
+        enabledTypes: already
+          ? prev.enabledTypes.filter(t => t !== type)
+          : [...prev.enabledTypes, type],
+      }
+    })
+  }
+
   async function handleGenerate() {
     const keyConfig = getApiKey()
     if (!keyConfig) {
@@ -196,6 +214,8 @@ export default function PrepPage() {
         rawText: prep!.raw_text,
         apiKey: keyConfig.key,
         model: keyConfig.model,
+        questionCount: localConfig.questionCount,
+        enabledTypes: localConfig.enabledTypes,
         signal: abortRef.current.signal,
         onProgress: (event) => {
           setPipelineProgress(event)
@@ -324,6 +344,67 @@ export default function PrepPage() {
             ) : (
               <>
                 <p className={styles.generateHint}>Generate study questions from this material.</p>
+
+                <div className={styles.genConfigPanel}>
+                  <button
+                    className={styles.genConfigToggle}
+                    onClick={() => setGenConfigOpen(v => !v)}
+                  >
+                    <span className={styles.genConfigSummary}>
+                      {localConfig.questionCount} questions
+                      {' · '}
+                      {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
+                        ? 'All types'
+                        : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(', ')}
+                    </span>
+                    <span className={styles.genConfigCaret}>{genConfigOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {genConfigOpen && (
+                    <div className={styles.genConfigBody}>
+                      <div className={styles.genConfigRow}>
+                        <label className={styles.genConfigLabel}>Questions</label>
+                        <input
+                          type="number"
+                          className={styles.genConfigNumber}
+                          min={5}
+                          max={20}
+                          value={localConfig.questionCount}
+                          onChange={e => setLocalConfig(prev => ({
+                            ...prev,
+                            questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
+                          }))}
+                        />
+                        <span className={styles.genConfigRange}>5–20</span>
+                      </div>
+
+                      <div className={styles.genConfigRow}>
+                        <label className={styles.genConfigLabel}>Types</label>
+                        <div className={styles.genTypeToggles}>
+                          {ALL_QUESTION_TYPES.map(type => {
+                            const checked = localConfig.enabledTypes.includes(type)
+                            const isOnly = checked && localConfig.enabledTypes.length === 1
+                            return (
+                              <label
+                                key={type}
+                                className={`${styles.genTypeToggle} ${isOnly ? styles.genTypeToggleOnly : ''}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={isOnly}
+                                  onChange={() => toggleLocalType(type)}
+                                />
+                                {TYPE_LABELS[type]}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button className={styles.generateBtn} onClick={handleGenerate}>
                   Generate questions
                 </button>
