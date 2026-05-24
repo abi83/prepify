@@ -19,8 +19,6 @@ import {
   deleteRun,
 } from './pipelineStore'
 
-const BATCH_SIZE = 5
-
 type BuilderFn = (
   task: QuestionTask,
   rawText: string,
@@ -112,10 +110,15 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     })
     .catch(() => null)
 
-  // Stage 3: Build + review missing question slots in batches.
-  // allSettled is used at each phase so a single bad LLM response (schema validation
-  // failure, network blip) only kills that slot — the rest of the batch still saves
-  // and is skipped on the next run.
+  // Stage 3: Build + review all missing slots in parallel.
+  //
+  // Each slot is a self-contained async pipeline: build → review → persist.
+  // allSettled isolates failures per slot — a bad LLM response only kills
+  // that one question; the others save normally and are skipped on retry.
+  //
+  // Counters increment per-question (not per-batch) so crafting and reviewing
+  // progress advance concurrently as soon as each individual step finishes.
+  // JS is single-threaded so shared-counter increments between awaits are safe.
   const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
 
   let craftDone = resumedCount
@@ -123,56 +126,43 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-  for (let b = 0; b < missingIndices.length; b += BATCH_SIZE) {
-    if (signal?.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' })
+  const settled = await Promise.allSettled(
+    missingIndices.map(async (taskIdx) => {
+      const task = tasks[taskIdx]
 
-    const batchIndices = missingIndices.slice(b, b + BATCH_SIZE)
-    const batchTasks = batchIndices.map(i => tasks[i])
+      // Build
+      const buildResult = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+      totalTokens += buildResult.metrics.total_tokens
+      craftDone++
+      onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-    // Build batch — failures are isolated per slot
-    const buildSettled = await Promise.allSettled(
-      batchTasks.map(task => BUILDERS[task.type](task, rawText, apiKey, model, signal))
-    )
-    craftDone += batchTasks.length
-    buildSettled.forEach(r => { if (r.status === 'fulfilled') totalTokens += r.value.metrics.total_tokens })
-    onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
+      // Review immediately — no waiting for other slots to finish building
+      const reviewed = await runQuestionReviewer(buildResult.output, task.concept, apiKey, model, signal)
+      totalTokens += reviewed.metrics.total_tokens
 
-    // Review + persist each slot — failures are isolated per slot
-    const reviewSettled = await Promise.allSettled(
-      buildSettled.map(async (build, j) => {
-        if (build.status === 'rejected') throw build.reason
-
-        const taskIdx = batchIndices[j]
-        const reviewed = await runQuestionReviewer(
-          build.value.output, batchTasks[j].concept, apiKey, model, signal
-        )
-        totalTokens += reviewed.metrics.total_tokens
-
-        let question: GeneratedQuestion
-        if (reviewed.output.question === null) {
-          // Retry build once on reviewer rejection
-          const retry = await BUILDERS[batchTasks[j].type](batchTasks[j], rawText, apiKey, model, signal)
-          totalTokens += retry.metrics.total_tokens
-          question = retry.output
-        } else {
-          question = reviewed.output.question
-        }
-
-        // Persist before marking in-memory — if save throws the slot stays null in DB
-        await saveQuestionSlot(runId, taskIdx, question)
-        builtQuestions.set(taskIdx, question)
-        return question
-      })
-    )
-    reviewDone += batchTasks.length
-    onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
-
-    reviewSettled.forEach((r, j) => {
-      if (r.status === 'rejected') {
-        console.warn(`[pipeline] slot ${batchIndices[j]} failed, will retry next run:`, r.reason)
+      let question: GeneratedQuestion
+      if (reviewed.output.question === null) {
+        // Retry build once on reviewer rejection
+        const retry = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+        totalTokens += retry.metrics.total_tokens
+        question = retry.output
+      } else {
+        question = reviewed.output.question
       }
+
+      // Persist before marking in-memory — if save throws the slot stays null in DB
+      await saveQuestionSlot(runId, taskIdx, question)
+      builtQuestions.set(taskIdx, question)
+      reviewDone++
+      onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
     })
-  }
+  )
+
+  settled.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[pipeline] slot ${missingIndices[i]} failed, will retry next run:`, r.reason)
+    }
+  })
 
   await namingPromise
   onProgress({ stage: 'done' })
