@@ -6,6 +6,8 @@ import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent } from '../types/pipeline'
 import { getApiKey } from '../lib/apiKey'
 import { runPipeline } from '../lib/pipeline'
+import { getExistingRunSummary } from '../lib/pipelineStore'
+import type { PartialRunSummary } from '../lib/pipelineStore'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import styles from './PrepPage.module.css'
@@ -13,16 +15,96 @@ import styles from './PrepPage.module.css'
 type Tab = 'cards' | 'quiz' | 'test'
 type GenPhase = 'idle' | 'running' | 'done'
 
-function getProgressLabel(progress: PipelineProgressEvent | null): string {
-  if (!progress) return 'Starting…'
-  switch (progress.stage) {
-    case 'concepts': return 'Extracting concepts…'
-    case 'resuming': return `Resuming from slot ${progress.done}/${progress.total}…`
-    case 'crafting': return `Crafting questions (${progress.done}/${progress.total})…`
-    case 'reviewing': return `Validating questions (${progress.done}/${progress.total})…`
-    case 'done': return 'Done'
-  }
+// ── Pipeline checklist ──────────────────────────────────────────────────────
+
+type RowStatus = 'pending' | 'running' | 'done'
+
+interface ChecklistRowData {
+  label: string
+  status: RowStatus
+  detail?: string
 }
+
+/** Derives checklist rows from live progress during generation. */
+function rowsFromProgress(
+  progress: PipelineProgressEvent | null,
+  craft: { done: number; total: number } | null,
+  review: { done: number; total: number } | null,
+): ChecklistRowData[] {
+  const stage = progress?.stage ?? null
+
+  const conceptsDone = stage !== null && stage !== 'concepts'
+  const conceptsRunning = stage === 'concepts' || stage === null
+
+  const craftingDone = stage === 'reviewing' || stage === 'done'
+  const craftingRunning = stage === 'crafting' || stage === 'resuming'
+
+  const reviewingDone = stage === 'done'
+  const reviewingRunning = stage === 'reviewing'
+
+  return [
+    {
+      label: 'Extract educational concepts',
+      status: conceptsDone ? 'done' : conceptsRunning ? 'running' : 'pending',
+    },
+    {
+      label: 'Craft questions',
+      status: craftingDone ? 'done' : craftingRunning ? 'running' : 'pending',
+      detail: craft ? `${craft.done}/${craft.total}` : undefined,
+    },
+    {
+      label: 'Validate questions',
+      status: reviewingDone ? 'done' : reviewingRunning ? 'running' : 'pending',
+      detail: review ? `${review.done}/${review.total}` : undefined,
+    },
+  ]
+}
+
+/** Derives checklist rows from stored DB state (idle / resume prompt). */
+function rowsFromSummary(s: PartialRunSummary): ChecklistRowData[] {
+  const total = s.totalTasks || 10
+  const n = s.completedSlots
+  return [
+    {
+      label: 'Extract educational concepts',
+      status: s.hasConcepts ? 'done' : 'pending',
+    },
+    {
+      label: 'Craft questions',
+      status: n > 0 ? 'done' : s.hasConcepts ? 'pending' : 'pending',
+      detail: s.totalTasks > 0 ? `${n}/${total}` : undefined,
+    },
+    {
+      label: 'Validate questions',
+      status: n > 0 ? 'done' : 'pending',
+      detail: s.totalTasks > 0 ? `${n}/${total}` : undefined,
+    },
+  ]
+}
+
+function ChecklistRow({ row }: { row: ChecklistRowData }) {
+  return (
+    <div className={styles.checklistRow}>
+      <span
+        className={`${styles.checklistIcon} ${
+          row.status === 'done' ? styles.iconDone :
+          row.status === 'running' ? styles.iconRunning :
+          styles.iconPending
+        }`}
+      >
+        {row.status === 'done' ? '✓' : row.status === 'running' ? <span className={styles.dotPulse} /> : '○'}
+      </span>
+      <span className={`${styles.checklistLabel} ${row.status === 'pending' ? styles.labelMuted : ''}`}>
+        {row.label}
+        {row.detail && (
+          <span className={styles.checklistDetail}> ({row.detail})</span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
 
 export default function PrepPage() {
   const { id } = useParams<{ id: string }>()
@@ -38,6 +120,9 @@ export default function PrepPage() {
 
   const [genPhase, setGenPhase] = useState<GenPhase>('idle')
   const [pipelineProgress, setPipelineProgress] = useState<PipelineProgressEvent | null>(null)
+  const [craftProgress, setCraftProgress] = useState<{ done: number; total: number } | null>(null)
+  const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null)
+  const [runSummary, setRunSummary] = useState<PartialRunSummary | null>(null)
   const [genMs, setGenMs] = useState(0)
   const [totalTokens, setTotalTokens] = useState(0)
   const [genError, setGenError] = useState<string | null>(null)
@@ -56,13 +141,21 @@ export default function PrepPage() {
       supabase.from('preps').select('*').eq('id', id).single(),
       supabase.from('questions').select('*').eq('prep_id', id).order('created_at'),
       supabase.from('attempts').select('*').eq('prep_id', id).order('created_at', { ascending: false }),
-    ]).then(([{ data: prepData }, { data: qData }, { data: aData }]) => {
+      getExistingRunSummary(id),
+    ]).then(([{ data: prepData }, { data: qData }, { data: aData }, summary]) => {
       setPrep(prepData)
       setQuestions((qData ?? []) as Question[])
       setAttempts((aData ?? []) as Attempt[])
+      setRunSummary(summary)
       setLoading(false)
     })
   }, [id])
+
+  async function refreshRunSummary() {
+    if (!id) return
+    const s = await getExistingRunSummary(id)
+    setRunSummary(s)
+  }
 
   async function handleGenerate() {
     const keyConfig = getApiKey()
@@ -73,6 +166,8 @@ export default function PrepPage() {
 
     setGenError(null)
     setPipelineProgress(null)
+    setCraftProgress(null)
+    setReviewProgress(null)
     abortRef.current = new AbortController()
     genStartRef.current = performance.now()
     setGenPhase('running')
@@ -84,7 +179,15 @@ export default function PrepPage() {
         apiKey: keyConfig.key,
         model: keyConfig.model,
         signal: abortRef.current.signal,
-        onProgress: (event) => setPipelineProgress(event),
+        onProgress: (event) => {
+          setPipelineProgress(event)
+          if (event.stage === 'crafting') setCraftProgress({ done: event.done, total: event.total })
+          if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
+        },
+        onTitleReady: (title) => {
+          supabase.from('preps').update({ title }).eq('id', id!)
+          setPrep(p => p ? { ...p, title } : p)
+        },
       })
 
       const elapsed = Math.round(performance.now() - genStartRef.current)
@@ -93,17 +196,14 @@ export default function PrepPage() {
       const { data: saved } = await supabase.from('questions').insert(rows).select()
       setQuestions((saved ?? []) as Question[])
 
-      if (result.prepTitle) {
-        await supabase.from('preps').update({ title: result.prepTitle }).eq('id', id!)
-        setPrep(p => p ? { ...p, title: result.prepTitle! } : p)
-      }
-
       setGenMs(elapsed)
       setTotalTokens(result.totalTokens)
       setGenPhase('done')
+      await refreshRunSummary()
     } catch (e: unknown) {
       if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
       setGenPhase('idle')
+      await refreshRunSummary()
     }
   }
 
@@ -125,6 +225,9 @@ export default function PrepPage() {
   const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== 'flashcard')
 
+  const isRunning = genPhase === 'running'
+  const hasPartialRun = runSummary !== null
+
   if (activeAttempt && (activeAttempt === 'quiz' || activeAttempt === 'test') && userId) {
     return (
       <div className={styles.root}>
@@ -143,6 +246,13 @@ export default function PrepPage() {
       </div>
     )
   }
+
+  // Checklist rows for the current state
+  const checklistRows = isRunning
+    ? rowsFromProgress(pipelineProgress, craftProgress, reviewProgress)
+    : hasPartialRun
+    ? rowsFromSummary(runSummary)
+    : null
 
   return (
     <div className={styles.root}>
@@ -172,25 +282,34 @@ export default function PrepPage() {
           </div>
         </div>
 
-        {!hasQuestions && genPhase === 'idle' && (
+        {/* ── Generation area ── */}
+        {!hasQuestions && (
           <div className={styles.generateArea}>
-            <p className={styles.generateHint}>Generate study questions from this material.</p>
-            <button className={styles.generateBtn} onClick={handleGenerate}>
-              Generate questions
-            </button>
-          </div>
-        )}
-
-        {genPhase === 'running' && (
-          <div className={styles.genStatus}>
-            <div className={styles.spinner} />
-            <span>{getProgressLabel(pipelineProgress)}</span>
-            <button
-              className={styles.cancelGenBtn}
-              onClick={() => abortRef.current?.abort()}
-            >
-              Cancel
-            </button>
+            {checklistRows ? (
+              <>
+                <div className={styles.checklist}>
+                  {checklistRows.map(row => <ChecklistRow key={row.label} row={row} />)}
+                </div>
+                <div className={styles.checklistActions}>
+                  {isRunning ? (
+                    <button className={styles.cancelGenBtn} onClick={() => abortRef.current?.abort()}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button className={styles.generateBtn} onClick={handleGenerate}>
+                      {hasPartialRun && runSummary.completedSlots > 0 ? 'Resume generation' : 'Start generation'}
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={styles.generateHint}>Generate study questions from this material.</p>
+                <button className={styles.generateBtn} onClick={handleGenerate}>
+                  Generate questions
+                </button>
+              </>
+            )}
           </div>
         )}
 
