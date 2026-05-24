@@ -10,90 +10,45 @@ import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipe
 import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
 import { addTokenUsage } from './tokenUsage'
+import { buildQuestionTasks } from './taskBuilder'
+import {
+  loadOrCreateRun,
+  saveConcepts,
+  saveQuestionTasksAndInitSlots,
+  saveQuestionSlot,
+  deleteRun,
+} from './pipelineStore'
 
-const BATCH_SIZE = 5
+/** Maximum number of concurrent build→review→save chains. */
+const CONCURRENCY = 5
 
-// Fixed distribution: 2 of each type, shuffled each run
-const QUESTION_TYPE_POOL: QuestionType[] = [
-  'flashcard', 'flashcard',
-  'single_choice', 'single_choice',
-  'multiple_choice', 'multiple_choice',
-  'fill_the_gap', 'fill_the_gap',
-  'sorting', 'sorting',
-]
+/**
+ * Runs `tasks` with at most `limit` concurrent executions.
+ * Unlike batching, a new task starts as soon as any running one finishes —
+ * there is no synchronization barrier at the end of each batch.
+ */
+async function withConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length)
+  let next = 0
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-function weightedPick(concepts: Concept[], exclude?: Set<string>): Concept {
-  const pool = exclude && exclude.size > 0
-    ? concepts.filter(c => !exclude.has(c.name))
-    : concepts
-  const source = pool.length > 0 ? pool : concepts
-
-  const total = source.reduce((sum, c) => sum + Math.max(c.importance, 0.05), 0)
-  let r = Math.random() * total
-  for (const c of source) {
-    r -= Math.max(c.importance, 0.05)
-    if (r <= 0) return c
-  }
-  return source[source.length - 1]
-}
-
-function buildQuestionTasks(concepts: Concept[]): QuestionTask[] {
-  if (concepts.length === 0) throw new Error('No concepts to build tasks from')
-
-  const sorted = [...concepts].sort((a, b) => b.importance - a.importance)
-  const types = shuffle([...QUESTION_TYPE_POOL])
-
-  const tasks: QuestionTask[] = []
-  const conceptCounts = new Map<string, number>()
-  const MAX_PER_CONCEPT = Math.max(2, Math.ceil(types.length / Math.min(sorted.length, 5)))
-
-  for (const type of types) {
-    // Prefer concepts that haven't hit the per-concept cap yet
-    const capped = new Set(
-      [...conceptCounts.entries()]
-        .filter(([, count]) => count >= MAX_PER_CONCEPT)
-        .map(([name]) => name)
-    )
-    const concept = weightedPick(sorted, capped)
-    conceptCounts.set(concept.name, (conceptCounts.get(concept.name) ?? 0) + 1)
-    tasks.push({ concept, type })
-  }
-
-  // Coverage pass: ensure top-5 concepts each appear at least once
-  const topN = Math.min(sorted.length, 5)
-  for (let i = 0; i < topN; i++) {
-    const top = sorted[i]
-    if (tasks.some(t => t.concept.name === top.name)) continue
-
-    // Replace a task whose concept appears most often (least coverage-critical)
-    const counts = new Map<string, number>()
-    tasks.forEach(t => counts.set(t.concept.name, (counts.get(t.concept.name) ?? 0) + 1))
-
-    let replaceIdx = -1
-    let maxCount = 0
-    tasks.forEach((t, idx) => {
-      const c = counts.get(t.concept.name) ?? 0
-      if (c > maxCount || (c === maxCount && t.concept.importance < (tasks[replaceIdx]?.concept.importance ?? 1))) {
-        maxCount = c
-        replaceIdx = idx
+  async function worker() {
+    while (next < tasks.length) {
+      const idx = next++
+      try {
+        results[idx] = { status: 'fulfilled', value: await tasks[idx]() }
+      } catch (e) {
+        results[idx] = { status: 'rejected', reason: e }
       }
-    })
-
-    if (replaceIdx >= 0) {
-      tasks[replaceIdx] = { concept: top, type: tasks[replaceIdx].type }
     }
   }
 
-  return tasks
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, worker)
+  )
+  return results
 }
 
 type BuilderFn = (
@@ -119,78 +74,142 @@ export interface PipelineResult {
 }
 
 export interface PipelineConfig {
+  prepId: string
   rawText: string
   apiKey: string
   model: string
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
+  /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
+  onTitleReady?: (title: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { rawText, apiKey, model, signal, onProgress } = config
+  const { prepId, rawText, apiKey, model, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
-  // Stage 1: Extract concepts
-  onProgress({ stage: 'concepts' })
-  const { output: concepts, metrics: conceptMetrics } = await runConceptExtractor(
-    rawText, apiKey, model, signal
+  // Load or create a persistent run record for crash recovery
+  const state = await loadOrCreateRun(prepId)
+  const { runId } = state
+
+  // Stage 1: Extract concepts (skip if already stored)
+  let concepts: Concept[]
+  if (state.concepts) {
+    concepts = state.concepts
+  } else {
+    onProgress({ stage: 'concepts' })
+    const { output, metrics } = await runConceptExtractor(rawText, apiKey, model, signal)
+    totalTokens += metrics.total_tokens
+    concepts = output
+    await saveConcepts(runId, concepts)
+  }
+
+  // Stage 2: Build question tasks (skip if already stored)
+  let tasks: QuestionTask[]
+  if (state.questionTasks) {
+    tasks = state.questionTasks
+    // Re-init slots if they were lost (edge case: crashed between saving tasks and inserting slots)
+    if (state.questionSlots.size === 0) {
+      await saveQuestionTasksAndInitSlots(runId, tasks)
+      for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
+    }
+  } else {
+    tasks = buildQuestionTasks(concepts)
+    await saveQuestionTasksAndInitSlots(runId, tasks)
+    for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
+  }
+
+  // Populate already-built questions from stored slots
+  const builtQuestions = new Map<number, GeneratedQuestion>(
+    [...state.questionSlots.entries()]
+      .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
   )
-  totalTokens += conceptMetrics.total_tokens
 
-  // Build question tasks (deterministic mixer)
-  const tasks = buildQuestionTasks(concepts)
+  const resumedCount = builtQuestions.size
+  if (resumedCount > 0) {
+    onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
+  }
 
-  // Start naming in parallel — non-critical, failure is silently ignored
+  // Start naming in parallel — non-critical, failure is silently ignored.
+  // onTitleReady fires immediately when naming finishes so the title is saved
+  // even if the pipeline is cancelled later.
   let prepTitle: string | null = null
   const namingPromise = runPrepNamer(concepts, apiKey, model, signal)
-    .then(r => { prepTitle = r.output.title; totalTokens += r.metrics.total_tokens })
+    .then(r => {
+      prepTitle = r.output.title
+      totalTokens += r.metrics.total_tokens
+      onTitleReady?.(r.output.title)
+    })
     .catch(() => null)
 
-  // Stage 2: Build + review questions in batches
-  const questions: GeneratedQuestion[] = []
-  let craftDone = 0
-  let reviewDone = 0
+  // Stage 3: Build + review all missing slots in parallel.
+  //
+  // Each slot is a self-contained async pipeline: build → review → persist.
+  // allSettled isolates failures per slot — a bad LLM response only kills
+  // that one question; the others save normally and are skipped on retry.
+  //
+  // Counters increment per-question (not per-batch) so crafting and reviewing
+  // progress advance concurrently as soon as each individual step finishes.
+  // JS is single-threaded so shared-counter increments between awaits are safe.
+  const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
 
-  onProgress({ stage: 'crafting', done: 0, total: tasks.length })
+  let craftDone = resumedCount
+  let reviewDone = resumedCount
 
-  for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-    if (signal?.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' })
+  onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-    const batch = tasks.slice(i, i + BATCH_SIZE)
+  const settled = await withConcurrency(
+    missingIndices.map((taskIdx) => async () => {
+      const task = tasks[taskIdx]
 
-    // Build batch in parallel
-    const buildResults = await Promise.all(
-      batch.map(task => BUILDERS[task.type](task, rawText, apiKey, model, signal))
-    )
-    craftDone += batch.length
-    buildResults.forEach(r => { totalTokens += r.metrics.total_tokens })
-    onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
+      // Build
+      const buildResult = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+      totalTokens += buildResult.metrics.total_tokens
+      craftDone++
+      onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-    // Review batch in parallel
-    const reviewedResults = await Promise.all(
-      buildResults.map(async (buildResult, j) => {
-        const reviewed = await runQuestionReviewer(
-          buildResult.output, batch[j].concept, apiKey, model, signal
-        )
-        totalTokens += reviewed.metrics.total_tokens
+      // Review immediately — no waiting for other slots to finish building
+      const reviewed = await runQuestionReviewer(buildResult.output, task.concept, apiKey, model, signal)
+      totalTokens += reviewed.metrics.total_tokens
 
-        if (reviewed.output.question === null) {
-          // Retry build once on rejection
-          const retry = await BUILDERS[batch[j].type](batch[j], rawText, apiKey, model, signal)
-          totalTokens += retry.metrics.total_tokens
-          return retry.output
-        }
-        return reviewed.output.question
-      })
-    )
-    reviewDone += batch.length
-    onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
+      let question: GeneratedQuestion
+      if (reviewed.output.question === null) {
+        // Retry build once on reviewer rejection
+        const retry = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+        totalTokens += retry.metrics.total_tokens
+        question = retry.output
+      } else {
+        question = reviewed.output.question
+      }
 
-    questions.push(...reviewedResults)
-  }
+      // Persist before marking in-memory — if save throws the slot stays null in DB
+      await saveQuestionSlot(runId, taskIdx, question)
+      builtQuestions.set(taskIdx, question)
+      reviewDone++
+      onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
+    }),
+    CONCURRENCY,
+  )
+
+  settled.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[pipeline] slot ${missingIndices[i]} failed, will retry next run:`, r.reason)
+    }
+  })
 
   await namingPromise
   onProgress({ stage: 'done' })
+
+  // Assemble in task order — only slots that completed successfully
+  const questions = tasks
+    .map((_, i) => builtQuestions.get(i))
+    .filter((q): q is GeneratedQuestion => q != null)
+
+  // Only clean up the run record once every slot is filled; partial runs persist
+  // so the next generate call can resume from where it left off.
+  if (builtQuestions.size === tasks.length) {
+    await deleteRun(prepId)
+  }
 
   addTokenUsage(totalTokens)
   return { questions, prepTitle, totalTokens }
