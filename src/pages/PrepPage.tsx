@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent } from '../types/pipeline'
-import { getApiKey } from '../lib/apiKey'
+import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
 import { runPipeline } from '../lib/pipeline'
 import { getExistingRunSummary } from '../lib/pipelineStore'
 import type { PartialRunSummary } from '../lib/pipelineStore'
@@ -215,6 +215,10 @@ export default function PrepPage() {
       const { data: saved } = await supabase.from('questions').insert(rows).select()
       setQuestions((saved ?? []) as Question[])
 
+      // Refresh prep to get the up-to-date tokens_used accumulated in DB
+      const { data: freshPrep } = await supabase.from('preps').select('*').eq('id', id!).single()
+      if (freshPrep) setPrep(freshPrep as Prep)
+
       setGenMs(elapsed)
       setTotalTokens(result.totalTokens)
       setGenPhase('done')
@@ -284,6 +288,14 @@ export default function PrepPage() {
         <div className={styles.meta}>
           <h1 className={styles.title}>{prep.title}</h1>
           <span className={styles.date}>{formatDate(prep.created_at)}</span>
+          {prep.tokens_used > 0 && (
+            <span className={styles.tokensBadge}>
+              {prep.tokens_used.toLocaleString()} tokens
+              {getApiKey() && (
+                <> · ~{formatCost(estimateCost(prep.tokens_used * 0.8, prep.tokens_used * 0.2, getApiKey()!.model))}</>
+              )}
+            </span>
+          )}
           {prep.study_description && (
             <p className={styles.description}>{prep.study_description}</p>
           )}
