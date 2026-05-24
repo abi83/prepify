@@ -362,6 +362,123 @@
   color: var(--text-muted);
 }
 
+/* ── Inline generation config ── */
+
+.genConfigPanel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  align-self: flex-start;
+  min-width: 280px;
+}
+
+.genConfigToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.genConfigToggle:hover {
+  color: var(--text);
+}
+
+.genConfigSummary {
+  flex: 1;
+}
+
+.genConfigCaret {
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.genConfigBody {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.genConfigRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.genConfigLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 68px;
+  padding-top: 5px;
+}
+
+.genConfigNumber {
+  background: var(--bg, #0d0d0d);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  outline: none;
+  width: 68px;
+  transition: border-color 0.15s;
+}
+
+.genConfigNumber:focus {
+  border-color: var(--accent);
+}
+
+.genConfigRange {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-top: 6px;
+}
+
+.genTypeToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.genTypeToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.genTypeToggle input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.genTypeToggleOnly {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.genTypeToggleOnly input[type='checkbox'] {
+  cursor: not-allowed;
+}
+
 /* --- Tabs --- */
 
 .tabs {
