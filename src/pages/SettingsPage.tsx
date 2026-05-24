@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import OpenAI from 'openai'
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '../lib/apiKey'
 import type { ModelId } from '../lib/apiKey'
-import { getTotalTokens, clearTokenUsage, getTotalTokensFromDb } from '../lib/tokenUsage'
+import { getTotalTokensFromDb } from '../lib/tokenUsage'
 import { estimateCost, formatCost } from '../lib/apiKey'
 import styles from './SettingsPage.module.css'
 
@@ -26,9 +26,7 @@ export default function SettingsPage() {
       setKeyValue(existing.key)
       setModel(existing.model)
     }
-    // Show localStorage cache immediately, then replace with authoritative DB value
-    setTotalTokens(getTotalTokens())
-    getTotalTokensFromDb().then(setTotalTokens)
+      getTotalTokensFromDb().then(setTotalTokens)
   }, [])
 
   function handleSave() {
@@ -163,14 +161,6 @@ export default function SettingsPage() {
                 ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model))}
               </span>
             </div>
-          )}
-          {totalTokens > 0 && (
-            <button
-              className={styles.clearUsageBtn}
-              onClick={() => { clearTokenUsage(); setTotalTokens(0) }}
-            >
-              Reset counter
-            </button>
           )}
         </section>
       </main>
