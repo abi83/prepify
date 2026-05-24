@@ -19,6 +19,38 @@ import {
   deleteRun,
 } from './pipelineStore'
 
+/** Maximum number of concurrent build→review→save chains. */
+const CONCURRENCY = 5
+
+/**
+ * Runs `tasks` with at most `limit` concurrent executions.
+ * Unlike batching, a new task starts as soon as any running one finishes —
+ * there is no synchronization barrier at the end of each batch.
+ */
+async function withConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length)
+  let next = 0
+
+  async function worker() {
+    while (next < tasks.length) {
+      const idx = next++
+      try {
+        results[idx] = { status: 'fulfilled', value: await tasks[idx]() }
+      } catch (e) {
+        results[idx] = { status: 'rejected', reason: e }
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, worker)
+  )
+  return results
+}
+
 type BuilderFn = (
   task: QuestionTask,
   rawText: string,
@@ -126,8 +158,8 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
-  const settled = await Promise.allSettled(
-    missingIndices.map(async (taskIdx) => {
+  const settled = await withConcurrency(
+    missingIndices.map((taskIdx) => async () => {
       const task = tasks[taskIdx]
 
       // Build
@@ -155,7 +187,8 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       builtQuestions.set(taskIdx, question)
       reviewDone++
       onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
-    })
+    }),
+    CONCURRENCY,
   )
 
   settled.forEach((r, i) => {
