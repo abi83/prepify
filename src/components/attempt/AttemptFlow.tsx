@@ -1,9 +1,41 @@
 import { useState } from 'react'
-import type { Question } from '../../types/questions'
+import type { Question, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from '../../types/questions'
 import QuestionBody, { AnswerState, emptyAnswer } from '../questions/QuestionBody'
 import ScoreScreen from './ScoreScreen'
 import { supabase } from '../../lib/supabase'
 import styles from './AttemptFlow.module.css'
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
+function shuffleQuestionAnswers(q: Question): Question {
+  switch (q.type) {
+    case 'single_choice': {
+      const c = q.content as SingleChoiceContent
+      return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
+    }
+    case 'multiple_choice': {
+      const c = q.content as MultipleChoiceContent
+      return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
+    }
+    case 'fill_the_gap': {
+      const c = q.content as FillTheGapContent
+      return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
+    }
+    case 'sorting': {
+      const c = q.content as SortingContent
+      return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
+    }
+    default:
+      return q
+  }
+}
 
 interface Props {
   questions: Question[]
@@ -63,12 +95,13 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
 
   const [phase, setPhase] = useState<Phase>('attempt')
   const [index, setIndex] = useState(0)
+  const [shuffledQuestions] = useState<Question[]>(() => attemptQuestions.map(shuffleQuestionAnswers))
   const [answers, setAnswers] = useState<AnswerState[]>(() => attemptQuestions.map(() => emptyAnswer()))
   const [submitted, setSubmitted] = useState<boolean[]>(() => attemptQuestions.map(() => false))
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const current = attemptQuestions[index]
+  const current = shuffledQuestions[index]
   const currentAnswer = answers[index]
   const isLastQuestion = index === total - 1
 
@@ -110,7 +143,7 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
         score={score}
         total={total}
         mode={mode}
-        questions={attemptQuestions}
+        questions={shuffledQuestions}
         answers={answers}
         onExit={onExit}
       />
