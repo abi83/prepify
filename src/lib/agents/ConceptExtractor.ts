@@ -1,6 +1,8 @@
 import { runAgent, AgentResult } from '../agent'
 import { conceptsResponseSchema } from '../../types/pipeline'
 import type { Concept } from '../../types/pipeline'
+import { chunkText } from '../chunkText'
+import { CHUNK_SIZE, CHUNK_OVERLAP } from '../config'
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 
@@ -34,14 +36,29 @@ export async function runConceptExtractor(
   model: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<Concept[]>> {
-  const result = await runAgent({
-    name: 'ConceptExtractor',
-    systemPrompt: SYSTEM_PROMPT,
-    userPrompt: `Source text:\n\n${rawText.slice(0, 8000)}`,
-    schema: conceptsResponseSchema,
-    apiKey,
-    model,
-    signal,
-  })
-  return { output: result.output.concepts, metrics: result.metrics }
+  const chunks = chunkText(rawText, CHUNK_SIZE, CHUNK_OVERLAP)
+
+  let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+  const allConcepts: Concept[] = []
+
+  for (const chunk of chunks) {
+    const result = await runAgent({
+      name: 'ConceptExtractor',
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt: `Source text:\n\n${chunk}`,
+      schema: conceptsResponseSchema,
+      apiKey,
+      model,
+      signal,
+    })
+    allConcepts.push(...result.output.concepts)
+    totalTokens = {
+      latency_ms: totalTokens.latency_ms + result.metrics.latency_ms,
+      prompt_tokens: totalTokens.prompt_tokens + result.metrics.prompt_tokens,
+      completion_tokens: totalTokens.completion_tokens + result.metrics.completion_tokens,
+      total_tokens: totalTokens.total_tokens + result.metrics.total_tokens,
+    }
+  }
+
+  return { output: allConcepts, metrics: totalTokens }
 }
