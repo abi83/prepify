@@ -15,8 +15,23 @@ EXTRACTION RULES:
 - Extract every concept worth testing a student on — do not aim for a specific count
 - Focus on: facts, definitions, processes, mechanisms, relationships, principles
 - Assign each concept an importance score (0.0–1.0) reflecting how central it is to the material
-- Include 1-3 common misconceptions per concept for use in question distractors (can be empty list)
+- Include 0-3 misconceptions per concept (can be empty list)
 - If the text contains no assessable concepts, return an empty list
+
+AVOID REDUNDANCY:
+- Before adding a concept, check if it is already fully covered as a sub-point of a broader concept you've already listed — if so, skip it
+- Prefer one broader concept over two narrow overlapping ones
+- Do not extract the same idea twice under different names
+
+DESCRIPTIONS:
+- 1–2 sentences maximum
+- State what the concept is and why it matters for understanding the material
+- Do not restate the source text verbatim or list every detail — focus on what makes it testable
+
+MISCONCEPTIONS:
+- Each misconception must be FACTUALLY INCORRECT
+- Must represent a plausible error a student could genuinely hold — not a trivial logical negation ("X does not exist" or "X never happens" are not misconceptions)
+- Good misconceptions reflect confusion between related concepts, common overgeneralizations, or subtle errors in reasoning
 
 IMPORTANCE SCORING:
 - 0.8–1.0: Core concepts; without these the material cannot be understood
