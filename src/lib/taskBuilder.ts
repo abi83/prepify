@@ -43,8 +43,9 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concep
 }
 
 /**
- * Assigns one question type to each concept slot:
+ * Assigns one question type and 1–3 concepts to each task slot:
  * - builds a type pool from config
+ * - 50% single-concept, 40% two-concept, 10% three-concept tasks
  * - spreads load across concepts weighted by importance
  * - guarantees each of the top-5 concepts appears at least once
  */
@@ -59,42 +60,64 @@ export function buildQuestionTasks(
   const sorted = [...concepts].sort((a, b) => b.importance - a.importance)
   const types = shuffle(buildTypePool(count, enabledTypes))
 
+  // Build slot-size pool: 50% single, 40% double, 10% triple
+  const singleCount = Math.round(count * 0.5)
+  const tripleCount = Math.max(0, Math.round(count * 0.1))
+  const doubleCount = count - singleCount - tripleCount
+  const slotSizes = shuffle([
+    ...Array<number>(singleCount).fill(1),
+    ...Array<number>(doubleCount).fill(2),
+    ...Array<number>(tripleCount).fill(3),
+  ])
+
   const tasks: QuestionTask[] = []
   const conceptCounts = new Map<string, number>()
-  const MAX_PER_CONCEPT = Math.max(2, Math.ceil(types.length / Math.min(sorted.length, 5)))
+  const MAX_PER_CONCEPT = Math.max(2, Math.ceil(count / Math.min(sorted.length, 5)))
 
-  for (const type of types) {
-    const capped = new Set(
-      [...conceptCounts.entries()]
-        .filter(([, count]) => count >= MAX_PER_CONCEPT)
-        .map(([name]) => name)
-    )
-    const concept = weightedPick(sorted, capped)
-    conceptCounts.set(concept.name, (conceptCounts.get(concept.name) ?? 0) + 1)
-    tasks.push({ concept, type })
+  for (let i = 0; i < types.length; i++) {
+    const type = types[i]
+    const size = sorted.length >= 2 ? (slotSizes[i] ?? 1) : 1
+
+    const slotConcepts: Concept[] = []
+    const slotExclude = new Set<string>()
+
+    for (let s = 0; s < size; s++) {
+      const capped = new Set(
+        [...conceptCounts.entries()]
+          .filter(([, n]) => n >= MAX_PER_CONCEPT)
+          .map(([name]) => name)
+      )
+      const exclude = new Set([...capped, ...slotExclude])
+      const concept = weightedPick(sorted, exclude)
+      slotConcepts.push(concept)
+      slotExclude.add(concept.name)
+      conceptCounts.set(concept.name, (conceptCounts.get(concept.name) ?? 0) + 1)
+    }
+
+    tasks.push({ concepts: slotConcepts, type })
   }
 
   // Coverage pass: ensure top-5 concepts each appear at least once
   const topN = Math.min(sorted.length, 5)
   for (let i = 0; i < topN; i++) {
     const top = sorted[i]
-    if (tasks.some(t => t.concept.name === top.name)) continue
+    if (tasks.some(t => t.concepts.some(c => c.name === top.name))) continue
 
     const counts = new Map<string, number>()
-    tasks.forEach(t => counts.set(t.concept.name, (counts.get(t.concept.name) ?? 0) + 1))
+    tasks.forEach(t => t.concepts.forEach(c => counts.set(c.name, (counts.get(c.name) ?? 0) + 1)))
 
     let replaceIdx = -1
     let maxCount = 0
     tasks.forEach((t, idx) => {
-      const c = counts.get(t.concept.name) ?? 0
-      if (c > maxCount || (c === maxCount && t.concept.importance < (tasks[replaceIdx]?.concept.importance ?? 1))) {
+      const c = counts.get(t.concepts[0].name) ?? 0
+      if (c > maxCount || (c === maxCount && t.concepts[0].importance < (tasks[replaceIdx]?.concepts[0].importance ?? 1))) {
         maxCount = c
         replaceIdx = idx
       }
     })
 
     if (replaceIdx >= 0) {
-      tasks[replaceIdx] = { concept: top, type: tasks[replaceIdx].type }
+      tasks[replaceIdx] = { concepts: [top], type: tasks[replaceIdx].type }
     }
   }
 

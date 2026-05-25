@@ -25,9 +25,18 @@ If the question is fundamentally broken (wrong facts, unfixable format), return 
 
 Return JSON: { "question": <corrected question object or null> }`
 
+function formatConcepts(concepts: Concept[]): string {
+  if (concepts.length === 1) {
+    const c = concepts[0]
+    return `Concept being assessed:\nName: ${c.name}\nDescription: ${c.description}`
+  }
+  return `Concepts being assessed:\n` +
+    concepts.map((c, i) => `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}`).join('\n\n')
+}
+
 export async function runQuestionReviewer(
   question: GeneratedQuestion,
-  concept: Concept,
+  concepts: Concept[],
   apiKey: string,
   model: string,
   signal?: AbortSignal,
@@ -36,7 +45,7 @@ export async function runQuestionReviewer(
     return await runAgent({
       name: 'QuestionReviewer',
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: `Concept being assessed:\nName: ${concept.name}\nDescription: ${concept.description}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}`,
+      userPrompt: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}`,
       schema: reviewerResponseSchema,
       apiKey,
       model,
