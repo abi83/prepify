@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import Tesseract from 'tesseract.js'
+import OpenAI from 'openai'
 import { supabase } from '../lib/supabase'
-import { getOcrLanguage, setOcrLanguage, OCR_LANGUAGES } from '../lib/ocrLanguage'
+import { getApiKey } from '../lib/apiKey'
 import styles from './UploadModal.module.css'
 
 type Props = {
@@ -11,35 +11,56 @@ type Props = {
 
 type Phase = 'idle' | 'ocr' | 'saving' | 'error'
 
+async function extractTextFromImage(file: File, apiKey: string): Promise<string> {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
+  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+  const response = await client.chat.completions.create({
+    model: 'gpt-5-nano',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:${file.type};base64,${base64}` },
+          },
+          {
+            type: 'text',
+            text: 'Extract all text from this textbook page verbatim, preserving structure and line breaks. Output only the extracted text, nothing else.',
+          },
+        ],
+      },
+    ],
+    service_tier: 'flex',
+  })
+
+  return response.choices[0]?.message?.content?.trim() ?? ''
+}
+
 export default function UploadModal({ onClose, onDone }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<Phase>('idle')
-  const [progress, setProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
-  const [language, setLanguage] = useState(getOcrLanguage)
-
-  function handleLanguageChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const code = e.target.value
-    setLanguage(code)
-    setOcrLanguage(code)
-  }
 
   async function handleFile(file: File) {
     setPhase('ocr')
-    setProgress(0)
+
+    const config = getApiKey()
+    if (!config) {
+      setPhase('error')
+      setErrorMsg('No API key configured. Please set one in Settings.')
+      return
+    }
 
     let rawText = ''
     try {
-      const worker = await Tesseract.createWorker(language, 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setProgress(Math.round(m.progress * 100))
-          }
-        },
-      })
-      const { data } = await worker.recognize(file)
-      rawText = data.text.trim()
-      await worker.terminate()
+      rawText = await extractTextFromImage(file, config.key)
     } catch {
       setPhase('error')
       setErrorMsg('OCR failed. Please try a clearer image.')
@@ -103,47 +124,31 @@ export default function UploadModal({ onClose, onDone }: Props) {
         </div>
 
         {phase === 'idle' && (
-          <>
-            <div className={styles.langRow}>
-              <label className={styles.langLabel} htmlFor="ocr-lang">Language</label>
-              <select
-                id="ocr-lang"
-                className={styles.langSelect}
-                value={language}
-                onChange={handleLanguageChange}
-              >
-                {OCR_LANGUAGES.map(l => (
-                  <option key={l.code} value={l.code}>{l.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div
-              className={styles.dropzone}
-              onClick={() => inputRef.current?.click()}
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-            >
-              <span className={styles.dropIcon}>📄</span>
-              <p className={styles.dropMain}>Upload a photo of a textbook page</p>
-              <p className={styles.dropSub}>Tap to select · or drag & drop</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={handleChange}
-              />
-            </div>
-          </>
+          <div
+            className={styles.dropzone}
+            onClick={() => inputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={e => e.preventDefault()}
+          >
+            <span className={styles.dropIcon}>📄</span>
+            <p className={styles.dropMain}>Upload a photo of a textbook page</p>
+            <p className={styles.dropSub}>Tap to select · or drag & drop</p>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={handleChange}
+            />
+          </div>
         )}
 
         {phase === 'ocr' && (
           <div className={styles.progress}>
-            <div className={styles.progressLabel}>Recognising text… {progress}%</div>
+            <div className={styles.progressLabel}>Recognising text…</div>
             <div className={styles.bar}>
-              <div className={styles.fill} style={{ width: `${progress}%` }} />
+              <div className={styles.fill} style={{ width: '100%' }} />
             </div>
           </div>
         )}
