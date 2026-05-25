@@ -1,4 +1,7 @@
 import { runConceptExtractor } from './agents/ConceptExtractor'
+import { runConceptMerger } from './agents/ConceptMerger'
+import { deduplicateExact } from './mergeConceptLists'
+import { BYOK_TEXT_HARD_LIMIT } from './config'
 import { runPrepNamer } from './agents/PrepNamer'
 import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
 import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
@@ -19,6 +22,14 @@ import {
   saveQuestionSlot,
   deleteRun,
 } from './pipelineStore'
+
+/** Thrown when rawText exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
+export class TextTooLongError extends Error {
+  constructor(public readonly length: number) {
+    super(`Text too long: ${length} characters`)
+    this.name = 'TextTooLongError'
+  }
+}
 
 /** Maximum number of concurrent build→review→save chains. */
 const CONCURRENCY = 5
@@ -93,6 +104,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   const { prepId, rawText, apiKey, model, questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
+  if (rawText.length > BYOK_TEXT_HARD_LIMIT) {
+    throw new TextTooLongError(rawText.length)
+  }
+
   // Load or create a persistent run record for crash recovery
   const state = await loadOrCreateRun(prepId)
   const { runId } = state
@@ -106,7 +121,18 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const { output, metrics } = await runConceptExtractor(rawText, apiKey, model, signal)
     totalTokens += metrics.total_tokens
     void incrementPrepTokensInDb(prepId, metrics.total_tokens)
-    concepts = output
+
+    // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call)
+    const deduped = deduplicateExact(output)
+    const merged = deduped.length > 1
+      ? await runConceptMerger(deduped, apiKey, model, signal).then(r => {
+          totalTokens += r.metrics.total_tokens
+          void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
+          return r.output
+        })
+      : deduped
+
+    concepts = merged
     await saveConcepts(runId, concepts)
   }
 
