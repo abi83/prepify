@@ -15,7 +15,7 @@ export const conceptsResponseSchema = z.object({
 export type Concept = z.infer<typeof conceptSchema>
 
 export interface QuestionTask {
-  concept: Concept
+  concepts: Concept[]
   type: QuestionType
 }
 

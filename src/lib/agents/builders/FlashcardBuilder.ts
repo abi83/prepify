@@ -22,22 +22,29 @@ CRITICAL for Brevity:
 
 Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "..." } }`
 
+function formatConcepts(concepts: QuestionTask['concepts']): string {
+  if (concepts.length === 1) {
+    const c = concepts[0]
+    const mis = c.misconceptions.length > 0 ? c.misconceptions.join('; ') : 'none listed'
+    return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
+  }
+  return `Concepts to assess (connect or contrast them in your question):\n\n` +
+    concepts.map((c, i) => {
+      const mis = c.misconceptions.length > 0 ? c.misconceptions.join('; ') : 'none listed'
+      return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
+    }).join('\n\n')
+}
+
 export async function runFlashcardBuilder(
   task: QuestionTask,
-  rawText: string,
   apiKey: string,
   model: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'flashcard'; content: FlashcardContent }>> {
-  const { concept } = task
-  const misconceptions = concept.misconceptions.length > 0
-    ? concept.misconceptions.join('; ')
-    : 'none listed'
-
   const result = await runAgent({
     name: 'FlashcardBuilder',
     systemPrompt: SYSTEM_PROMPT,
-    userPrompt: `Source text excerpt:\n${rawText.slice(0, 2000)}\n\nConcept to assess:\nName: ${concept.name}\nDescription: ${concept.description}\nCommon misconceptions: ${misconceptions}`,
+    userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,

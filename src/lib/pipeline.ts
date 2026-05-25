@@ -65,7 +65,6 @@ async function withConcurrency<T>(
 
 type BuilderFn = (
   task: QuestionTask,
-  rawText: string,
   apiKey: string,
   model: string,
   signal?: AbortSignal,
@@ -199,21 +198,21 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       const task = tasks[taskIdx]
 
       // Build
-      const buildResult = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+      const buildResult = await BUILDERS[task.type](task, apiKey, model, signal)
       totalTokens += buildResult.metrics.total_tokens
       void incrementPrepTokensInDb(prepId, buildResult.metrics.total_tokens)
       craftDone++
       onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
-      const reviewed = await runQuestionReviewer(buildResult.output, task.concept, apiKey, model, signal)
+      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, signal)
       totalTokens += reviewed.metrics.total_tokens
       void incrementPrepTokensInDb(prepId, reviewed.metrics.total_tokens)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
-        const retry = await BUILDERS[task.type](task, rawText, apiKey, model, signal)
+        const retry = await BUILDERS[task.type](task, apiKey, model, signal)
         totalTokens += retry.metrics.total_tokens
         void incrementPrepTokensInDb(prepId, retry.metrics.total_tokens)
         question = retry.output
