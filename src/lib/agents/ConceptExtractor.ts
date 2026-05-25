@@ -32,12 +32,16 @@ NOT ASSESSABLE (skip):
 Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ] }
 The list will be capped at 20 entries — prioritise by importance if you have more.`
 
+export interface ConceptExtractorResult extends AgentResult<Concept[]> {
+  chunkCount: number
+}
+
 export async function runConceptExtractor(
   rawText: string,
   apiKey: string,
   model: string,
   signal?: AbortSignal,
-): Promise<AgentResult<Concept[]>> {
+): Promise<ConceptExtractorResult> {
   const chunks = chunkText(rawText, CHUNK_SIZE, CHUNK_OVERLAP)
 
   let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
@@ -63,5 +67,5 @@ export async function runConceptExtractor(
     }
   }
 
-  return { output: allConcepts, metrics: totalTokens }
+  return { output: allConcepts, metrics: totalTokens, chunkCount: chunks.length }
 }

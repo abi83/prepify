@@ -118,13 +118,14 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: 'concepts' })
-    const { output, metrics } = await runConceptExtractor(rawText, apiKey, model, signal)
+    const { output, metrics, chunkCount } = await runConceptExtractor(rawText, apiKey, model, signal)
     totalTokens += metrics.total_tokens
     void incrementPrepTokensInDb(prepId, metrics.total_tokens)
 
-    // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call)
+    // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
+    // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
-    const merged = deduped.length > 1
+    const merged = chunkCount > 1
       ? await runConceptMerger(deduped, apiKey, model, signal).then(r => {
           totalTokens += r.metrics.total_tokens
           void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
