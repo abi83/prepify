@@ -9,7 +9,7 @@ export const conceptSchema = z.object({
 })
 
 export const conceptsResponseSchema = z.object({
-  concepts: z.array(conceptSchema).min(1).max(15),
+  concepts: z.array(conceptSchema).max(20),
 })
 
 export type Concept = z.infer<typeof conceptSchema>

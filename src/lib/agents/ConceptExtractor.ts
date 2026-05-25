@@ -12,10 +12,11 @@ A concept is assessable if it:
 3. Appears in the provided text — NO hallucination
 
 EXTRACTION RULES:
-- Extract 5-15 key concepts worth testing a student on
+- Extract every concept worth testing a student on — do not aim for a specific count
 - Focus on: facts, definitions, processes, mechanisms, relationships, principles
 - Assign each concept an importance score (0.0–1.0) reflecting how central it is to the material
 - Include 1-3 common misconceptions per concept for use in question distractors (can be empty list)
+- If the text contains no assessable concepts, return an empty list
 
 IMPORTANCE SCORING:
 - 0.8–1.0: Core concepts; without these the material cannot be understood
@@ -28,7 +29,8 @@ NOT ASSESSABLE (skip):
 - Instructions, exam logistics, scoring rubrics
 - Unrelated asides or parenthetical remarks
 
-Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ] }`
+Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ] }
+The list will be capped at 20 entries — prioritise by importance if you have more.`
 
 export async function runConceptExtractor(
   rawText: string,
@@ -51,7 +53,8 @@ export async function runConceptExtractor(
       model,
       signal,
     })
-    allConcepts.push(...result.output.concepts)
+    const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
+    allConcepts.push(...filtered)
     totalTokens = {
       latency_ms: totalTokens.latency_ms + result.metrics.latency_ms,
       prompt_tokens: totalTokens.prompt_tokens + result.metrics.prompt_tokens,
