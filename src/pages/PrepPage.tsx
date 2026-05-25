@@ -225,7 +225,7 @@ export default function PrepPage() {
           if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
         },
         onTitleReady: (title) => {
-          supabase.from('preps').update({ title }).eq('id', id!)
+          void supabase.from('preps').update({ title }).eq('id', id!).then()
           setPrep(p => p ? { ...p, title } : p)
           setTitleReady(true)
         },
@@ -285,7 +285,7 @@ export default function PrepPage() {
           if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
         },
         onTitleReady: (title) => {
-          supabase.from('preps').update({ title }).eq('id', id!)
+          void supabase.from('preps').update({ title }).eq('id', id!).then()
           setPrep(p => p ? { ...p, title } : p)
           setTitleReady(true)
         },
