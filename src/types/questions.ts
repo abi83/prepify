@@ -128,7 +128,7 @@ export type PrepContext = z.infer<typeof prepContextSchema>
 
 // --- Questions array (from QuestionsAgent) ---
 
-export const generatedQuestionSchema = z.discriminatedUnion('type', [
+export const generatedQuestionSchema = z.union([
   z.object({ type: z.literal('flashcard'), content: flashcardContentSchema }),
   z.object({ type: z.literal('single_choice'), content: singleChoiceContentSchema }),
   z.object({ type: z.literal('multiple_choice'), content: multipleChoiceContentSchema }),
