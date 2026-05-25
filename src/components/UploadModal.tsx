@@ -11,6 +11,8 @@ type Props = {
 
 type Phase = 'idle' | 'ocr' | 'saving' | 'error'
 
+type OcrResult = { text: string; confidence: number }
+
 async function extractTextFromImage(file: File, apiKey: string): Promise<string> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -21,26 +23,46 @@ async function extractTextFromImage(file: File, apiKey: string): Promise<string>
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
   const response = await client.chat.completions.create({
-    model: 'gpt-5-nano',
+    model: 'gpt-5-mini',
     messages: [
       {
         role: 'user',
         content: [
           {
             type: 'image_url',
-            image_url: { url: `data:${file.type};base64,${base64}` },
+            image_url: { url: `data:${file.type};base64,${base64}`, detail: 'high' },
           },
           {
             type: 'text',
-            text: 'Extract all text from this textbook page verbatim, preserving structure and line breaks. Output only the extracted text, nothing else.',
+            text: `Extract as much text as you can see from this textbook page. Do your best even if the image is imperfect.
+
+Respond with JSON only:
+{
+  "text": "<extracted text, preserving structure and line breaks>",
+  "confidence": <0.0–1.0>
+}
+
+Confidence rubric:
+- 0.9–1.0: Sharp image, all text clearly readable
+- 0.7–0.9: Mostly readable, minor blur or cropping
+- 0.5–0.7: Partial — some words/lines unclear or missing
+- 0.0–0.5: Poor quality — large portions unreadable`,
           },
         ],
       },
     ],
+    response_format: { type: 'json_object' },
     service_tier: 'flex',
   })
 
-  return response.choices[0]?.message?.content?.trim() ?? ''
+  const raw = response.choices[0]?.message?.content?.trim() ?? ''
+  const parsed: OcrResult = JSON.parse(raw)
+
+  if (parsed.confidence < 0.5) {
+    throw new Error(`low_confidence:${parsed.confidence}`)
+  }
+
+  return parsed.text
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
@@ -61,9 +83,14 @@ export default function UploadModal({ onClose, onDone }: Props) {
     let rawText = ''
     try {
       rawText = await extractTextFromImage(file, config.key)
-    } catch {
+    } catch (err) {
       setPhase('error')
-      setErrorMsg('OCR failed. Please try a clearer image.')
+      const msg = err instanceof Error ? err.message : ''
+      setErrorMsg(
+        msg.startsWith('low_confidence')
+          ? 'Image too blurry or dark to read reliably. Please try a clearer photo.'
+          : 'OCR failed. Please try again.'
+      )
       return
     }
 
