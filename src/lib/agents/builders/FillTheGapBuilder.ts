@@ -29,22 +29,29 @@ RATIONALE (max 300 chars).
 
 Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "..." } }`
 
+function formatConcepts(concepts: QuestionTask['concepts']): string {
+  if (concepts.length === 1) {
+    const c = concepts[0]
+    const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join('\n') : '- (none listed)'
+    return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
+  }
+  return `Concepts to assess (connect or contrast them in your question):\n\n` +
+    concepts.map((c, i) => {
+      const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join('\n') : '- (none listed)'
+      return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
+    }).join('\n\n')
+}
+
 export async function runFillTheGapBuilder(
   task: QuestionTask,
-  rawText: string,
   apiKey: string,
   model: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'fill_the_gap'; content: FillTheGapContent }>> {
-  const { concept } = task
-  const misconceptions = concept.misconceptions.length > 0
-    ? concept.misconceptions.map(m => `- ${m}`).join('\n')
-    : '- (none listed)'
-
   const result = await runAgent({
     name: 'FillTheGapBuilder',
     systemPrompt: SYSTEM_PROMPT,
-    userPrompt: `Source text excerpt:\n${rawText.slice(0, 3000)}\n\nConcept to assess:\nName: ${concept.name}\nDescription: ${concept.description}\nCommon misconceptions:\n${misconceptions}`,
+    userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,
