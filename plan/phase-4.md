@@ -23,14 +23,25 @@ Body: { prep_id }
 
 User identity is extracted from the JWT server-side — never trusted from the request body.
 
+### Text input limits
+
+Free tier uses the app's API key, so input size is capped to keep costs predictable:
+
+- **Hard limit:** 10 000 characters of OCR'd text and only 1 full photo upload
+- If the uploaded text exceeds the limit, reject the request with a clear user-facing message before the pipeline runs. No silent truncation.
+- No chunking, no merger — single extraction call per generation. One photo → one concepts list -> one set of questions.
+
+This constraint is intentional. Users who need multi-page support should add their own API key (BYOK).
+
 ### Flow
 1. Verify JWT → extract `user_id`
 2. Check rate limit for `user_id` — return `429` if exceeded
 3. Fetch `raw_text` from `preps` table using `prep_id` + `user_id` (RLS enforced via service role)
-4. Run three-agent pipeline server-side using app's `OPENAI_API_KEY`
-5. Write generated `questions` and updated `title` directly to Supabase
-6. Increment usage counter
-7. Return `{ success: true }`
+4. **Reject with `413` if `raw_text` exceeds 10 000 characters** — return a message prompting BYOK
+5. Run three-agent pipeline server-side using app's `OPENAI_API_KEY`
+6. Write generated `questions` and updated `title` directly to Supabase
+7. Increment usage counter
+8. Return `{ success: true }`
 
 Frontend receives `{ success: true }` and re-fetches questions and title from Supabase as normal — no payload in the response.
 

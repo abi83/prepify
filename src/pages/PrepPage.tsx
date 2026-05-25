@@ -5,7 +5,8 @@ import type { Prep } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
-import { runPipeline } from '../lib/pipeline'
+import { runPipeline, TextTooLongError } from '../lib/pipeline'
+import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from '../lib/generationConfig'
 import type { GenerationConfig } from '../lib/generationConfig'
 import type { QuestionType } from '../types/questions'
@@ -148,6 +149,7 @@ export default function PrepPage() {
   const [genMs, setGenMs] = useState(0)
   const [totalTokens, setTotalTokens] = useState(0)
   const [genError, setGenError] = useState<string | null>(null)
+  const [textTooLong, setTextTooLong] = useState<{ length: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
 
@@ -244,6 +246,62 @@ export default function PrepPage() {
       setGenPhase('done')
       await refreshRunSummary()
     } catch (e: unknown) {
+      if (e instanceof TextTooLongError) {
+        setTextTooLong({ length: e.length })
+        setGenPhase('idle')
+        return
+      }
+      if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
+      setGenPhase('idle')
+      await refreshRunSummary()
+    }
+  }
+
+  async function handleConfirmTruncate() {
+    setTextTooLong(null)
+    const truncated = prep!.raw_text.slice(0, BYOK_TEXT_HARD_LIMIT)
+    const keyConfig = getApiKey()!
+    setGenError(null)
+    setPipelineProgress(null)
+    setCraftProgress(null)
+    setReviewProgress(null)
+    setTitleReady(false)
+    abortRef.current = new AbortController()
+    genStartRef.current = performance.now()
+    setGenPhase('running')
+
+    try {
+      const result = await runPipeline({
+        prepId: id!,
+        rawText: truncated,
+        apiKey: keyConfig.key,
+        model: keyConfig.model,
+        questionCount: localConfig.questionCount,
+        enabledTypes: localConfig.enabledTypes,
+        signal: abortRef.current.signal,
+        onProgress: (event) => {
+          setPipelineProgress(event)
+          if (event.stage === 'crafting') setCraftProgress({ done: event.done, total: event.total })
+          if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
+        },
+        onTitleReady: (title) => {
+          supabase.from('preps').update({ title }).eq('id', id!)
+          setPrep(p => p ? { ...p, title } : p)
+          setTitleReady(true)
+        },
+      })
+
+      const elapsed = Math.round(performance.now() - genStartRef.current)
+      const rows = result.questions.map(q => ({ prep_id: id!, type: q.type, content: q.content }))
+      const { data: saved } = await supabase.from('questions').insert(rows).select()
+      setQuestions((saved ?? []) as Question[])
+      const { data: freshPrep } = await supabase.from('preps').select('*').eq('id', id!).single()
+      if (freshPrep) setPrep(freshPrep as Prep)
+      setGenMs(elapsed)
+      setTotalTokens(result.totalTokens)
+      setGenPhase('done')
+      await refreshRunSummary()
+    } catch (e: unknown) {
       if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
       setGenPhase('idle')
       await refreshRunSummary()
@@ -299,6 +357,23 @@ export default function PrepPage() {
 
   return (
     <div className={styles.root}>
+      {textTooLong && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalBox}>
+            <h2 className={styles.modalTitle}>Text too long</h2>
+            <p className={styles.modalBody}>
+              Your text is <strong>{textTooLong.length.toLocaleString()}</strong> characters.
+              Only the first <strong>{BYOK_TEXT_HARD_LIMIT.toLocaleString()}</strong> will be processed —
+              content beyond that limit will be ignored.
+            </p>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setTextTooLong(null)}>Cancel</button>
+              <button className={styles.modalConfirm} onClick={handleConfirmTruncate}>Continue anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className={styles.header}>
         <button className={styles.back} onClick={() => navigate('/preps')}>← My Preps</button>
         <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
