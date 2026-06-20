@@ -15,10 +15,11 @@ export default function MultipleChoiceQuestion({ content, selected, isReview, on
 
   function toggle(id: string) {
     if (isReview || !onChange) return
-    const next = selected.includes(id)
-      ? selected.filter(s => s !== id)
-      : [...selected, id]
-    onChange(next)
+    if (selected.includes(id)) {
+      onChange(selected.filter(s => s !== id))
+    } else if (selected.length < correctCount) {
+      onChange([...selected, id])
+    }
   }
 
   return (

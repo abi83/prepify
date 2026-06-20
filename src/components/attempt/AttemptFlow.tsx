@@ -50,7 +50,11 @@ type Phase = 'attempt' | 'score'
 function isAnswerValid(q: Question, a: AnswerState): boolean {
   switch (q.type) {
     case 'single_choice': return a.single !== null
-    case 'multiple_choice': return a.multi.length > 0
+    case 'multiple_choice': {
+      const c = q.content as MultipleChoiceContent
+      const correctCount = c.answers.filter(x => x.is_correct).length
+      return a.multi.length === correctCount
+    }
     case 'fill_the_gap': {
       const { gaps } = q.content as { gaps: { index: number }[] }
       return gaps.every((_, i) => !!a.fill[i])
