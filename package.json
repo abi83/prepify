@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "db:push": "bash scripts/db-push.sh",
     "db:status": "bash scripts/db-status.sh"
   },
