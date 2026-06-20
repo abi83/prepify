@@ -2,11 +2,12 @@
 
 ## Project Overview
 Prepify is a React + Vite + TypeScript app backed by Supabase (auth + database).
-Users upload textbook photos, OCR extracts text, and the app generates study quizzes.
+Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
+API keys are BYOK — users supply their own OpenAI key stored in localStorage.
 
 ## Tech Stack
 - React + Vite (TypeScript)
-- Supabase (auth, database, storage)
+- Supabase (auth, database)
 - Tesseract.js (in-browser OCR)
 - CSS Modules
 
@@ -58,29 +59,29 @@ npm run db:status
 
 ## Database Schema
 
-### preps (Phase 1)
+### preps
 | column | type | notes |
 |---|---|---|
 | id | uuid | PK, auto-generated |
 | user_id | uuid | FK → auth.users |
-| title | text | auto-incremented ("Prep #1", "Prep #2"); LLM-named in Phase 3 |
+| title | text | LLM-named after generation |
 | raw_text | text | OCR output |
 | created_at | timestamptz | auto-set |
 
 RLS: users can only access their own rows (`auth.uid() = user_id`).
 
-### questions (Phase 2)
+### questions
 | column | type | notes |
 |---|---|---|
 | id | uuid | PK, auto-generated |
 | prep_id | uuid | FK → preps |
-| type | text | `'flashcard'` \| `'mcq'` \| `'fill'` |
-| content | jsonb | flashcard: `{front, back}` · mcq: `{question, options[], answer}` · fill: `{sentence, answer}` |
+| type | text | `'flashcard'` \| `'single_choice'` \| `'multiple_choice'` \| `'fill_the_gap'` \| `'sorting'` |
+| content | jsonb | shape varies by type |
 | created_at | timestamptz | auto-set |
 
 RLS: accessible if `prep_id` belongs to the current user.
 
-### attempts (Phase 2)
+### attempts
 | column | type | notes |
 |---|---|---|
 | id | uuid | PK, auto-generated |
@@ -93,15 +94,6 @@ RLS: accessible if `prep_id` belongs to the current user.
 
 RLS: users can only access their own rows (`auth.uid() = user_id`).
 
-### free_usage (Phase 4)
-| column | type | notes |
-|---|---|---|
-| user_id | uuid | PK, FK → auth.users |
-| date | date | resets daily |
-| count | int | generations used today |
-
-Used by the Vercel proxy to enforce 3 free generations/day.
-
 ---
 
 ## Development
@@ -110,12 +102,3 @@ Used by the Vercel proxy to enforce 3 free generations/day.
 npm install
 npm run dev
 ```
-
----
-
-## Implementation Phases
-
-- **Phase 1** — Auth + Upload + OCR + Prep Storage ✓
-- **Phase 2** — Study mode (quiz/test) using Claude API
-- **Phase 3** — LLM-named preps, refined study UX
-- **Phase 4** — Server-side pipeline, polish
