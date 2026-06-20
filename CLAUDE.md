@@ -50,7 +50,12 @@ No `supabase login` needed — uses `SUPABASE_DATABASE_PASSWORD` from `.env`. Mi
 | user_id | uuid | FK → auth.users |
 | title | text | LLM-named |
 | raw_text | text | OCR output |
+| visibility | enum | `private` · `link` · `public`, default `private` |
+| grade | integer | 1–13, nullable |
+| discipline | enum | school subject (see migration for full list), nullable |
 | created_at | timestamptz | |
+
+RLS on `preps`: owner has full access; `link` preps are SELECT-readable by anyone with the row id; `public` preps are SELECT-readable by all including unauthenticated.
 
 ### questions
 | column | type | notes |
@@ -72,7 +77,18 @@ No `supabase login` needed — uses `SUPABASE_DATABASE_PASSWORD` from `.env`. Mi
 | total | int | total questions |
 | created_at | timestamptz | |
 
-RLS on all tables: users can only access their own rows.
+RLS on `questions` and `attempts`: always user-scoped regardless of prep visibility. Anonymous users studying a public/link prep do not get attempt tracking.
+
+---
+
+## Issue Tracking
+
+All work is tracked via **GitHub Issues** on this repo. When the user says "ticket" or "issue", that means a GitHub issue.
+
+### Workflow
+- When asked to implement a ticket/issue, fetch it first with `gh issue view <number>` before touching code.
+- When spotting a bug or a good idea during work, **suggest creating a GitHub issue** — do not implement right away. Prioritisation is the owner's call.
+- Use `gh issue create` to file a new issue when the user agrees.
 
 ---
 
