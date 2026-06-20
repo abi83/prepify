@@ -47,7 +47,7 @@ interface Props {
 
 type Phase = 'attempt' | 'score'
 
-function isAnswerValid(q: Question, a: AnswerState): boolean {
+export function isAnswerValid(q: Question, a: AnswerState): boolean {
   switch (q.type) {
     case 'single_choice': return a.single !== null
     case 'multiple_choice': {
