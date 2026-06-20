@@ -8,11 +8,11 @@ Built for my daughter. Might be useful for yours too.
 
 ## How it works
 
-OCR runs entirely in the browser (Tesseract.js — your photo never leaves the device). The extracted text goes through a multi-agent LLM pipeline that generates five question types: flashcards, single-choice, multiple-choice, fill-the-gap, and sorting.
+Your photo is sent to OpenAI Vision for OCR, then the extracted text goes through a multi-agent LLM pipeline that generates five question types: flashcards, single-choice, multiple-choice, fill-the-gap, and sorting.
 
 Three study modes: **Flashcards** (flip), **Quiz** (immediate per-question feedback), **Test** (scored at the end).
 
-You bring your own OpenAI API key — stored in `localStorage`, sent only to OpenAI.
+You bring your own OpenAI API key — stored in `localStorage`, used only to call OpenAI directly from your browser.
 
 ---
 
@@ -34,4 +34,4 @@ Open the app → Settings → paste your OpenAI key.
 
 ## Stack
 
-React 18 + Vite · TypeScript · Supabase (auth + Postgres) · Tesseract.js · CSS Modules
+React 18 + Vite · TypeScript · Supabase (auth + Postgres) · OpenAI API · CSS Modules
