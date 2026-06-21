@@ -24,6 +24,12 @@
   color: var(--text);
 }
 
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .settingsLink {
   background: none;
   color: var(--text-muted);
@@ -34,6 +40,20 @@
 
 .settingsLink:hover {
   color: var(--text);
+}
+
+.shareBtn {
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.shareBtn:hover {
+  background: var(--accent-hover);
 }
 
 .main {

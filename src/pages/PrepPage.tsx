@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Prep } from '../lib/supabase'
+import type { Prep, PrepVisibility } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
-import type { PipelineProgressEvent } from '../types/pipeline'
+import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
 import { runPipeline, TextTooLongError } from '../lib/pipeline'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
@@ -14,6 +14,7 @@ import { getExistingRunSummary } from '../lib/pipelineStore'
 import type { PartialRunSummary } from '../lib/pipelineStore'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
+import ShareModal from '../components/ShareModal'
 import styles from './PrepPage.module.css'
 
 type Tab = 'cards' | 'quiz' | 'test'
@@ -154,6 +155,8 @@ export default function PrepPage() {
   const genStartRef = useRef(0)
 
   const [userId, setUserId] = useState<string | null>(null)
+  const [concepts, setConcepts] = useState<Concept[]>([])
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
@@ -166,11 +169,13 @@ export default function PrepPage() {
       supabase.from('questions').select('*').eq('prep_id', id).order('created_at'),
       supabase.from('attempts').select('*').eq('prep_id', id).order('created_at', { ascending: false }),
       getExistingRunSummary(id),
-    ]).then(([{ data: prepData }, { data: qData }, { data: aData }, summary]) => {
+      supabase.from('pipeline_runs').select('concepts').eq('prep_id', id).maybeSingle(),
+    ]).then(([{ data: prepData }, { data: qData }, { data: aData }, summary, { data: runData }]) => {
       setPrep(prepData)
       setQuestions((qData ?? []) as Question[])
       setAttempts((aData ?? []) as Attempt[])
       setRunSummary(summary)
+      if (runData?.concepts) setConcepts(runData.concepts as Concept[])
       setLoading(false)
     })
   }, [id])
@@ -376,8 +381,31 @@ export default function PrepPage() {
 
       <header className={styles.header}>
         <button className={styles.back} onClick={() => navigate('/preps')}>← My Preps</button>
-        <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
+        <div className={styles.headerRight}>
+          {prep.user_id === userId && hasQuestions && (
+            <button className={styles.shareBtn} onClick={() => setShowShareModal(true)}>
+              {prep.visibility === 'private' ? 'Share' : 'Shared'}
+            </button>
+          )}
+          <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
+        </div>
       </header>
+
+      {showShareModal && prep.user_id === userId && (
+        <ShareModal
+          prepId={prep.id}
+          concepts={concepts}
+          apiKey={getApiKey()?.key ?? ''}
+          model={getApiKey()?.model ?? 'gpt-5-nano'}
+          initialVisibility={prep.visibility}
+          initialGrade={prep.grade}
+          initialDiscipline={prep.discipline}
+          onSave={(visibility: PrepVisibility, grade: number | null, discipline: string | null) => {
+            setPrep(p => p ? { ...p, visibility, grade, discipline } : p)
+          }}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
 
       <main className={styles.main}>
         <div className={styles.meta}>

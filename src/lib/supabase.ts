@@ -10,6 +10,8 @@ export const supabase = createClient(
   supabaseAnonKey ?? 'placeholder',
 )
 
+export type PrepVisibility = 'private' | 'link' | 'public'
+
 export type Prep = {
   id: string
   user_id: string
@@ -18,4 +20,7 @@ export type Prep = {
   study_description: string | null
   created_at: string
   tokens_used: number
+  visibility: PrepVisibility
+  grade: number | null
+  discipline: string | null
 }
