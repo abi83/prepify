@@ -98,7 +98,7 @@ export default function ShareModal({
   }
 
   function handleCopyLink() {
-    const url = `${window.location.origin}/preps/${prepId}`
+    const url = `${window.location.origin}/study/${prepId}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -109,7 +109,7 @@ export default function ShareModal({
     if (e.target === e.currentTarget) onClose()
   }
 
-  const shareUrl = `${window.location.origin}/preps/${prepId}`
+  const shareUrl = `${window.location.origin}/study/${prepId}`
 
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>

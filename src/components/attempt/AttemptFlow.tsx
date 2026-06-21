@@ -41,7 +41,7 @@ interface Props {
   questions: Question[]
   mode: 'quiz' | 'test'
   prepId: string
-  userId: string
+  userId: string | null
   onExit: () => void
 }
 
@@ -134,7 +134,9 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
   async function finalize() {
     setSaving(true)
     const score = attemptQuestions.reduce((acc, q, i) => acc + (isAnswerCorrect(q, answers[i]) ? 1 : 0), 0)
-    await supabase.from('attempts').insert({ prep_id: prepId, user_id: userId, mode, score, total })
+    if (userId) {
+      await supabase.from('attempts').insert({ prep_id: prepId, user_id: userId, mode, score, total })
+    }
     setSaving(false)
     setPhase('score')
     setShowConfirm(false)
@@ -240,7 +242,9 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
             <h3>Submit {mode}?</h3>
             <p>
               {mode === 'quiz'
-                ? 'Your results will be saved to your history.'
+                ? userId
+                  ? 'Your results will be saved to your history.'
+                  : 'Sign in to save results to your history.'
                 : `You've answered all ${total} questions. Submit for your final score?`}
             </p>
             <div className={styles.dialogBtns}>
