@@ -115,3 +115,14 @@
 .icon {
   font-size: 1.6rem;
 }
+
+.catalogLink {
+  font-size: 0.88rem;
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.catalogLink:hover {
+  opacity: 0.8;
+}

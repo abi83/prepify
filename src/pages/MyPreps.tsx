@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import UploadModal from '../components/UploadModal'
@@ -39,6 +39,7 @@ export default function MyPreps() {
       <header className={styles.header}>
         <span className={styles.logo}>Prepify</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Link to="/catalog" className={styles.navLink}>Catalog</Link>
           <button className={styles.signOut} onClick={() => navigate('/settings')} title="Settings">⚙</button>
           <button className={styles.signOut} onClick={signOut}>Sign out</button>
         </div>

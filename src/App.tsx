@@ -7,6 +7,7 @@ import MyPreps from './pages/MyPreps'
 import PrepPage from './pages/PrepPage'
 import StudyPage from './pages/StudyPage'
 import SettingsPage from './pages/SettingsPage'
+import CatalogPage from './pages/CatalogPage'
 
 function AuthGuard({ session, children }: { session: Session | null; children: React.ReactNode }) {
   if (!session) return <Navigate to="/" replace />
@@ -53,6 +54,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key`}
         <Route path="/preps" element={<AuthGuard session={session}><MyPreps /></AuthGuard>} />
         <Route path="/preps/:id" element={<AuthGuard session={session}><PrepPage /></AuthGuard>} />
         <Route path="/study/:id" element={<StudyPage />} />
+        <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/settings" element={<AuthGuard session={session}><SettingsPage /></AuthGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

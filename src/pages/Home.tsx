@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import styles from './Home.module.css'
 
@@ -34,6 +35,7 @@ export default function Home() {
           )}
         </button>
         <p className={styles.note}>Free to start · No credit card required</p>
+        <Link to="/catalog" className={styles.catalogLink}>Browse public study sets →</Link>
       </div>
 
       <div className={styles.features}>
