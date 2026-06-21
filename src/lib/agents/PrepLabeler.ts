@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
 import type { Concept } from '../../types/pipeline'
 
-const DISCIPLINES = [
+export const DISCIPLINES = [
   'History',
   'Geography',
   'Literature',
@@ -19,7 +19,7 @@ const DISCIPLINES = [
 
 export type Discipline = (typeof DISCIPLINES)[number]
 
-const prepLabelSchema = z.object({
+export const prepLabelSchema = z.object({
   grade: z.number().int().min(1).max(13).nullable(),
   discipline: z.enum(DISCIPLINES).nullable(),
   confidence: z.number().min(0).max(1),
