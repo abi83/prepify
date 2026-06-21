@@ -90,6 +90,16 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 - When spotting a bug or a good idea during work, **suggest creating a GitHub issue** — do not implement right away. Prioritisation is the owner's call.
 - Use `gh issue create` to file a new issue when the user agrees.
 
+### Implementation flow
+For every ticket/feature, in order:
+1. Implement the code changes
+2. Apply migrations if any (`npm run db:push`)
+3. Commit the code
+4. Push to `main`
+5. Close the GitHub issue
+
+No PRs, no staging — we ship directly to main. "Test on prod" fits this project size.
+
 ---
 
 ## Development
