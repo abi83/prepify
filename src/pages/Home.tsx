@@ -10,7 +10,7 @@ export default function Home() {
     setLoading(true)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/preps` },
+      options: { redirectTo: window.location.origin },
     })
   }
 
