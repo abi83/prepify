@@ -39,12 +39,14 @@ export async function runQuestionReviewer(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ question: GeneratedQuestion | null }>> {
+  const langInstruction = language !== 'en' ? `\nAll question text must be in ${language}.` : ''
   try {
     return await runAgent({
       name: 'QuestionReviewer',
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: SYSTEM_PROMPT + langInstruction,
       userPrompt: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}`,
       schema: reviewerResponseSchema,
       apiKey,

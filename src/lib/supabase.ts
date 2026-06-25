@@ -23,4 +23,5 @@ export type Prep = {
   visibility: PrepVisibility
   grade: number | null
   discipline: string | null
+  language: string | null
 }

@@ -55,9 +55,11 @@ export async function runConceptExtractor(
   rawText: string,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkText(rawText, CHUNK_SIZE, CHUNK_OVERLAP)
+  const langInstruction = language !== 'en' ? `\nRespond in the same language as the source text (${language}).` : ''
 
   let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
   const allConcepts: Concept[] = []
@@ -65,7 +67,7 @@ export async function runConceptExtractor(
   for (const chunk of chunks) {
     const result = await runAgent({
       name: 'ConceptExtractor',
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: SYSTEM_PROMPT + langInstruction,
       userPrompt: `Source text:\n\n${chunk}`,
       schema: conceptsResponseSchema,
       apiKey,

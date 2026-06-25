@@ -27,16 +27,18 @@ export async function runConceptMerger(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<Concept[]>> {
   if (concepts.length === 0) return { output: [], metrics: { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
 
   const nameSet = new Set(concepts.map(c => c.name))
   const payload = concepts.map(c => ({ name: c.name, importance: c.importance }))
+  const langInstruction = language !== 'en' ? `\nRespond in the same language as the concept names (${language}).` : ''
 
   const result = await runAgent({
     name: 'ConceptMerger',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: JSON.stringify(payload),
     schema: mergerResponseSchema,
     apiKey,

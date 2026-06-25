@@ -21,6 +21,7 @@ export async function runPrepNamer(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ title: string }>> {
   const conceptList = concepts
@@ -29,9 +30,11 @@ export async function runPrepNamer(
     .map(c => `- ${c.name} (importance: ${c.importance.toFixed(2)})`)
     .join('\n')
 
+  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
+
   return runAgent({
     name: 'PrepNamer',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: `Concepts:\n${conceptList}`,
     schema: prepNameSchema,
     apiKey,

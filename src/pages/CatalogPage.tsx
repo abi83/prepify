@@ -9,11 +9,30 @@ type CatalogEntry = {
   title: string
   grade: number | null
   discipline: string | null
+  language: string | null
   created_at: string
   question_count: number
 }
 
 const ALL_GRADES = Array.from({ length: 13 }, (_, i) => i + 1)
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  de: 'Deutsch',
+  fr: 'Français',
+  it: 'Italiano',
+  es: 'Español',
+  pl: 'Polski',
+  nl: 'Nederlands',
+  pt: 'Português',
+  ru: 'Русский',
+  uk: 'Українська',
+  cs: 'Čeština',
+  sk: 'Slovenčina',
+  ro: 'Română',
+  hu: 'Magyar',
+  tr: 'Türkçe',
+}
 
 export default function CatalogPage() {
   const navigate = useNavigate()
@@ -22,6 +41,7 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true)
   const [gradeFilter, setGradeFilter] = useState<number | ''>('')
   const [disciplineFilter, setDisciplineFilter] = useState<string>('')
+  const [languageFilter, setLanguageFilter] = useState<string>('')
 
   useEffect(() => {
     async function load() {
@@ -29,7 +49,7 @@ export default function CatalogPage() {
 
       const { data: preps } = await supabase
         .from('preps')
-        .select('id, title, grade, discipline, created_at')
+        .select('id, title, grade, discipline, language, created_at')
         .eq('visibility', 'public')
         .order('created_at', { ascending: false })
 
@@ -51,7 +71,7 @@ export default function CatalogPage() {
       }
 
       setEntries(
-        preps.map((p: { id: string; title: string; grade: number | null; discipline: string | null; created_at: string }) => ({
+        preps.map((p: { id: string; title: string; grade: number | null; discipline: string | null; language: string | null; created_at: string }) => ({
           ...p,
           question_count: countMap[p.id] ?? 0,
         }))
@@ -65,8 +85,11 @@ export default function CatalogPage() {
   const filtered = entries.filter(e => {
     if (gradeFilter !== '' && e.grade !== gradeFilter) return false
     if (disciplineFilter !== '' && e.discipline !== disciplineFilter) return false
+    if (languageFilter !== '' && e.language !== languageFilter) return false
     return true
   })
+
+  const availableLanguages = [...new Set(entries.map(e => e.language).filter((l): l is string => !!l))]
 
   return (
     <div className={styles.root}>
@@ -108,6 +131,20 @@ export default function CatalogPage() {
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
+
+          {availableLanguages.length > 1 && (
+            <select
+              className={styles.select}
+              value={languageFilter}
+              onChange={e => setLanguageFilter(e.target.value)}
+              aria-label="Filter by language"
+            >
+              <option value="">All languages</option>
+              {availableLanguages.map(l => (
+                <option key={l} value={l}>{LANGUAGE_LABELS[l] ?? l.toUpperCase()}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {loading ? (

@@ -46,11 +46,13 @@ export async function runFillTheGapBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'fill_the_gap'; content: FillTheGapContent }>> {
+  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
   const result = await runAgent({
     name: 'FillTheGapBuilder',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,

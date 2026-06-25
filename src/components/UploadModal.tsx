@@ -11,9 +11,9 @@ type Props = {
 
 type Phase = 'idle' | 'ocr' | 'saving' | 'error'
 
-type OcrResult = { text: string; confidence: number }
+type OcrResult = { text: string; confidence: number; language: string }
 
-async function extractTextFromImage(file: File, apiKey: string): Promise<string> {
+async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(',')[1])
@@ -23,7 +23,7 @@ async function extractTextFromImage(file: File, apiKey: string): Promise<string>
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
   const response = await client.chat.completions.create({
-    model: 'gpt-5-mini',
+    model,
     messages: [
       {
         role: 'user',
@@ -39,7 +39,8 @@ async function extractTextFromImage(file: File, apiKey: string): Promise<string>
 Respond with JSON only:
 {
   "text": "<extracted text, preserving structure and line breaks>",
-  "confidence": <0.0–1.0>
+  "confidence": <0.0–1.0>,
+  "language": "<ISO 639-1 code of the text language, e.g. en, de, fr, it, es, pl>"
 }
 
 Confidence rubric:
@@ -62,7 +63,7 @@ Confidence rubric:
     throw new Error(`low_confidence:${parsed.confidence}`)
   }
 
-  return parsed.text
+  return { text: parsed.text, language: parsed.language ?? 'en' }
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
@@ -80,9 +81,9 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    let rawText = ''
+    let ocrResult: { text: string; language: string } | undefined
     try {
-      rawText = await extractTextFromImage(file, config.key)
+      ocrResult = await extractTextFromImage(file, config.key, config.model)
     } catch (err) {
       setPhase('error')
       const msg = err instanceof Error ? err.message : ''
@@ -94,7 +95,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    if (!rawText) {
+    if (!ocrResult.text) {
       setPhase('error')
       setErrorMsg('No text detected. Please try a clearer image.')
       return
@@ -115,7 +116,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
       const { data, error } = await supabase
         .from('preps')
-        .insert({ user_id: user.id, title, raw_text: rawText })
+        .insert({ user_id: user.id, title, raw_text: ocrResult.text, language: ocrResult.language })
         .select('id')
         .single()
 

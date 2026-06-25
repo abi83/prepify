@@ -45,11 +45,13 @@ export async function runSingleChoiceBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'single_choice'; content: SingleChoiceContent }>> {
+  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
   const result = await runAgent({
     name: 'SingleChoiceBuilder',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,

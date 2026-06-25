@@ -66,6 +66,7 @@ type BuilderFn = (
   task: QuestionTask,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
@@ -88,6 +89,8 @@ export interface PipelineConfig {
   rawText: string
   apiKey: string
   model: string
+  /** ISO 639-1 language code detected from the source image (e.g. 'de', 'fr'). Defaults to 'en'. */
+  language?: string
   /** Target number of questions to generate (default 10, range 5–20). */
   questionCount?: number
   /** Which question types to include (default: all five types). */
@@ -99,7 +102,7 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, rawText, apiKey, model, questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
+  const { prepId, rawText, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
   if (rawText.length > BYOK_TEXT_HARD_LIMIT) {
@@ -116,7 +119,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: 'concepts' })
-    const { output, metrics, chunkCount } = await runConceptExtractor(rawText, apiKey, model, signal)
+    const { output, metrics, chunkCount } = await runConceptExtractor(rawText, apiKey, model, language, signal)
     totalTokens += metrics.total_tokens
     void incrementPrepTokensInDb(prepId, metrics.total_tokens)
 
@@ -124,7 +127,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
-      ? await runConceptMerger(deduped, apiKey, model, signal).then(r => {
+      ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
           totalTokens += r.metrics.total_tokens
           void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
           return r.output
@@ -168,7 +171,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   // onTitleReady fires immediately when naming finishes so the title is saved
   // even if the pipeline is cancelled later.
   let prepTitle: string | null = null
-  const namingPromise = runPrepNamer(concepts, apiKey, model, signal)
+  const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
     .then(r => {
       prepTitle = r.output.title
       totalTokens += r.metrics.total_tokens
@@ -198,21 +201,21 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       const task = tasks[taskIdx]
 
       // Build
-      const buildResult = await BUILDERS[task.type](task, apiKey, model, signal)
+      const buildResult = await BUILDERS[task.type](task, apiKey, model, language, signal)
       totalTokens += buildResult.metrics.total_tokens
       void incrementPrepTokensInDb(prepId, buildResult.metrics.total_tokens)
       craftDone++
       onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
-      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, signal)
+      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
       totalTokens += reviewed.metrics.total_tokens
       void incrementPrepTokensInDb(prepId, reviewed.metrics.total_tokens)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
-        const retry = await BUILDERS[task.type](task, apiKey, model, signal)
+        const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
         totalTokens += retry.metrics.total_tokens
         void incrementPrepTokensInDb(prepId, retry.metrics.total_tokens)
         question = retry.output

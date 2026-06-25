@@ -39,11 +39,13 @@ export async function runFlashcardBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'flashcard'; content: FlashcardContent }>> {
+  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
   const result = await runAgent({
     name: 'FlashcardBuilder',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,

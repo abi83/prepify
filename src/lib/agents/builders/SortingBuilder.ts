@@ -47,11 +47,13 @@ export async function runSortingBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'sorting'; content: SortingContent }>> {
+  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
   const result = await runAgent({
     name: 'SortingBuilder',
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
     userPrompt: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
