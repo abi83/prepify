@@ -20,7 +20,6 @@ import {
   saveConcepts,
   saveQuestionTasksAndInitSlots,
   saveQuestionSlot,
-  deleteRun,
 } from './pipelineStore'
 
 /** Thrown when rawText exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
@@ -243,12 +242,6 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   const questions = tasks
     .map((_, i) => builtQuestions.get(i))
     .filter((q): q is GeneratedQuestion => q != null)
-
-  // Only clean up the run record once every slot is filled; partial runs persist
-  // so the next generate call can resume from where it left off.
-  if (builtQuestions.size === tasks.length) {
-    await deleteRun(prepId)
-  }
 
   return { questions, prepTitle, totalTokens }
 }
