@@ -1,15 +1,19 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import OpenAI from 'openai'
 import { supabase } from '../lib/supabase'
 import { getApiKey } from '../lib/apiKey'
+import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import styles from './UploadModal.module.css'
+
+const MAX_IMAGES = 10
+const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 type Props = {
   onClose: () => void
   onDone: (prepId: string) => void
 }
 
-type Phase = 'idle' | 'ocr' | 'saving' | 'error'
+type Phase = 'collect' | 'ocr' | 'saving' | 'error'
 
 type OcrResult = { text: string; confidence: number; language: string }
 
@@ -67,12 +71,50 @@ Confidence rubric:
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [phase, setPhase] = useState<Phase>('idle')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  const [files, setFiles] = useState<File[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
+  const [phase, setPhase] = useState<Phase>('collect')
+
+  useEffect(() => {
+    const urls = files.map(f => URL.createObjectURL(f))
+    setPreviews(urls)
+    return () => urls.forEach(u => URL.revokeObjectURL(u))
+  }, [files])
+  const [ocrProgress, setOcrProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
   const [errorMsg, setErrorMsg] = useState('')
 
-  async function handleFile(file: File) {
-    setPhase('ocr')
+  function addFiles(incoming: FileList | null) {
+    if (!incoming) return
+
+    const validFiles: File[] = []
+    const oversized: string[] = []
+
+    for (const f of Array.from(incoming)) {
+      if (f.size > MAX_FILE_BYTES) {
+        oversized.push(f.name)
+      } else {
+        validFiles.push(f)
+      }
+    }
+
+    if (oversized.length) {
+      setPhase('error')
+      setErrorMsg(`${oversized.join(', ')} ${oversized.length === 1 ? 'exceeds' : 'exceed'} the 5 MB limit. Please use smaller images.`)
+      return
+    }
+
+    setFiles(prev => [...prev, ...validFiles].slice(0, MAX_IMAGES))
+  }
+
+  function removeFile(index: number) {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  async function handleRecognise() {
+    if (files.length === 0) return
 
     const config = getApiKey()
     if (!config) {
@@ -81,25 +123,44 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    let ocrResult: { text: string; language: string } | undefined
+    setPhase('ocr')
+    setOcrProgress({ done: 0, total: files.length })
+
+    let results: { text: string; language: string }[]
     try {
-      ocrResult = await extractTextFromImage(file, config.key, config.model)
+      results = await Promise.all(
+        files.map(async (file, i) => {
+          const result = await extractTextFromImage(file, config.key, config.model)
+          setOcrProgress(p => ({ ...p, done: p.done + 1 }))
+          return { ...result, index: i }
+        })
+      ) as { text: string; language: string }[]
     } catch (err) {
       setPhase('error')
       const msg = err instanceof Error ? err.message : ''
       setErrorMsg(
         msg.startsWith('low_confidence')
-          ? 'Image too blurry or dark to read reliably. Please try a clearer photo.'
+          ? 'One of the images is too blurry or dark to read reliably. Please replace it with a clearer photo.'
           : 'OCR failed. Please try again.'
       )
       return
     }
 
-    if (!ocrResult.text) {
+    const combinedText = results.map(r => r.text).join('\n\n')
+
+    if (!combinedText.trim()) {
       setPhase('error')
-      setErrorMsg('No text detected. Please try a clearer image.')
+      setErrorMsg('No text detected in any image. Please try clearer photos.')
       return
     }
+
+    if (combinedText.length > BYOK_TEXT_HARD_LIMIT) {
+      setPhase('error')
+      setErrorMsg(`Extracted text exceeds the ${(BYOK_TEXT_HARD_LIMIT / 1000).toFixed(0)} 000 character limit. Please use fewer pages.`)
+      return
+    }
+
+    const language = results[0]?.language ?? 'en'
 
     setPhase('saving')
 
@@ -116,7 +177,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
       const { data, error } = await supabase
         .from('preps')
-        .insert({ user_id: user.id, title, raw_text: ocrResult.text, language: ocrResult.language })
+        .insert({ user_id: user.id, title, raw_text: combinedText, language })
         .select('id')
         .single()
 
@@ -128,18 +189,8 @@ export default function UploadModal({ onClose, onDone }: Props) {
     }
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleFile(file)
-  }
-
   const isWorking = phase === 'ocr' || phase === 'saving'
+  const canAddMore = files.length < MAX_IMAGES
 
   return (
     <div className={styles.overlay} onClick={isWorking ? undefined : onClose}>
@@ -151,32 +202,91 @@ export default function UploadModal({ onClose, onDone }: Props) {
           )}
         </div>
 
-        {phase === 'idle' && (
-          <div
-            className={styles.dropzone}
-            onClick={() => inputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-          >
-            <span className={styles.dropIcon}>📄</span>
-            <p className={styles.dropMain}>Upload a photo of a textbook page</p>
-            <p className={styles.dropSub}>Tap to select · or drag & drop</p>
+        {phase === 'collect' && (
+          <>
+            {files.length === 0 ? (
+              <div
+                className={styles.dropzone}
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
+                onDragOver={e => e.preventDefault()}
+              >
+                <span className={styles.dropIcon}>📄</span>
+                <p className={styles.dropMain}>Upload photos of textbook pages</p>
+                <p className={styles.dropSub}>Tap to select · or drag & drop</p>
+              </div>
+            ) : (
+              <>
+                <div className={styles.thumbGrid}>
+                  {files.map((_, i) => (
+                    <div key={i} className={styles.thumb}>
+                      <img src={previews[i]} alt={`Page ${i + 1}`} className={styles.thumbImg} />
+                      <button
+                        className={styles.thumbRemove}
+                        onClick={() => removeFile(i)}
+                        aria-label={`Remove page ${i + 1}`}
+                      >✕</button>
+                      <span className={styles.thumbLabel}>{i + 1}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {canAddMore && (
+                  <div className={styles.addMoreRow}>
+                    <button className={styles.addBtn} onClick={() => fileInputRef.current?.click()}>
+                      + Add files
+                    </button>
+                    <button className={styles.addBtn} onClick={() => cameraInputRef.current?.click()}>
+                      + Take photo
+                    </button>
+                    <span className={styles.addHint}>{files.length} / {MAX_IMAGES} pages</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className={styles.mobileButtons}>
+              {files.length === 0 && (
+                <button className={styles.cameraBtn} onClick={() => cameraInputRef.current?.click()}>
+                  Take photo
+                </button>
+              )}
+              {files.length > 0 && (
+                <button className={styles.recogniseBtn} onClick={handleRecognise}>
+                  Recognise & Create
+                </button>
+              )}
+            </div>
+
             <input
-              ref={inputRef}
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => { addFiles(e.target.files); e.target.value = '' }}
+            />
+            <input
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               style={{ display: 'none' }}
-              onChange={handleChange}
+              onChange={e => { addFiles(e.target.files); e.target.value = '' }}
             />
-          </div>
+          </>
         )}
 
         {phase === 'ocr' && (
           <div className={styles.progress}>
-            <div className={styles.progressLabel}>Recognising text…</div>
+            <div className={styles.progressLabel}>
+              Recognising image {ocrProgress.done + 1} of {ocrProgress.total}…
+            </div>
             <div className={styles.bar}>
-              <div className={styles.fill} style={{ width: '100%' }} />
+              <div
+                className={styles.fill}
+                style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.done / ocrProgress.total) * 100 : 0}%` }}
+              />
             </div>
           </div>
         )}
@@ -193,7 +303,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
         {phase === 'error' && (
           <div className={styles.error}>
             <p>{errorMsg}</p>
-            <button className={styles.retry} onClick={() => { setPhase('idle'); setErrorMsg('') }}>
+            <button className={styles.retry} onClick={() => { setPhase('collect'); setErrorMsg('') }}>
               Try again
             </button>
           </div>
