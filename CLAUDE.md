@@ -8,8 +8,8 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage.
 ## Tech Stack
 - React + Vite (TypeScript)
 - Supabase (auth, database)
-- Tesseract.js (in-browser OCR)
 - CSS Modules
+- OpenAI API, Gemini API as a plan (LLM pipeline)
 
 ## Environment
 Copy `.env.example` to `.env`:
