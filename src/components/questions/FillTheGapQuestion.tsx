@@ -13,10 +13,9 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
   const { gaps } = content
 
   const usedOnce = new Set<string>()
-  selected.forEach((id, idx) => {
+  selected.forEach(id => {
     const opt = content.answers.find(a => a.id === id)
     if (opt && !opt.multiple_usage) usedOnce.add(id)
-    void idx
   })
 
   function handleChange(gapIndex: number, answerId: string) {

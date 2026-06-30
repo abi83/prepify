@@ -145,25 +145,3 @@ export interface Attempt {
   created_at: string
 }
 
-// --- Prep context (from PrepContextAgent) ---
-
-export const prepContextSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-})
-
-export type PrepContext = z.infer<typeof prepContextSchema>
-
-// --- Questions array (from QuestionsAgent) ---
-
-export const generatedQuestionSchema = z.union([
-  z.object({ type: z.literal('flashcard'), content: flashcardContentSchema }),
-  z.object({ type: z.literal('single_choice'), content: singleChoiceContentSchema }),
-  z.object({ type: z.literal('multiple_choice'), content: multipleChoiceContentSchema }),
-  z.object({ type: z.literal('fill_the_gap'), content: fillTheGapContentSchema }),
-  z.object({ type: z.literal('sorting'), content: sortingContentSchema }),
-])
-
-export const generatedQuestionsSchema = z.array(generatedQuestionSchema).min(1)
-
-export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>

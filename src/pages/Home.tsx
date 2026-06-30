@@ -63,7 +63,7 @@ function GoogleIcon() {
 }
 
 const FEATURES = [
-  { icon: '📷', title: 'Snap & go', desc: 'Upload any textbook photo. OCR extracts the text instantly in your browser — nothing is sent to a server.' },
+  { icon: '📷', title: 'Snap & go', desc: 'Upload any textbook photo. Your image is sent to OpenAI Vision for OCR, then the text feeds the question pipeline.' },
   { icon: '🧠', title: 'AI-generated questions', desc: 'Flashcards, multiple-choice, and fill-in-the-blank questions crafted from exactly what you uploaded.' },
   { icon: '📊', title: 'Track your progress', desc: 'Take timed tests, see your scores, and revisit past sessions to study smarter over time.' },
 ]

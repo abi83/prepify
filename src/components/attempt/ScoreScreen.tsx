@@ -1,6 +1,7 @@
 import type { Question, Asset } from '../../types/questions'
 import type { AnswerState } from '../questions/QuestionBody'
 import QuestionBody from '../questions/QuestionBody'
+import { isAnswerCorrect } from '../../lib/scoring'
 import styles from './ScoreScreen.module.css'
 
 interface Props {
@@ -60,28 +61,4 @@ export default function ScoreScreen({ score, total, mode, questions, answers, as
       </div>
     </div>
   )
-}
-
-function isAnswerCorrect(q: Question, a: AnswerState): boolean {
-  switch (q.type) {
-    case 'single_choice': {
-      const c = (q.content as { answers: { id: string; is_correct: boolean }[] }).answers
-      return c.find(x => x.id === a.single)?.is_correct ?? false
-    }
-    case 'multiple_choice': {
-      const c = (q.content as { answers: { id: string; is_correct: boolean }[] }).answers
-      const correct = new Set(c.filter(x => x.is_correct).map(x => x.id))
-      const given = new Set(a.multi)
-      return correct.size === given.size && [...correct].every(id => given.has(id))
-    }
-    case 'fill_the_gap': {
-      const { gaps } = q.content as { gaps: { index: number; correct_answer_id: string }[] }
-      return gaps.every((g, i) => a.fill[i] === g.correct_answer_id)
-    }
-    case 'sorting': {
-      const { answers } = q.content as { answers: { id: string; correct_index: number }[] }
-      return answers.every(ans => a.sort.indexOf(ans.id) + 1 === ans.correct_index)
-    }
-    default: return false
-  }
 }

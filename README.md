@@ -24,7 +24,7 @@ Node 18+, a Supabase project, an OpenAI API key.
 git clone https://github.com/abi83/prepify.git
 cd prepify
 npm install
-cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
 npm run dev
 ```
 
@@ -34,4 +34,4 @@ Open the app → Settings → paste your OpenAI key.
 
 ## Stack
 
-React 18 + Vite · TypeScript · Supabase (auth + Postgres) · OpenAI API · CSS Modules
+React 18 + Vite · TypeScript · Supabase (auth + Postgres) · OpenAI API · CSS Modules · @dnd-kit (drag-and-drop sorting)

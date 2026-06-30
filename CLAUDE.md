@@ -9,12 +9,12 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage.
 - React + Vite (TypeScript)
 - Supabase (auth, database)
 - CSS Modules
-- OpenAI API, Gemini API as a plan (LLM pipeline)
+- OpenAI API (LLM pipeline)
 
 ## Environment
 Copy `.env.example` to `.env`:
 - `VITE_SUPABASE_URL` — Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` — Supabase anon/public key
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
 
 Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 
