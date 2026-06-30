@@ -27,7 +27,12 @@ VALIDATION (internal before output):
 
 RATIONALE (max 300 chars).
 
-Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "..." } }`
+ASSET HINT: Decide if a visual asset would significantly improve this question.
+- For equations with gaps: type="formula"
+- For chemistry molecules: type="molecule"
+- For most cloze questions: needed=false
+
+Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Question, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from '../../types/questions'
+import type { Question, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent, Asset } from '../../types/questions'
 import QuestionBody, { AnswerState, emptyAnswer } from '../questions/QuestionBody'
 import ScoreScreen from './ScoreScreen'
 import { supabase } from '../../lib/supabase'
@@ -39,6 +39,7 @@ function shuffleQuestionAnswers(q: Question): Question {
 
 interface Props {
   questions: Question[]
+  assets: Asset[]
   mode: 'quiz' | 'test'
   prepId: string
   userId: string | null
@@ -93,7 +94,8 @@ function getAttemptQuestions(questions: Question[]): Question[] {
   return questions.filter(q => q.type !== 'flashcard')
 }
 
-export default function AttemptFlow({ questions, mode, prepId, userId, onExit }: Props) {
+export default function AttemptFlow({ questions, assets, mode, prepId, userId, onExit }: Props) {
+  const assetByQuestion = new Map(assets.map(a => [a.question_id, a]))
   const attemptQuestions = getAttemptQuestions(questions)
   const total = attemptQuestions.length
 
@@ -151,6 +153,7 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
         mode={mode}
         questions={shuffledQuestions}
         answers={answers}
+        assets={assets}
         onExit={onExit}
       />
     )
@@ -176,6 +179,7 @@ export default function AttemptFlow({ questions, mode, prepId, userId, onExit }:
           question={current}
           answer={currentAnswer}
           isReview={isReview}
+          asset={assetByQuestion.get(current.id)}
           onChange={handleAnswerChange}
         />
       </div>

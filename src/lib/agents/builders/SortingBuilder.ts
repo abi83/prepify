@@ -24,11 +24,15 @@ CONSTRUCTION:
 
 RATIONALE (max 240 chars): Justify the ordering and mention why at least one plausible wrong order fails.
 
+ASSET HINT: Decide if a visual asset would improve this question.
+- For process/pipeline flowcharts: type="diagram"
+- For most sorting questions: needed=false
+
 VALIDATION (internal before output):
 - answers length == 4; ids == {A,B,C,D}
 - correct_index covers {1,2,3,4} exactly once
 
-Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "..." } }`
+Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

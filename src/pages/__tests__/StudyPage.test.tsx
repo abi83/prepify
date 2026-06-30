@@ -21,6 +21,7 @@ vi.mock('../../lib/supabase', () => ({
               : Promise.resolve({ data: null, error: null }),
           order: () => Promise.resolve({ data: mockQuestions, error: null }),
         }),
+        in: () => Promise.resolve({ data: [], error: null }),
       }),
     }),
   },

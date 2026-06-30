@@ -25,12 +25,18 @@ CORRECTNESS DISTRIBUTION:
 
 RATIONALE (max 240 chars).
 
+ASSET HINT: Decide if a visual asset would significantly improve this question.
+- For math/physics with equations: type="formula"
+- For chemistry with molecules: type="molecule"
+- For process/classification: type="diagram"
+- For most questions: needed=false
+
 VALIDATION (internal before output):
 - answers length 4-6; ids sequential from A, no gaps
 - Multiple is_correct=true; multiple is_correct=false
 - Every explanation prefixed correctly
 
-Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "..." } }`
+Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

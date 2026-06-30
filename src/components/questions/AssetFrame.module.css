@@ -1,0 +1,15 @@
+.wrap {
+  width: 100%;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e8eaf0;
+  background: #fafbfc;
+}
+
+.frame {
+  width: 100%;
+  height: 220px;
+  border: none;
+  display: block;
+}

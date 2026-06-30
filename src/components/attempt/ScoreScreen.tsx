@@ -1,4 +1,4 @@
-import type { Question } from '../../types/questions'
+import type { Question, Asset } from '../../types/questions'
 import type { AnswerState } from '../questions/QuestionBody'
 import QuestionBody from '../questions/QuestionBody'
 import styles from './ScoreScreen.module.css'
@@ -9,10 +9,12 @@ interface Props {
   mode: 'quiz' | 'test'
   questions: Question[]
   answers: AnswerState[]
+  assets: Asset[]
   onExit: () => void
 }
 
-export default function ScoreScreen({ score, total, mode, questions, answers, onExit }: Props) {
+export default function ScoreScreen({ score, total, mode, questions, answers, assets, onExit }: Props) {
+  const assetByQuestion = new Map(assets.map(a => [a.question_id, a]))
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
   const isGood = pct >= 60
 
@@ -45,7 +47,7 @@ export default function ScoreScreen({ score, total, mode, questions, answers, on
                       {(q.content as { question?: string }).question ?? ''}
                     </span>
                   </div>
-                  <QuestionBody question={q} answer={answer} isReview={true} />
+                  <QuestionBody question={q} answer={answer} isReview={true} asset={assetByQuestion.get(q.id)} />
                 </div>
               )
             })}

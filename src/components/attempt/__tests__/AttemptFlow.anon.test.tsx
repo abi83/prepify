@@ -31,6 +31,7 @@ async function runThroughAttempt(userId: string | null, mode: 'quiz' | 'test') {
   render(
     <AttemptFlow
       questions={[singleQ]}
+      assets={[]}
       mode={mode}
       prepId="prep-1"
       userId={userId}
@@ -90,6 +91,7 @@ describe('AttemptFlow — attempt saving', () => {
     render(
       <AttemptFlow
         questions={[singleQ]}
+        assets={[]}
         mode="quiz"
         prepId="prep-1"
         userId={null}

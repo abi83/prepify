@@ -1,11 +1,35 @@
 import { z } from 'zod'
 
+// --- Asset hint (emitted by question builders, consumed by asset router) ---
+
+export const assetTypeSchema = z.enum(['formula', 'molecule', 'diagram', 'table', 'svg'])
+export type AssetType = z.infer<typeof assetTypeSchema>
+
+export const assetHintSchema = z.discriminatedUnion('needed', [
+  z.object({ needed: z.literal(false) }),
+  z.object({
+    needed: z.literal(true),
+    type: assetTypeSchema,
+    description: z.string(),
+  }),
+])
+export type AssetHint = z.infer<typeof assetHintSchema>
+
+export interface Asset {
+  id: string
+  question_id: string
+  type: AssetType | 'image'
+  blob: string
+  created_at: string
+}
+
 // --- Content schemas ---
 
 export const flashcardContentSchema = z.object({
   front: z.string(),
   back: z.string(),
   back_explanation: z.string(),
+  asset_hint: assetHintSchema.optional(),
 })
 
 export const answerSchema = z.object({
@@ -19,12 +43,14 @@ export const singleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).length(4),
   rationale: z.string(),
+  asset_hint: assetHintSchema.optional(),
 })
 
 export const multipleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).min(4).max(6),
   rationale: z.string(),
+  asset_hint: assetHintSchema.optional(),
 })
 
 export const fillGapAnswerSchema = z.object({
@@ -44,6 +70,7 @@ export const fillTheGapContentSchema = z.object({
   gaps: z.array(fillGapSchema).min(2).max(4),
   answers: z.array(fillGapAnswerSchema).min(4).max(6),
   rationale: z.string(),
+  asset_hint: assetHintSchema.optional(),
 }).refine(
   ({ question, gaps }) => {
     // Every gap must have a corresponding {{gap:N}} marker in the question text
@@ -70,6 +97,7 @@ export const sortingContentSchema = z.object({
   question: z.string(),
   answers: z.array(sortingAnswerSchema).length(4),
   rationale: z.string(),
+  asset_hint: assetHintSchema.optional(),
 })
 
 // --- Question type union ---

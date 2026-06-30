@@ -20,7 +20,12 @@ CRITICAL for Brevity:
 - front: maximum 20 words. Strip all filler.
 - back_explanation: maximum 15 words. One sentence.
 
-Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "..." } }`
+ASSET HINT: Decide if a visual asset would improve this flashcard.
+- For math/physics formulas: type="formula"
+- For chemistry molecules: type="molecule"
+- For most flashcards: needed=false
+
+Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "...", "asset_hint": { "needed": false } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

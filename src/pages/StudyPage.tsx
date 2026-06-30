@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
-import type { Question, FlashcardContent } from '../types/questions'
+import type { Question, FlashcardContent, Asset } from '../types/questions'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import styles from './StudyPage.module.css'
@@ -15,6 +15,7 @@ export default function StudyPage() {
 
   const [prep, setPrep] = useState<Prep | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('cards')
   const [activeAttempt, setActiveAttempt] = useState<'quiz' | 'test' | null>(null)
@@ -29,10 +30,15 @@ export default function StudyPage() {
     Promise.all([
       supabase.from('preps').select('*').eq('id', id).single(),
       supabase.from('questions').select('*').eq('prep_id', id).order('created_at'),
-    ]).then(([{ data: prepData }, { data: qData }]) => {
+    ]).then(async ([{ data: prepData }, { data: qData }]) => {
+      const qs = (qData ?? []) as Question[]
       setPrep(prepData)
-      setQuestions((qData ?? []) as Question[])
+      setQuestions(qs)
       setLoading(false)
+      if (qs.length > 0) {
+        const { data: assetData } = await supabase.from('assets').select('*').in('question_id', qs.map(q => q.id))
+        setAssets((assetData ?? []) as Asset[])
+      }
     })
   }, [id])
 
@@ -64,6 +70,7 @@ export default function StudyPage() {
         <main className={styles.main}>
           <AttemptFlow
             questions={studyQuestions}
+            assets={assets}
             mode={activeAttempt}
             prepId={prep.id}
             userId={userId}

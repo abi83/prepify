@@ -21,12 +21,19 @@ ANSWERS (exactly 4, ids A/B/C/D):
 
 RATIONALE (max 240 chars): Briefly justify why the correct answer is right and how each distractor represents a specific misconception.
 
+ASSET HINT: Decide if a visual asset would significantly improve this question (e.g. formula, molecule structure, flowchart).
+- For math/physics concepts involving equations: set needed=true, type="formula", description=LaTeX description
+- For chemistry with structural molecules: set needed=true, type="molecule", description=molecule name + SMILES hint
+- For process/classification/hierarchy questions: set needed=true, type="diagram", description of what to diagram
+- For most questions (definitions, history, language): set needed=false
+- IMPORTANT: The asset can also be an answer option — e.g. "Which formula represents X?" with 4 formulas as options. In that case set needed=true and describe all 4 options in the description field.
+
 VALIDATION (internal before output):
 - Exactly 4 answers; ids = {A,B,C,D}
 - Exactly one is_correct=true
 - Every explanation prefixed correctly
 
-Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "..." } }`
+Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

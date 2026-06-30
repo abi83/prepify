@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Prep, PrepVisibility, VisualElement, Page } from '../lib/supabase'
-import type { Question, Attempt, FlashcardContent } from '../types/questions'
+import type { Question, Attempt, FlashcardContent, Asset } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
 import { runPipeline, TextTooLongError } from '../lib/pipeline'
@@ -12,6 +12,7 @@ import type { GenerationConfig } from '../lib/generationConfig'
 import type { QuestionType } from '../types/questions'
 import { getExistingRunSummary } from '../lib/pipelineStore'
 import type { PartialRunSummary } from '../lib/pipelineStore'
+import { generateAndSaveAssets } from '../lib/assetGeneration'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import ShareModal from '../components/ShareModal'
@@ -203,6 +204,7 @@ export default function PrepPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [concepts, setConcepts] = useState<Concept[]>([])
   const [showShareModal, setShowShareModal] = useState(false)
+  const [assets, setAssets] = useState<Asset[]>([])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
@@ -216,13 +218,19 @@ export default function PrepPage() {
       supabase.from('attempts').select('*').eq('prep_id', id).order('created_at', { ascending: false }),
       getExistingRunSummary(id),
       supabase.from('pipeline_runs').select('concepts').eq('prep_id', id).maybeSingle(),
-    ]).then(([{ data: prepData }, { data: qData }, { data: aData }, summary, { data: runData }]) => {
+    ]).then(async ([{ data: prepData }, { data: qData }, { data: aData }, summary, { data: runData }]) => {
+      const qs = (qData ?? []) as Question[]
       setPrep(prepData)
-      setQuestions((qData ?? []) as Question[])
+      setQuestions(qs)
       setAttempts((aData ?? []) as Attempt[])
       setRunSummary(summary)
       if (runData?.concepts) setConcepts(runData.concepts as Concept[])
       setLoading(false)
+
+      if (qs.length > 0) {
+        const { data: assetData } = await supabase.from('assets').select('*').in('question_id', qs.map(q => q.id))
+        setAssets((assetData ?? []) as Asset[])
+      }
     })
   }, [id])
 
@@ -287,7 +295,13 @@ export default function PrepPage() {
 
       const rows = result.questions.map(q => ({ prep_id: id!, type: q.type, content: q.content }))
       const { data: saved } = await supabase.from('questions').insert(rows).select()
-      setQuestions((saved ?? []) as Question[])
+      const savedQuestions = (saved ?? []) as Question[]
+      setQuestions(savedQuestions)
+
+      // Generate visual assets for questions that requested one (non-blocking — failures are soft)
+      if (savedQuestions.length > 0) {
+        void generateAndSaveAssets(savedQuestions, id!, keyConfig.key, keyConfig.model, abortRef.current?.signal)
+      }
 
       // Refresh prep to get the up-to-date tokens_used accumulated in DB
       const { data: freshPrep } = await supabase.from('preps').select('*').eq('id', id!).single()
@@ -355,7 +369,11 @@ export default function PrepPage() {
       const elapsed = Math.round(performance.now() - genStartRef.current)
       const rows = result.questions.map(q => ({ prep_id: id!, type: q.type, content: q.content }))
       const { data: saved } = await supabase.from('questions').insert(rows).select()
-      setQuestions((saved ?? []) as Question[])
+      const savedQuestions = (saved ?? []) as Question[]
+      setQuestions(savedQuestions)
+      if (savedQuestions.length > 0) {
+        void generateAndSaveAssets(savedQuestions, id!, keyConfig.key, keyConfig.model, abortRef.current?.signal)
+      }
       const { data: freshPrep } = await supabase.from('preps').select('*').eq('id', id!).single()
       if (freshPrep) setPrep(freshPrep as Prep)
       setGenMs(elapsed)
@@ -399,6 +417,7 @@ export default function PrepPage() {
         <main className={styles.main}>
           <AttemptFlow
             questions={studyQuestions}
+            assets={assets}
             mode={activeAttempt}
             prepId={prep.id}
             userId={userId}
