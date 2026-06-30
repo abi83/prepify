@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import OpenAI from 'openai'
 import { supabase } from '../lib/supabase'
+import type { VisualElement } from '../lib/supabase'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import styles from './UploadModal.module.css'
@@ -15,9 +16,14 @@ type Props = {
 
 type Phase = 'collect' | 'ocr' | 'saving' | 'error'
 
-type OcrResult = { text: string; confidence: number; language: string }
+type OcrResult = {
+  text: string
+  confidence: number
+  language: string
+  visual_elements: VisualElement[]
+}
 
-async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string }> {
+async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElement[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(',')[1])
@@ -38,20 +44,32 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
           },
           {
             type: 'text',
-            text: `Extract as much text as you can see from this textbook page. Do your best even if the image is imperfect.
+            text: `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
 
 Respond with JSON only:
 {
   "text": "<extracted text, preserving structure and line breaks>",
   "confidence": <0.0–1.0>,
-  "language": "<ISO 639-1 code of the text language, e.g. en, de, fr, it, es, pl>"
+  "language": "<ISO 639-1 code of the text language, e.g. en, de, fr, it, es, pl>",
+  "visual_elements": [
+    {
+      "type": "<diagram|formula|table|chart|molecule|image>",
+      "description": "<plain-language description of what it shows>",
+      "content": "<LaTeX for formulas, SMILES for molecules, Mermaid DSL for diagrams, markdown for tables, or descriptive text>",
+      "caption": "<caption text visible on the page, or null>",
+      "context": "<surrounding text that references this element, or null>",
+      "confidence": <0.0–1.0 for this specific element>
+    }
+  ]
 }
 
-Confidence rubric:
+Confidence rubric (top-level):
 - 0.9–1.0: Sharp image, all text clearly readable
 - 0.7–0.9: Mostly readable, minor blur or cropping
 - 0.5–0.7: Partial — some words/lines unclear or missing
-- 0.0–0.5: Poor quality — large portions unreadable`,
+- 0.0–0.5: Poor quality — large portions unreadable
+
+If no visual elements are present, return an empty array for visual_elements.`,
           },
         ],
       },
@@ -67,7 +85,8 @@ Confidence rubric:
     throw new Error(`low_confidence:${parsed.confidence}`)
   }
 
-  return { text: parsed.text, language: parsed.language ?? 'en' }
+  const elements = (parsed.visual_elements ?? []).filter(e => e.confidence >= 0.6)
+  return { text: parsed.text, language: parsed.language ?? 'en', visual_elements: elements }
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
@@ -126,7 +145,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase('ocr')
     setOcrProgress({ done: 0, total: files.length })
 
-    let results: { text: string; language: string }[]
+    let results: { text: string; language: string; visual_elements: VisualElement[] }[]
     try {
       results = await Promise.all(
         files.map(async (file, i) => {
@@ -134,7 +153,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
           setOcrProgress(p => ({ ...p, done: p.done + 1 }))
           return { ...result, index: i }
         })
-      ) as { text: string; language: string }[]
+      ) as { text: string; language: string; visual_elements: VisualElement[] }[]
     } catch (err) {
       setPhase('error')
       const msg = err instanceof Error ? err.message : ''
@@ -161,6 +180,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     }
 
     const language = results[0]?.language ?? 'en'
+    const allVisualElements = results.flatMap(r => r.visual_elements)
 
     setPhase('saving')
 
@@ -177,7 +197,13 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
       const { data, error } = await supabase
         .from('preps')
-        .insert({ user_id: user.id, title, raw_text: combinedText, language })
+        .insert({
+          user_id: user.id,
+          title,
+          raw_text: combinedText,
+          language,
+          visual_elements: allVisualElements.length > 0 ? allVisualElements : null,
+        })
         .select('id')
         .single()
 

@@ -12,6 +12,17 @@ export const supabase = createClient(
 
 export type PrepVisibility = 'private' | 'link' | 'public'
 
+export type VisualElementType = 'diagram' | 'formula' | 'table' | 'chart' | 'molecule' | 'image'
+
+export type VisualElement = {
+  type: VisualElementType
+  description: string
+  content: string
+  caption: string | null
+  context: string | null
+  confidence: number
+}
+
 export type Prep = {
   id: string
   user_id: string
@@ -24,4 +35,5 @@ export type Prep = {
   grade: number | null
   discipline: string | null
   language: string | null
+  visual_elements: VisualElement[] | null
 }

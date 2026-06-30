@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Prep, PrepVisibility } from '../lib/supabase'
+import type { Prep, PrepVisibility, VisualElement } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
@@ -74,6 +74,19 @@ function rowsFromProgress(
   ]
 }
 
+/** Serializes visual elements into a structured text suffix for the concept extractor. */
+function serializeVisualElements(elements: VisualElement[]): string {
+  if (elements.length === 0) return ''
+  const lines = elements.map((el, i) => {
+    const parts = [`[Visual ${i + 1}] Type: ${el.type}`, `Description: ${el.description}`]
+    if (el.content) parts.push(`Content: ${el.content}`)
+    if (el.caption) parts.push(`Caption: ${el.caption}`)
+    if (el.context) parts.push(`Referenced by: ${el.context}`)
+    return parts.join('\n')
+  })
+  return `\n\n--- Visual Elements ---\n${lines.join('\n\n')}`
+}
+
 const DEFAULT_TITLE_RE = /^Prep #\d+$/
 
 /** Derives checklist rows from stored DB state (idle / resume prompt). */
@@ -121,6 +134,38 @@ function ChecklistRow({ row }: { row: ChecklistRowData }) {
           <span className={styles.checklistDetail}> ({row.detail})</span>
         )}
       </span>
+    </div>
+  )
+}
+
+// ── Visual elements debug panel ─────────────────────────────────────────────
+
+function VisualElementsDebug({ elements }: { elements: VisualElement[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={styles.textCard}>
+      <div className={styles.textHeader}>
+        <span className={styles.textLabel}>Visual elements ({elements.length})</span>
+        <button className={styles.toggle} onClick={() => setOpen(v => !v)}>
+          {open ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+      {open && (
+        <div className={styles.visualElementsList}>
+          {elements.map((el, i) => (
+            <div key={i} className={styles.visualElementItem}>
+              <div className={styles.visualElementHeader}>
+                <span className={styles.visualElementType}>{el.type}</span>
+                <span className={styles.visualElementConfidence}>{Math.round(el.confidence * 100)}%</span>
+              </div>
+              <p className={styles.visualElementDescription}>{el.description}</p>
+              {el.content && <pre className={styles.visualElementContent}>{el.content}</pre>}
+              {el.caption && <p className={styles.visualElementMeta}><strong>Caption:</strong> {el.caption}</p>}
+              {el.context && <p className={styles.visualElementMeta}><strong>Context:</strong> {el.context}</p>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -216,9 +261,10 @@ export default function PrepPage() {
     setGenPhase('running')
 
     try {
+      const visualSuffix = serializeVisualElements(prep!.visual_elements ?? [])
       const result = await runPipeline({
         prepId: id!,
-        rawText: prep!.raw_text,
+        rawText: prep!.raw_text + visualSuffix,
         apiKey: keyConfig.key,
         model: keyConfig.model,
         language: prep!.language ?? 'en',
@@ -277,9 +323,10 @@ export default function PrepPage() {
     setGenPhase('running')
 
     try {
+      const visualSuffix = serializeVisualElements(prep!.visual_elements ?? [])
       const result = await runPipeline({
         prepId: id!,
-        rawText: truncated,
+        rawText: truncated + visualSuffix,
         apiKey: keyConfig.key,
         model: keyConfig.model,
         language: prep!.language ?? 'en',
@@ -437,6 +484,10 @@ export default function PrepPage() {
             <pre className={styles.pre}>{prep.raw_text}</pre>
           </div>
         </div>
+
+        {prep.visual_elements && prep.visual_elements.length > 0 && (
+          <VisualElementsDebug elements={prep.visual_elements} />
+        )}
 
         {/* ── Generation area ── */}
         {!hasQuestions && (
