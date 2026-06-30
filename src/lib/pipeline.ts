@@ -2,6 +2,7 @@ import { runConceptExtractor } from './agents/ConceptExtractor'
 import { runConceptMerger } from './agents/ConceptMerger'
 import { deduplicateExact } from './mergeConceptLists'
 import { BYOK_TEXT_HARD_LIMIT } from './config'
+import type { Page } from './supabase'
 import { runPrepNamer } from './agents/PrepNamer'
 import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
 import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
@@ -22,7 +23,7 @@ import {
   saveQuestionSlot,
 } from './pipelineStore'
 
-/** Thrown when rawText exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
+/** Thrown when total page text exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
 export class TextTooLongError extends Error {
   constructor(public readonly length: number) {
     super(`Text too long: ${length} characters`)
@@ -86,7 +87,7 @@ export interface PipelineResult {
 
 export interface PipelineConfig {
   prepId: string
-  rawText: string
+  pages: Page[]
   apiKey: string
   model: string
   /** ISO 639-1 language code detected from the source image (e.g. 'de', 'fr'). Defaults to 'en'. */
@@ -102,11 +103,12 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, rawText, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
+  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
   let totalTokens = 0
 
-  if (rawText.length > BYOK_TEXT_HARD_LIMIT) {
-    throw new TextTooLongError(rawText.length)
+  const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
+  if (totalTextLength > BYOK_TEXT_HARD_LIMIT) {
+    throw new TextTooLongError(totalTextLength)
   }
 
   // Load or create a persistent run record for crash recovery
@@ -119,7 +121,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: 'concepts' })
-    const { output, metrics, chunkCount } = await runConceptExtractor(rawText, apiKey, model, language, signal)
+    const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
     totalTokens += metrics.total_tokens
     void incrementPrepTokensInDb(prepId, metrics.total_tokens)
 

@@ -23,11 +23,17 @@ export type VisualElement = {
   confidence: number
 }
 
+export type Page = {
+  page: number
+  text: string
+  visual_elements: VisualElement[]
+}
+
 export type Prep = {
   id: string
   user_id: string
   title: string
-  raw_text: string
+  pages: Page[]
   study_description: string | null
   created_at: string
   tokens_used: number
@@ -35,5 +41,4 @@ export type Prep = {
   grade: number | null
   discipline: string | null
   language: string | null
-  visual_elements: VisualElement[] | null
 }

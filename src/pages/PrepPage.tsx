@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Prep, PrepVisibility, VisualElement } from '../lib/supabase'
+import type { Prep, PrepVisibility, VisualElement, Page } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
@@ -74,18 +74,6 @@ function rowsFromProgress(
   ]
 }
 
-/** Serializes visual elements into a structured text suffix for the concept extractor. */
-function serializeVisualElements(elements: VisualElement[]): string {
-  if (elements.length === 0) return ''
-  const lines = elements.map((el, i) => {
-    const parts = [`[Visual ${i + 1}] Type: ${el.type}`, `Description: ${el.description}`]
-    if (el.content) parts.push(`Content: ${el.content}`)
-    if (el.caption) parts.push(`Caption: ${el.caption}`)
-    if (el.context) parts.push(`Referenced by: ${el.context}`)
-    return parts.join('\n')
-  })
-  return `\n\n--- Visual Elements ---\n${lines.join('\n\n')}`
-}
 
 const DEFAULT_TITLE_RE = /^Prep #\d+$/
 
@@ -138,33 +126,47 @@ function ChecklistRow({ row }: { row: ChecklistRowData }) {
   )
 }
 
-// ── Visual elements debug panel ─────────────────────────────────────────────
+// ── Per-page section ────────────────────────────────────────────────────────
 
-function VisualElementsDebug({ elements }: { elements: VisualElement[] }) {
+function VisualElementItem({ el }: { el: VisualElement }) {
+  return (
+    <div className={styles.visualElementItem}>
+      <div className={styles.visualElementHeader}>
+        <span className={styles.visualElementType}>{el.type}</span>
+        <span className={styles.visualElementConfidence}>{Math.round(el.confidence * 100)}%</span>
+      </div>
+      <p className={styles.visualElementDescription}>{el.description}</p>
+      {el.content && <pre className={styles.visualElementContent}>{el.content}</pre>}
+      {el.caption && <p className={styles.visualElementMeta}><strong>Caption:</strong> {el.caption}</p>}
+      {el.context && <p className={styles.visualElementMeta}><strong>Context:</strong> {el.context}</p>}
+    </div>
+  )
+}
+
+function PageSection({ page }: { page: Page }) {
   const [open, setOpen] = useState(false)
+  const hasVisuals = page.visual_elements.length > 0
   return (
     <div className={styles.textCard}>
       <div className={styles.textHeader}>
-        <span className={styles.textLabel}>Visual elements ({elements.length})</span>
+        <span className={styles.textLabel}>Page {page.page}</span>
         <button className={styles.toggle} onClick={() => setOpen(v => !v)}>
           {open ? 'Collapse' : 'Expand'}
         </button>
       </div>
       {open && (
-        <div className={styles.visualElementsList}>
-          {elements.map((el, i) => (
-            <div key={i} className={styles.visualElementItem}>
-              <div className={styles.visualElementHeader}>
-                <span className={styles.visualElementType}>{el.type}</span>
-                <span className={styles.visualElementConfidence}>{Math.round(el.confidence * 100)}%</span>
-              </div>
-              <p className={styles.visualElementDescription}>{el.description}</p>
-              {el.content && <pre className={styles.visualElementContent}>{el.content}</pre>}
-              {el.caption && <p className={styles.visualElementMeta}><strong>Caption:</strong> {el.caption}</p>}
-              {el.context && <p className={styles.visualElementMeta}><strong>Context:</strong> {el.context}</p>}
+        <>
+          <div className={`${styles.textBody} ${styles.expanded}`}>
+            <pre className={styles.pre}>{page.text}</pre>
+          </div>
+          {hasVisuals && (
+            <div className={styles.visualElementsList}>
+              {page.visual_elements.map((el, i) => (
+                <VisualElementItem key={i} el={el} />
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -180,7 +182,6 @@ export default function PrepPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<Tab>('cards')
   const [activeAttempt, setActiveAttempt] = useState<Tab | null>(null)
 
@@ -261,10 +262,9 @@ export default function PrepPage() {
     setGenPhase('running')
 
     try {
-      const visualSuffix = serializeVisualElements(prep!.visual_elements ?? [])
       const result = await runPipeline({
         prepId: id!,
-        rawText: prep!.raw_text + visualSuffix,
+        pages: prep!.pages,
         apiKey: keyConfig.key,
         model: keyConfig.model,
         language: prep!.language ?? 'en',
@@ -311,8 +311,16 @@ export default function PrepPage() {
 
   async function handleConfirmTruncate() {
     setTextTooLong(null)
-    const truncated = prep!.raw_text.slice(0, BYOK_TEXT_HARD_LIMIT)
     const keyConfig = getApiKey()!
+
+    // Truncate by keeping pages until we hit the char limit
+    let charCount = 0
+    const truncatedPages = prep!.pages.filter(p => {
+      if (charCount >= BYOK_TEXT_HARD_LIMIT) return false
+      charCount += p.text.length
+      return true
+    })
+
     setGenError(null)
     setPipelineProgress(null)
     setCraftProgress(null)
@@ -323,10 +331,9 @@ export default function PrepPage() {
     setGenPhase('running')
 
     try {
-      const visualSuffix = serializeVisualElements(prep!.visual_elements ?? [])
       const result = await runPipeline({
         prepId: id!,
-        rawText: truncated + visualSuffix,
+        pages: truncatedPages,
         apiKey: keyConfig.key,
         model: keyConfig.model,
         language: prep!.language ?? 'en',
@@ -417,8 +424,8 @@ export default function PrepPage() {
             <h2 className={styles.modalTitle}>Text too long</h2>
             <p className={styles.modalBody}>
               Your text is <strong>{textTooLong.length.toLocaleString()}</strong> characters.
-              Only the first <strong>{BYOK_TEXT_HARD_LIMIT.toLocaleString()}</strong> will be processed —
-              content beyond that limit will be ignored.
+              Only pages up to <strong>{BYOK_TEXT_HARD_LIMIT.toLocaleString()}</strong> characters will be processed —
+              later pages will be ignored.
             </p>
             <div className={styles.modalActions}>
               <button className={styles.modalCancel} onClick={() => setTextTooLong(null)}>Cancel</button>
@@ -473,21 +480,9 @@ export default function PrepPage() {
           )}
         </div>
 
-        <div className={styles.textCard}>
-          <div className={styles.textHeader}>
-            <span className={styles.textLabel}>Extracted text</span>
-            <button className={styles.toggle} onClick={() => setExpanded(v => !v)}>
-              {expanded ? 'Collapse' : 'Expand'}
-            </button>
-          </div>
-          <div className={`${styles.textBody} ${expanded ? styles.expanded : ''}`}>
-            <pre className={styles.pre}>{prep.raw_text}</pre>
-          </div>
-        </div>
-
-        {prep.visual_elements && prep.visual_elements.length > 0 && (
-          <VisualElementsDebug elements={prep.visual_elements} />
-        )}
+        {prep.pages.map(page => (
+          <PageSection key={page.page} page={page} />
+        ))}
 
         {/* ── Generation area ── */}
         {!hasQuestions && (

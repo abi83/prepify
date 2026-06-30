@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import OpenAI from 'openai'
 import { supabase } from '../lib/supabase'
-import type { VisualElement } from '../lib/supabase'
+import type { VisualElement, Page } from '../lib/supabase'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import styles from './UploadModal.module.css'
@@ -148,12 +148,12 @@ export default function UploadModal({ onClose, onDone }: Props) {
     let results: { text: string; language: string; visual_elements: VisualElement[] }[]
     try {
       results = await Promise.all(
-        files.map(async (file, i) => {
+        files.map(async (file) => {
           const result = await extractTextFromImage(file, config.key, config.model)
           setOcrProgress(p => ({ ...p, done: p.done + 1 }))
-          return { ...result, index: i }
+          return result
         })
-      ) as { text: string; language: string; visual_elements: VisualElement[] }[]
+      )
     } catch (err) {
       setPhase('error')
       const msg = err instanceof Error ? err.message : ''
@@ -165,7 +165,13 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    const combinedText = results.map(r => r.text).join('\n\n')
+    const pages: Page[] = results.map((r, i) => ({
+      page: i + 1,
+      text: r.text,
+      visual_elements: r.visual_elements,
+    }))
+
+    const combinedText = pages.map(p => p.text).join('\n\n')
 
     if (!combinedText.trim()) {
       setPhase('error')
@@ -180,7 +186,6 @@ export default function UploadModal({ onClose, onDone }: Props) {
     }
 
     const language = results[0]?.language ?? 'en'
-    const allVisualElements = results.flatMap(r => r.visual_elements)
 
     setPhase('saving')
 
@@ -200,9 +205,8 @@ export default function UploadModal({ onClose, onDone }: Props) {
         .insert({
           user_id: user.id,
           title,
-          raw_text: combinedText,
+          pages,
           language,
-          visual_elements: allVisualElements.length > 0 ? allVisualElements : null,
         })
         .select('id')
         .single()
