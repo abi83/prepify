@@ -93,9 +93,6 @@ export default function StudyPage() {
       <main className={styles.main}>
         <div className={styles.meta}>
           <h1 className={styles.title}>{prep.title}</h1>
-          {prep.study_description && (
-            <p className={styles.description}>{prep.study_description}</p>
-          )}
         </div>
 
         {questions.length === 0 ? (

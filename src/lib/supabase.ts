@@ -34,7 +34,6 @@ export type Prep = {
   user_id: string
   title: string
   pages: Page[]
-  study_description: string | null
   created_at: string
   tokens_used: number
   visibility: PrepVisibility

@@ -88,7 +88,6 @@ describe('StudyPage — loaded with questions', () => {
       visibility: 'link',
       grade: 10,
       discipline: 'Biology',
-      study_description: 'A quick overview of cells.',
       created_at: '2026-01-01T00:00:00Z',
       tokens_used: 0,
     }
@@ -160,7 +159,6 @@ describe('StudyPage — anonymous user', () => {
       visibility: 'public',
       grade: null,
       discipline: null,
-      study_description: null,
       created_at: '2026-01-01T00:00:00Z',
       tokens_used: 0,
     }

@@ -494,9 +494,6 @@ export default function PrepPage() {
               )}
             </span>
           )}
-          {prep.study_description && (
-            <p className={styles.description}>{prep.study_description}</p>
-          )}
         </div>
 
         {prep.pages.map(page => (
