@@ -43,41 +43,8 @@ No `supabase login` needed — uses `SUPABASE_DATABASE_PASSWORD` from `.env`. Mi
 
 ## Database Schema
 
-### preps
-| column | type | notes |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → auth.users |
-| title | text | LLM-named |
-| raw_text | text | OCR output |
-| visibility | enum | `private` · `link` · `public`, default `private` |
-| grade | integer | 1–13, nullable |
-| discipline | enum | school subject (see migration for full list), nullable |
-| created_at | timestamptz | |
-
-RLS on `preps`: owner has full access; `link` preps are SELECT-readable by anyone with the row id; `public` preps are SELECT-readable by all including unauthenticated.
-
-### questions
-| column | type | notes |
-|---|---|---|
-| id | uuid | PK |
-| prep_id | uuid | FK → preps |
-| type | text | `flashcard` · `single_choice` · `multiple_choice` · `fill_the_gap` · `sorting` |
-| content | jsonb | shape varies by type |
-| created_at | timestamptz | |
-
-### attempts
-| column | type | notes |
-|---|---|---|
-| id | uuid | PK |
-| prep_id | uuid | FK → preps |
-| user_id | uuid | FK → auth.users |
-| mode | text | `quiz` · `test` |
-| score | int | correct answers |
-| total | int | total questions |
-| created_at | timestamptz | |
-
-RLS on `questions` and `attempts`: always user-scoped regardless of prep visibility. Anonymous users studying a public/link prep do not get attempt tracking.
+TypeScript types: `src/lib/supabase.ts` (Prep) and `src/types/questions.ts` (Question, Attempt, Asset).
+Full schema and RLS policies: `supabase/migrations/`.
 
 ---
 
