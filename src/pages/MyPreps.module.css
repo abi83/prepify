@@ -131,8 +131,14 @@
   gap: 8px;
 }
 
+.listItem {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .item {
-  width: 100%;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -148,6 +154,70 @@
 .item:hover {
   border-color: var(--accent);
   background: var(--surface-2);
+}
+
+.deleteRowBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.deleteRowBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.deleteConfirmLabel {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.deleteConfirmYes {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.deleteConfirmYes:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deleteConfirmNo {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.deleteConfirmNo:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .itemTitle {

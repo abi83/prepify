@@ -56,6 +56,35 @@
   background: var(--accent-hover);
 }
 
+.deleteBtn {
+  background: none;
+  color: var(--danger);
+  font-size: 0.82rem;
+  padding: 6px 0;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.deleteBtn:hover {
+  opacity: 0.75;
+}
+
+.modalDelete {
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.modalDelete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .main {
   flex: 1;
   padding: 40px 24px;

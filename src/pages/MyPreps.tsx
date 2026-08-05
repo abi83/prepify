@@ -9,6 +9,8 @@ export default function MyPreps() {
   const [preps, setPreps] = useState<Prep[]>([])
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -32,6 +34,14 @@ export default function MyPreps() {
   function handleDone(prepId: string) {
     setShowUpload(false)
     navigate(`/preps/${prepId}`)
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(true)
+    await supabase.from('preps').delete().eq('id', id)
+    setPreps(prev => prev.filter(p => p.id !== id))
+    setConfirmDeleteId(null)
+    setDeleting(false)
   }
 
   return (
@@ -67,11 +77,30 @@ export default function MyPreps() {
         ) : (
           <ul className={styles.list}>
             {preps.map(prep => (
-              <li key={prep.id}>
+              <li key={prep.id} className={styles.listItem}>
                 <button className={styles.item} onClick={() => navigate(`/preps/${prep.id}`)}>
                   <span className={styles.itemTitle}>{prep.title}</span>
                   <span className={styles.itemDate}>{formatDate(prep.created_at)}</span>
                 </button>
+                {confirmDeleteId === prep.id ? (
+                  <div className={styles.deleteConfirm}>
+                    <span className={styles.deleteConfirmLabel}>Delete?</span>
+                    <button className={styles.deleteConfirmYes} onClick={() => handleDelete(prep.id)} disabled={deleting}>
+                      {deleting ? '…' : 'Yes'}
+                    </button>
+                    <button className={styles.deleteConfirmNo} onClick={() => setConfirmDeleteId(null)} disabled={deleting}>
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className={styles.deleteRowBtn}
+                    onClick={e => { e.stopPropagation(); setConfirmDeleteId(prep.id) }}
+                    title="Delete prep"
+                  >
+                    ✕
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -204,6 +204,8 @@ export default function PrepPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [concepts, setConcepts] = useState<Concept[]>([])
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [assets, setAssets] = useState<Asset[]>([])
 
   useEffect(() => {
@@ -387,6 +389,12 @@ export default function PrepPage() {
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('preps').delete().eq('id', id!)
+    navigate('/preps')
+  }
+
   function handleExitAttempt() {
     setActiveAttempt(null)
     supabase.from('attempts').select('*').eq('prep_id', id!).order('created_at', { ascending: false })
@@ -437,6 +445,23 @@ export default function PrepPage() {
 
   return (
     <div className={styles.root}>
+      {showDeleteConfirm && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalBox}>
+            <h2 className={styles.modalTitle}>Delete prep?</h2>
+            <p className={styles.modalBody}>
+              This will permanently delete <strong>{prep.title}</strong> and all its questions, attempts, and pipeline data.
+            </p>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</button>
+              <button className={styles.modalDelete} onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {textTooLong && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalBox}>
@@ -461,6 +486,9 @@ export default function PrepPage() {
             <button className={styles.shareBtn} onClick={() => setShowShareModal(true)}>
               {prep.visibility === 'private' ? 'Share' : 'Shared'}
             </button>
+          )}
+          {prep.user_id === userId && (
+            <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>Delete</button>
           )}
           <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
         </div>
