@@ -5,14 +5,11 @@ import { z } from 'zod'
 export const assetTypeSchema = z.enum(['formula', 'molecule', 'diagram', 'table', 'svg'])
 export type AssetType = z.infer<typeof assetTypeSchema>
 
-export const assetHintSchema = z.discriminatedUnion('needed', [
-  z.object({ needed: z.literal(false) }),
-  z.object({
-    needed: z.literal(true),
-    type: assetTypeSchema,
-    description: z.string(),
-  }),
-])
+export const assetHintSchema = z.object({
+  needed: z.boolean(),
+  type: assetTypeSchema.nullable(),
+  description: z.string().nullable(),
+})
 export type AssetHint = z.infer<typeof assetHintSchema>
 
 export interface Asset {
@@ -29,7 +26,7 @@ export const flashcardContentSchema = z.object({
   front: z.string(),
   back: z.string(),
   back_explanation: z.string(),
-  asset_hint: assetHintSchema.optional().nullable(),
+  asset_hint: assetHintSchema,
 })
 
 export const answerSchema = z.object({
@@ -43,14 +40,14 @@ export const singleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).length(4),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional().nullable(),
+  asset_hint: assetHintSchema,
 })
 
 export const multipleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).min(4).max(6),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional().nullable(),
+  asset_hint: assetHintSchema,
 })
 
 export const fillGapAnswerSchema = z.object({
@@ -70,7 +67,7 @@ export const fillTheGapContentSchema = z.object({
   gaps: z.array(fillGapSchema).min(2).max(4),
   answers: z.array(fillGapAnswerSchema).min(4).max(6),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional().nullable(),
+  asset_hint: assetHintSchema,
 }).refine(
   ({ question, gaps }) => {
     // Every gap must have a corresponding {{gap:N}} marker in the question text
@@ -97,7 +94,7 @@ export const sortingContentSchema = z.object({
   question: z.string(),
   answers: z.array(sortingAnswerSchema).length(4),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional().nullable(),
+  asset_hint: assetHintSchema,
 })
 
 // --- Generated question (builder output, pre-DB) ---

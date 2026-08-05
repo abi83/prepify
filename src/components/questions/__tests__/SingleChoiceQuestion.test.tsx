@@ -7,6 +7,7 @@ import type { SingleChoiceContent } from '../../../types/questions'
 const content: SingleChoiceContent = {
   question: 'What is the capital of France?',
   rationale: 'Paris is the capital.',
+  asset_hint: { needed: false, type: null, description: null },
   answers: [
     { id: 'a', text: 'Berlin', is_correct: false, explanation: 'Capital of Germany.' },
     { id: 'b', text: 'Paris',  is_correct: true,  explanation: 'Capital of France.' },

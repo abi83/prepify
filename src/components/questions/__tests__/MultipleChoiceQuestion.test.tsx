@@ -7,6 +7,7 @@ import type { MultipleChoiceContent } from '../../../types/questions'
 const content: MultipleChoiceContent = {
   question: 'Which are primary colors?',
   rationale: 'Red, blue, yellow are primary.',
+  asset_hint: { needed: false, type: null, description: null },
   answers: [
     { id: 'a', text: 'Red',    is_correct: true,  explanation: 'Primary color.' },
     { id: 'b', text: 'Green',  is_correct: false, explanation: 'Secondary color.' },

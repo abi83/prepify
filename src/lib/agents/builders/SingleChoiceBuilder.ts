@@ -33,7 +33,7 @@ VALIDATION (internal before output):
 - Exactly one is_correct=true
 - Every explanation prefixed correctly
 
-Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
+Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

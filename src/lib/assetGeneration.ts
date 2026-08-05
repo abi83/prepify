@@ -1,11 +1,11 @@
 import type { Question, AssetHint } from '../types/questions'
-import { routeAsset } from './agents/assets/assetRouter'
+import { routeAsset, type ActiveAssetHint } from './agents/assets/assetRouter'
 import { supabase } from './supabase'
 import { incrementPrepTokensInDb } from './tokenUsage'
 
-function extractAssetHint(question: Question): AssetHint | undefined {
+function extractAssetHint(question: Question): AssetHint | null {
   const content = question.content as Record<string, unknown>
-  return content.asset_hint as AssetHint | undefined
+  return (content.asset_hint as AssetHint) ?? null
 }
 
 /**
@@ -22,8 +22,8 @@ export async function generateAndSaveAssets(
 ): Promise<void> {
   const pending = questions
     .map(q => ({ q, hint: extractAssetHint(q) }))
-    .filter((x): x is { q: Question; hint: AssetHint & { needed: true } } =>
-      x.hint?.needed === true
+    .filter((x): x is { q: Question; hint: ActiveAssetHint } =>
+      x.hint?.needed === true && x.hint.type !== null && x.hint.description !== null
     )
 
   if (pending.length === 0) return

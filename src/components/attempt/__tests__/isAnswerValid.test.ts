@@ -3,10 +3,12 @@ import { isAnswerValid } from '../AttemptFlow'
 import { emptyAnswer } from '../../questions/QuestionBody'
 import type { Question } from '../../../types/questions'
 
+const NO_ASSET = { needed: false, type: null, description: null } as const
+
 const singleQ: Question = {
   id: 'q1', prep_id: 'p1', created_at: '', type: 'single_choice',
   content: {
-    question: 'Q?', rationale: '',
+    question: 'Q?', rationale: '', asset_hint: NO_ASSET,
     answers: [
       { id: 'a', text: 'A', is_correct: true,  explanation: '' },
       { id: 'b', text: 'B', is_correct: false, explanation: '' },
@@ -19,7 +21,7 @@ const singleQ: Question = {
 const multiQ: Question = {
   id: 'q2', prep_id: 'p1', created_at: '', type: 'multiple_choice',
   content: {
-    question: 'Q?', rationale: '',
+    question: 'Q?', rationale: '', asset_hint: NO_ASSET,
     answers: [
       { id: 'a', text: 'A', is_correct: true,  explanation: '' },
       { id: 'b', text: 'B', is_correct: false, explanation: '' },

@@ -25,7 +25,7 @@ ASSET HINT: Decide if a visual asset would improve this flashcard.
 - For chemistry molecules: type="molecule"
 - For most flashcards: needed=false
 
-Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "...", "asset_hint": { "needed": false } } }`
+Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

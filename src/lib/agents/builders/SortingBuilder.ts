@@ -32,7 +32,7 @@ VALIDATION (internal before output):
 - answers length == 4; ids == {A,B,C,D}
 - correct_index covers {1,2,3,4} exactly once
 
-Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
+Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

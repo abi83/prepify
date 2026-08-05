@@ -17,6 +17,7 @@ const singleQ: Question = {
   id: 'q1', prep_id: 'p1', created_at: '', type: 'single_choice',
   content: {
     question: 'What is 2+2?', rationale: '',
+    asset_hint: { needed: false, type: null, description: null },
     answers: [
       { id: 'a', text: '4', is_correct: true, explanation: '' },
       { id: 'b', text: '5', is_correct: false, explanation: '' },

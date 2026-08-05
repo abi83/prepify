@@ -32,7 +32,7 @@ ASSET HINT: Decide if a visual asset would significantly improve this question.
 - For chemistry molecules: type="molecule"
 - For most cloze questions: needed=false
 
-Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false } } }`
+Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
 function formatConcepts(concepts: QuestionTask['concepts']): string {
   if (concepts.length === 1) {

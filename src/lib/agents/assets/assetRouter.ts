@@ -9,8 +9,10 @@ export interface AssetOutput {
   blob: string
 }
 
+export type ActiveAssetHint = AssetHint & { needed: true; type: AssetType; description: string }
+
 export async function routeAsset(
-  hint: AssetHint & { needed: true },
+  hint: ActiveAssetHint,
   apiKey: string,
   model: string,
   signal?: AbortSignal,
