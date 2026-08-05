@@ -29,7 +29,7 @@ export const flashcardContentSchema = z.object({
   front: z.string(),
   back: z.string(),
   back_explanation: z.string(),
-  asset_hint: assetHintSchema.optional(),
+  asset_hint: assetHintSchema.optional().nullable(),
 })
 
 export const answerSchema = z.object({
@@ -43,14 +43,14 @@ export const singleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).length(4),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional(),
+  asset_hint: assetHintSchema.optional().nullable(),
 })
 
 export const multipleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).min(4).max(6),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional(),
+  asset_hint: assetHintSchema.optional().nullable(),
 })
 
 export const fillGapAnswerSchema = z.object({
@@ -70,7 +70,7 @@ export const fillTheGapContentSchema = z.object({
   gaps: z.array(fillGapSchema).min(2).max(4),
   answers: z.array(fillGapAnswerSchema).min(4).max(6),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional(),
+  asset_hint: assetHintSchema.optional().nullable(),
 }).refine(
   ({ question, gaps }) => {
     // Every gap must have a corresponding {{gap:N}} marker in the question text
@@ -97,7 +97,7 @@ export const sortingContentSchema = z.object({
   question: z.string(),
   answers: z.array(sortingAnswerSchema).length(4),
   rationale: z.string(),
-  asset_hint: assetHintSchema.optional(),
+  asset_hint: assetHintSchema.optional().nullable(),
 })
 
 // --- Generated question (builder output, pre-DB) ---
