@@ -496,7 +496,7 @@ export default function PrepPage() {
           )}
         </div>
 
-        {prep.pages.map(page => (
+        {(prep.pages ?? []).map(page => (
           <PageSection key={page.page} page={page} />
         ))}
 
