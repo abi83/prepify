@@ -100,6 +100,17 @@ export const sortingContentSchema = z.object({
   asset_hint: assetHintSchema.optional(),
 })
 
+// --- Generated question (builder output, pre-DB) ---
+
+export const generatedQuestionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('flashcard'), content: flashcardContentSchema }),
+  z.object({ type: z.literal('single_choice'), content: singleChoiceContentSchema }),
+  z.object({ type: z.literal('multiple_choice'), content: multipleChoiceContentSchema }),
+  z.object({ type: z.literal('fill_the_gap'), content: fillTheGapContentSchema }),
+  z.object({ type: z.literal('sorting'), content: sortingContentSchema }),
+])
+export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>
+
 // --- Question type union ---
 
 export const questionTypeSchema = z.enum([

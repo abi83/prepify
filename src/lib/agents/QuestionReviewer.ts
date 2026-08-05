@@ -52,7 +52,7 @@ export async function runQuestionReviewer(
       apiKey,
       model,
       signal,
-    })
+    }) as AgentResult<{ question: GeneratedQuestion | null }>
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err
     // Reviewer failed — pass the original question through rather than losing it
