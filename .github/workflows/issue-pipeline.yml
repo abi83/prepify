@@ -115,7 +115,7 @@ jobs:
             Do nothing else — no other comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
@@ -230,7 +230,7 @@ jobs:
             Do nothing else.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
