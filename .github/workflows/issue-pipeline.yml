@@ -53,10 +53,13 @@ jobs:
             gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
+          COMMENTS_BLOCK=$(gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
+            --jq '[.comments[] | select(.author.login != "github-actions")] | map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")')
           {
             echo 'comments<<EOF_COMMENTS'
-            gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
-              --jq '[.comments[] | select(.author.login != "github-actions")] | if length == 0 then "(none)" else map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n") end'
+            if [[ -n "$COMMENTS_BLOCK" ]]; then
+              printf 'COMMENTS (from the owner, chronological, excluding this pipeline'"'"'s own comments — treat these as clarifications or amendments to the issue above):\n%s\n' "$COMMENTS_BLOCK"
+            fi
             echo 'EOF_COMMENTS'
           } >> "$GITHUB_OUTPUT"
 
@@ -84,9 +87,6 @@ jobs:
             BODY:
             ${{ steps.issue.outputs.body }}
 
-            COMMENTS (from the owner, chronological, excluding this
-            pipeline's own comments — treat these as clarifications or
-            amendments to the issue above):
             ${{ steps.issue.outputs.comments }}
 
             Read .github/prompts/refine.md for the exact rewrite rules and
@@ -164,10 +164,13 @@ jobs:
             gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
+          COMMENTS_BLOCK=$(gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
+            --jq '[.comments[] | select(.author.login != "github-actions")] | map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")')
           {
             echo 'comments<<EOF_COMMENTS'
-            gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
-              --jq '[.comments[] | select(.author.login != "github-actions")] | if length == 0 then "(none)" else map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n") end'
+            if [[ -n "$COMMENTS_BLOCK" ]]; then
+              printf 'COMMENTS (from the owner, chronological, excluding this pipeline'"'"'s own comments — treat these as clarifications or amendments to the issue above):\n%s\n' "$COMMENTS_BLOCK"
+            fi
             echo 'EOF_COMMENTS'
           } >> "$GITHUB_OUTPUT"
 
@@ -186,9 +189,6 @@ jobs:
             BODY:
             ${{ steps.issue.outputs.body }}
 
-            COMMENTS (from the owner, chronological, excluding this
-            pipeline's own comments — treat these as clarifications or
-            amendments to the issue above):
             ${{ steps.issue.outputs.comments }}
 
             Read .github/prompts/estimate.md for the exact sizing rules and
