@@ -15,6 +15,11 @@ on:
         options:
           - refine
           - estimate
+      debug:
+        description: "Show full Claude output in logs"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   issues: write
@@ -30,6 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/checkout@v4
+        with:
+          repository: abi83/prepify.wiki
+          path: wiki
+
       - name: Resolve issue
         id: issue
         env:
@@ -44,12 +54,21 @@ jobs:
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Preserve original body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          ISSUE_BODY: ${{ steps.issue.outputs.body }}
+        run: |
+          printf '<details><summary>Body before refinement</summary>\n\n%s\n\n</details>' "$ISSUE_BODY" \
+            | gh issue comment "$ISSUE_NUMBER" --repo ${{ github.repository }} --body-file -
+
       - name: Run Claude refinement
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          show_full_output: true
+          show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
           allowed_bots: "claude[bot]"
           prompt: |
             REPO: ${{ github.repository }}
@@ -70,14 +89,16 @@ jobs:
             Do nothing else — no comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
-      - name: Log cost
+      - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FILE="${{ steps.claude.outputs.execution_file }}"
-          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "$FILE" 2>/dev/null || echo unknown)
-          echo "### Refine cost — issue #${{ steps.issue.outputs.number }}: \$$COST" >> "$GITHUB_STEP_SUMMARY"
+          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refined by [pipeline run]($RUN_URL) — cost: \$$COST"
 
       - name: Flag failure
         if: failure()
@@ -94,6 +115,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: abi83/prepify.wiki
+          path: wiki
 
       - name: Resolve issue
         id: issue
@@ -114,7 +140,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          show_full_output: true
+          show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
           allowed_bots: "claude[bot]"
           prompt: |
             REPO: ${{ github.repository }}
@@ -136,14 +162,16 @@ jobs:
             Do nothing else.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
-      - name: Log cost
+      - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FILE="${{ steps.claude.outputs.execution_file }}"
-          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "$FILE" 2>/dev/null || echo unknown)
-          echo "### Estimate cost — issue #${{ steps.issue.outputs.number }}: \$$COST" >> "$GITHUB_STEP_SUMMARY"
+          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimated by [pipeline run]($RUN_URL) — cost: \$$COST"
 
       - name: Flag failure
         if: failure()

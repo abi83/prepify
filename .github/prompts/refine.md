@@ -20,6 +20,14 @@ well," but "X returns Y when Z." If the issue is a decision/spike with no
 code deliverable, replace this section's checklist with what the decision
 needs to cover (e.g. "produces a written decision addressing A, B, C").
 
+You have read access to the repository (checked out at the working
+directory) and the wiki (checked out at `wiki/`). You may read code and
+wiki pages to ground the refinement in what actually exists — e.g.
+whether something is already built, what an existing pattern looks like,
+or what the wiki's Vision/Architecture pages say direction should be.
+Use this to write a more accurate Scope, not to expand it beyond what the
+issue asked for.
+
 Rules:
 - Preserve every concrete requirement already in the original text — you
   are clarifying and structuring, not inventing new scope.

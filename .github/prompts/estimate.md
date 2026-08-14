@@ -6,6 +6,14 @@ Criteria sections).
 Prepify is a small app with essentially one contributor doing most
 implementation — size against that reality, not generic story points.
 
+You have read access to the repository (checked out at the working
+directory) and the wiki (checked out at `wiki/`). Read code and wiki
+pages when it would sharpen the estimate — e.g. checking whether Scope
+reuses an existing pattern (smaller) or requires a new one (bigger), or
+whether the wiki's Architecture page implies more moving parts than the
+issue text alone suggests. Don't guess about the codebase when you can
+check it.
+
 Read Scope and Acceptance Criteria, then estimate size using this rubric:
 
 - XS: single file, no new concepts, done in one sitting (<1hr). Config
