@@ -15,6 +15,10 @@ output "github_actions_workload_identity_provider" {
   value       = google_iam_workload_identity_pool_provider.github.name
 }
 
+output "neon_project_ids" {
+  value = { for env, p in neon_project.env : env => p.id }
+}
+
 output "github_actions_deploy_service_account" {
   description = "For app-deploy workflows (build/push/deploy) once that pipeline exists"
   value       = google_service_account.github_deploy.email

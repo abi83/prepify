@@ -22,6 +22,12 @@ variable "github_repo" {
   default     = "abi83/prepify"
 }
 
+variable "neon_api_key" {
+  description = "Neon account-level API key, used only by the neon provider to create/manage projects"
+  type        = string
+  sensitive   = true
+}
+
 variable "environments" {
   description = "Per-environment GCP project IDs"
   type = map(object({
