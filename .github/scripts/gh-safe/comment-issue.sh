@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-COMMENT_FILE="${COMMENT_FILE:-/tmp/issue-pipeline-comment.md}"
+COMMENT_FILE="${COMMENT_FILE:-./.issue-pipeline-comment.md}"
 
 ISSUE=$(jq -r '.issue.number // .inputs.issue_number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
 if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
