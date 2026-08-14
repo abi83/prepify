@@ -110,7 +110,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
+          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
+          COST="unknown"
+          if [[ -n "$RAW_COST" ]]; then
+            COST=$(printf '%.4f' "$RAW_COST")
+          fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refinement [pipeline run]($RUN_URL) — cost: \$$COST"
 
@@ -197,7 +201,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
+          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
+          COST="unknown"
+          if [[ -n "$RAW_COST" ]]; then
+            COST=$(printf '%.4f' "$RAW_COST")
+          fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimation [pipeline run]($RUN_URL) — cost: \$$COST"
 
