@@ -44,10 +44,13 @@ jobs:
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Claude refinement
+        id: claude
+        uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
+          allowed_bots: "claude[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
@@ -66,7 +69,23 @@ jobs:
 
             Do nothing else — no comments, no other edits.
           claude_args: |
+            --model claude-haiku-4-5-20251001
             --allowedTools "Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+
+      - name: Log cost
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          FILE="${{ steps.claude.outputs.execution_file }}"
+          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "$FILE" 2>/dev/null || echo unknown)
+          echo "### Refine cost — issue #${{ steps.issue.outputs.number }}: \$$COST" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Flag failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated refinement failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   estimate:
     if: >
@@ -90,10 +109,13 @@ jobs:
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Claude estimation
+        id: claude
+        uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
+          allowed_bots: "claude[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
@@ -113,4 +135,20 @@ jobs:
 
             Do nothing else.
           claude_args: |
+            --model claude-haiku-4-5-20251001
             --allowedTools "Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+
+      - name: Log cost
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          FILE="${{ steps.claude.outputs.execution_file }}"
+          COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "$FILE" 2>/dev/null || echo unknown)
+          echo "### Estimate cost — issue #${{ steps.issue.outputs.number }}: \$$COST" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Flag failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated estimation failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
