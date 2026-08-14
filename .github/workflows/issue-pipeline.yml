@@ -1,0 +1,35 @@
+name: Issue Refinement & Estimation
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to refine and estimate"
+        required: true
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  process-issue:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'status:needs-refinement' ||
+      github.event.label.name == 'status:accepted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Refine and estimate issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+        run: node .github/scripts/issue-pipeline.mjs
