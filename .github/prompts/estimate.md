@@ -6,6 +6,13 @@ Criteria sections).
 Prepify is a small app with essentially one contributor doing most
 implementation — size against that reality, not generic story points.
 
+If Scope or Acceptance Criteria are too ambiguous to size at all (not
+just uncertain — genuinely unsizeable without knowing which of two very
+different implementations is intended), stop. Do not force out a size.
+Instead, comment on the issue tagging the owner (their handle is given
+in your instructions) with one specific, answerable question, and report
+that you stopped for clarification instead of estimating.
+
 You have read access to the repository (checked out at the working
 directory) and the wiki (checked out at `wiki/`). Read code and wiki
 pages when it would sharpen the estimate — e.g. checking whether Scope

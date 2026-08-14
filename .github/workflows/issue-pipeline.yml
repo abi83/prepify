@@ -74,22 +74,30 @@ jobs:
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
             TITLE: ${{ steps.issue.outputs.title }}
+            OWNER: @${{ github.repository_owner }}
             BODY:
             ${{ steps.issue.outputs.body }}
 
             Read .github/prompts/refine.md for the exact rewrite rules and
             apply them to the issue above to produce a new body.
 
-            Then, in order:
+            If refine.md says to stop for clarification: post your
+            question as a comment tagging OWNER with
+            ./.github/scripts/gh-safe/comment-issue.sh "<question>",
+            then swap labels with
+            ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:needs-attention"
+            and stop. Do not edit the body in this case.
+
+            Otherwise, in order:
             1. Set the new body:
                ./.github/scripts/gh-safe/edit-issue-body.sh "<new body>"
             2. Swap labels:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:refined"
 
-            Do nothing else — no comments, no other edits.
+            Do nothing else — no other comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
@@ -98,7 +106,7 @@ jobs:
         run: |
           COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refined by [pipeline run]($RUN_URL) — cost: \$$COST"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refinement [pipeline run]($RUN_URL) — cost: \$$COST"
 
       - name: Flag failure
         if: failure()
@@ -146,13 +154,21 @@ jobs:
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
             TITLE: ${{ steps.issue.outputs.title }}
+            OWNER: @${{ github.repository_owner }}
             BODY:
             ${{ steps.issue.outputs.body }}
 
             Read .github/prompts/estimate.md for the exact sizing rules and
             apply them to the refined issue above.
 
-            Then, in order:
+            If estimate.md says to stop for clarification: post your
+            question as a comment tagging OWNER with
+            ./.github/scripts/gh-safe/comment-issue.sh "<question>",
+            then swap labels with
+            ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:refined" --add-label "status:needs-attention"
+            and stop.
+
+            Otherwise, in order:
             1. Post the estimate output as a comment:
                ./.github/scripts/gh-safe/comment-issue.sh "<estimate output, verbatim>"
             2. Add the size label matching your SIZE line (size:XS,
@@ -171,7 +187,7 @@ jobs:
         run: |
           COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // "unknown"' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null || echo unknown)
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimated by [pipeline run]($RUN_URL) — cost: \$$COST"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimation [pipeline run]($RUN_URL) — cost: \$$COST"
 
       - name: Flag failure
         if: failure()
