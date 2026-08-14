@@ -130,6 +130,19 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refinement [pipeline run]($RUN_URL) — cost: \$$COST"
 
+      - name: Verify outcome
+        if: success() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM="${{ steps.issue.outputs.number }}"
+          LABELS=$(gh issue view "$NUM" --repo ${{ github.repository }} --json labels --jq '[.labels[].name] | join(",")')
+          if [[ "$LABELS" != *"status:refined"* && "$LABELS" != *"status:needs-attention"* ]]; then
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Refinement run completed without leaving the issue in \`status:refined\` or \`status:needs-attention\` — likely stopped partway through. See the run: $RUN_URL"
+          fi
+
       - name: Flag failure
         if: failure()
         env:
@@ -231,6 +244,19 @@ jobs:
           fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimation [pipeline run]($RUN_URL) — cost: \$$COST"
+
+      - name: Verify outcome
+        if: success() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM="${{ steps.issue.outputs.number }}"
+          LABELS=$(gh issue view "$NUM" --repo ${{ github.repository }} --json labels --jq '[.labels[].name] | join(",")')
+          if [[ "$LABELS" != *"status:estimated"* && "$LABELS" != *"status:needs-attention"* ]]; then
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Estimation run completed without leaving the issue in \`status:estimated\` or \`status:needs-attention\` — likely stopped partway through. See the run: $RUN_URL"
+          fi
 
       - name: Flag failure
         if: failure()
