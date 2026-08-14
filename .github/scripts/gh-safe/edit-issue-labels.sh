@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-ISSUE=$(jq -r '.issue.number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
+ISSUE=$(jq -r '.issue.number // .inputs.issue_number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
 if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
   echo "Error: no issue number in event payload" >&2
   exit 1

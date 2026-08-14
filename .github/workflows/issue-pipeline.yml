@@ -3,6 +3,18 @@ name: Issue Refinement & Estimation
 on:
   issues:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to process"
+        required: true
+      phase:
+        description: "Which phase to run"
+        required: true
+        type: choice
+        options:
+          - refine
+          - estimate
 
 permissions:
   issues: write
@@ -12,10 +24,25 @@ jobs:
   refine:
     if: >
       github.event.label.name == 'status:needs-refinement' ||
-      github.event.label.name == 'status:accepted'
+      github.event.label.name == 'status:accepted' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'refine')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM="${{ github.event.issue.number || github.event.inputs.issue_number }}"
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+          echo "title=$(gh issue view "$NUM" --repo ${{ github.repository }} --json title --jq .title)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'body<<EOF_BODY'
+            gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -23,10 +50,10 @@ jobs:
           show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
-            ISSUE NUMBER: ${{ github.event.issue.number }}
-            TITLE: ${{ github.event.issue.title }}
+            ISSUE NUMBER: ${{ steps.issue.outputs.number }}
+            TITLE: ${{ steps.issue.outputs.title }}
             BODY:
-            ${{ github.event.issue.body }}
+            ${{ steps.issue.outputs.body }}
 
             Read .github/prompts/refine.md for the exact rewrite rules and
             apply them to the issue above to produce a new body.
@@ -42,20 +69,37 @@ jobs:
             --allowedTools "Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
   estimate:
-    if: github.event.label.name == 'status:refined'
+    if: >
+      github.event.label.name == 'status:refined' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'estimate')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM="${{ github.event.issue.number || github.event.inputs.issue_number }}"
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+          echo "title=$(gh issue view "$NUM" --repo ${{ github.repository }} --json title --jq .title)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'body<<EOF_BODY'
+            gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
+            echo 'EOF_BODY'
+          } >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
-            ISSUE NUMBER: ${{ github.event.issue.number }}
-            TITLE: ${{ github.event.issue.title }}
+            ISSUE NUMBER: ${{ steps.issue.outputs.number }}
+            TITLE: ${{ steps.issue.outputs.title }}
             BODY:
-            ${{ github.event.issue.body }}
+            ${{ steps.issue.outputs.body }}
 
             Read .github/prompts/estimate.md for the exact sizing rules and
             apply them to the refined issue above.
