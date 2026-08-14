@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-BODY_FILE="${BODY_FILE:-/tmp/issue-pipeline-body.md}"
+BODY_FILE="${BODY_FILE:-./.issue-pipeline-body.md}"
 
 ISSUE=$(jq -r '.issue.number // .inputs.issue_number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
 if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then

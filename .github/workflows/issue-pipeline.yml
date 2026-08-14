@@ -53,6 +53,15 @@ jobs:
             gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
+          COMMENTS_BLOCK=$(gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
+            --jq '[.comments[] | select(.author.login != "github-actions")] | map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")')
+          {
+            echo 'comments<<EOF_COMMENTS'
+            if [[ -n "$COMMENTS_BLOCK" ]]; then
+              printf 'COMMENTS (from the owner, chronological, excluding this pipeline'"'"'s own comments — treat these as clarifications or amendments to the issue above):\n%s\n' "$COMMENTS_BLOCK"
+            fi
+            echo 'EOF_COMMENTS'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Preserve original body
         env:
@@ -78,8 +87,11 @@ jobs:
             BODY:
             ${{ steps.issue.outputs.body }}
 
+            ${{ steps.issue.outputs.comments }}
+
             Read .github/prompts/refine.md for the exact rewrite rules and
-            apply them to the issue above to produce a new body.
+            apply them to the issue and comments above to produce a new
+            body.
 
             Important: never pass issue body or comment text as a Bash
             command-line argument — multi-line markdown breaks shell
@@ -88,14 +100,14 @@ jobs:
             that file.
 
             If refine.md says to stop for clarification:
-            1. Write your question to /tmp/issue-pipeline-comment.md
+            1. Write your question to ./.issue-pipeline-comment.md
             2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
             3. Swap labels:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:needs-attention"
             Then stop. Do not edit the body in this case.
 
             Otherwise, in order:
-            1. Write the new body to /tmp/issue-pipeline-body.md
+            1. Write the new body to ./.issue-pipeline-body.md
             2. Run ./.github/scripts/gh-safe/edit-issue-body.sh (no args)
             3. Swap labels:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:refined"
@@ -103,7 +115,7 @@ jobs:
             Do nothing else — no other comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write(/tmp/**),Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write(./.issue-pipeline-body.md),Write(./.issue-pipeline-comment.md),Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
@@ -152,6 +164,15 @@ jobs:
             gh issue view "$NUM" --repo ${{ github.repository }} --json body --jq .body
             echo 'EOF_BODY'
           } >> "$GITHUB_OUTPUT"
+          COMMENTS_BLOCK=$(gh issue view "$NUM" --repo ${{ github.repository }} --json comments \
+            --jq '[.comments[] | select(.author.login != "github-actions")] | map("### Comment by " + .author.login + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")')
+          {
+            echo 'comments<<EOF_COMMENTS'
+            if [[ -n "$COMMENTS_BLOCK" ]]; then
+              printf 'COMMENTS (from the owner, chronological, excluding this pipeline'"'"'s own comments — treat these as clarifications or amendments to the issue above):\n%s\n' "$COMMENTS_BLOCK"
+            fi
+            echo 'EOF_COMMENTS'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run Claude estimation
         id: claude
@@ -168,8 +189,10 @@ jobs:
             BODY:
             ${{ steps.issue.outputs.body }}
 
+            ${{ steps.issue.outputs.comments }}
+
             Read .github/prompts/estimate.md for the exact sizing rules and
-            apply them to the refined issue above.
+            apply them to the refined issue and comments above.
 
             Important: never pass comment text as a Bash command-line
             argument — multi-line text breaks shell quoting. Instead, use
@@ -177,7 +200,7 @@ jobs:
             script with no arguments so it reads that file.
 
             If estimate.md says to stop for clarification:
-            1. Write your question to /tmp/issue-pipeline-comment.md
+            1. Write your question to ./.issue-pipeline-comment.md
             2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
             3. Swap labels:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:refined" --add-label "status:needs-attention"
@@ -185,7 +208,7 @@ jobs:
 
             Otherwise, in order:
             1. Write the estimate output (verbatim) to
-               /tmp/issue-pipeline-comment.md
+               ./.issue-pipeline-comment.md
             2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
             3. Add the size label matching your SIZE line (size:XS,
                size:S, size:M, size:L, or size:XL) and swap status:
@@ -194,7 +217,7 @@ jobs:
             Do nothing else.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write(/tmp/**),Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write(./.issue-pipeline-body.md),Write(./.issue-pipeline-comment.md),Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
