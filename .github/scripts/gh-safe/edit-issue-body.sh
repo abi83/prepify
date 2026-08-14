@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 #
-# Sets the body of the issue bound to the triggering event. Scoped so the
-# agent can only rewrite the one issue that fired the workflow, not any
-# issue number it might be tempted to pass.
+# Sets the body of the issue bound to the triggering event, reading the
+# new body from a fixed file (written beforehand with the Write tool).
+# Content never passes through a Bash argument, since multi-line markdown
+# containing "#" headers trips Claude Code's static shell-safety checks
+# when quoted as a CLI arg.
 #
-# Usage: ./edit-issue-body.sh "<new body text>"
+# Usage: write the new body to $BODY_FILE, then run with no arguments.
 
 set -euo pipefail
+
+BODY_FILE="${BODY_FILE:-/tmp/issue-pipeline-body.md}"
 
 ISSUE=$(jq -r '.issue.number // .inputs.issue_number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
 if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
@@ -14,9 +18,9 @@ if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-if [[ $# -ne 1 ]]; then
-  echo "Error: expects exactly one argument, the new issue body" >&2
+if [[ ! -f "$BODY_FILE" ]]; then
+  echo "Error: $BODY_FILE not found — write the new body there first" >&2
   exit 1
 fi
 
-gh issue edit "$ISSUE" --body "$1"
+gh issue edit "$ISSUE" --body-file "$BODY_FILE"

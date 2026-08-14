@@ -81,23 +81,29 @@ jobs:
             Read .github/prompts/refine.md for the exact rewrite rules and
             apply them to the issue above to produce a new body.
 
-            If refine.md says to stop for clarification: post your
-            question as a comment tagging OWNER with
-            ./.github/scripts/gh-safe/comment-issue.sh "<question>",
-            then swap labels with
-            ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:needs-attention"
-            and stop. Do not edit the body in this case.
+            Important: never pass issue body or comment text as a Bash
+            command-line argument — multi-line markdown breaks shell
+            quoting. Instead, use the Write tool to write text to a file
+            first, then run the script with no arguments so it reads
+            that file.
+
+            If refine.md says to stop for clarification:
+            1. Write your question to /tmp/issue-pipeline-comment.md
+            2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
+            3. Swap labels:
+               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:needs-attention"
+            Then stop. Do not edit the body in this case.
 
             Otherwise, in order:
-            1. Set the new body:
-               ./.github/scripts/gh-safe/edit-issue-body.sh "<new body>"
-            2. Swap labels:
+            1. Write the new body to /tmp/issue-pipeline-body.md
+            2. Run ./.github/scripts/gh-safe/edit-issue-body.sh (no args)
+            3. Swap labels:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:refined"
 
             Do nothing else — no other comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write(/tmp/**),Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
@@ -161,24 +167,30 @@ jobs:
             Read .github/prompts/estimate.md for the exact sizing rules and
             apply them to the refined issue above.
 
-            If estimate.md says to stop for clarification: post your
-            question as a comment tagging OWNER with
-            ./.github/scripts/gh-safe/comment-issue.sh "<question>",
-            then swap labels with
-            ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:refined" --add-label "status:needs-attention"
-            and stop.
+            Important: never pass comment text as a Bash command-line
+            argument — multi-line text breaks shell quoting. Instead, use
+            the Write tool to write text to a file first, then run the
+            script with no arguments so it reads that file.
+
+            If estimate.md says to stop for clarification:
+            1. Write your question to /tmp/issue-pipeline-comment.md
+            2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
+            3. Swap labels:
+               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:refined" --add-label "status:needs-attention"
+            Then stop.
 
             Otherwise, in order:
-            1. Post the estimate output as a comment:
-               ./.github/scripts/gh-safe/comment-issue.sh "<estimate output, verbatim>"
-            2. Add the size label matching your SIZE line (size:XS,
+            1. Write the estimate output (verbatim) to
+               /tmp/issue-pipeline-comment.md
+            2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
+            3. Add the size label matching your SIZE line (size:XS,
                size:S, size:M, size:L, or size:XL) and swap status:
                ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:refined" --add-label "status:estimated" --add-label "size:<SIZE>"
 
             Do nothing else.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write(/tmp/**),Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*)"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
