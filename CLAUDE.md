@@ -43,8 +43,7 @@ No `supabase login` needed — uses `SUPABASE_DATABASE_PASSWORD` from `.env`. Mi
 
 ## Database Schema
 
-TypeScript types: `src/lib/supabase.ts` (Prep) and `src/types/questions.ts` (Question, Attempt, Asset).
-Full schema and RLS policies: `supabase/migrations/`.
+Schema and RLS policies live in migrations; application types mirror them in code.
 
 ---
 
@@ -59,13 +58,24 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 
 ### Implementation flow
 For every ticket/feature, in order:
-1. Implement the code changes
+1. Create a branch, implement the code changes
 2. Apply migrations if any (`npm run db:push`)
-3. Commit the code
-4. Push to `main`
-5. Close the GitHub issue
+3. Commit and push the branch
+4. Open a PR — no direct pushes to `main`
+5. Once reviewed and merged, close the GitHub issue
 
-No PRs, no staging — we ship directly to main. "Test on prod" fits this project size.
+A dev/prod environment split is planned but not set up yet — migrations still apply against the one environment we have.
+
+---
+
+## Wiki
+
+The GitHub wiki (separate repo, cloned locally at `../prepify.wiki`) is a high-level companion to the code — vision and direction, not implementation.
+
+- **Self-documenting code is the default.** The wiki captures intent and shape — what code and commit history can't. It doesn't restate what's already legible from reading the repo.
+- **Concepts and modules, never files, lines, or values.** No file paths, no constants, no counts — anything that lives in code will drift out of sync the moment it changes there.
+- **No ticket, issue, epic, or status tracking.** That lives in GitHub Issues/Projects.
+- Edits are direct-push (wikis have no PR flow) — but commit only when there's a meaningful change, not for every wording tweak.
 
 ---
 
