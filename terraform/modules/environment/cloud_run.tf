@@ -1,33 +1,27 @@
 resource "google_service_account" "run_runtime" {
-  for_each = var.environments
-
-  project      = google_project.env[each.key].project_id
+  project      = google_project.this.project_id
   account_id   = "prepify-run-runtime"
-  display_name = "Prepify Cloud Run runtime (${each.key})"
+  display_name = "Prepify Cloud Run runtime (${var.environment})"
 }
 
 resource "google_storage_bucket_iam_member" "run_runtime_storage_access" {
-  for_each = var.environments
-
-  bucket = google_storage_bucket.storage[each.key].name
+  bucket = google_storage_bucket.this.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.run_runtime[each.key].email}"
+  member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
 # TODO(#54): replace the placeholder image below once the deploy pipeline
 # exists. `ignore_changes` keeps Terraform from fighting that pipeline over
 # the image field once it starts deploying real ones.
 resource "google_cloud_run_v2_service" "app" {
-  for_each = var.environments
-
-  project  = google_project.env[each.key].project_id
+  project  = google_project.this.project_id
   name     = "prepify"
   location = var.region
 
   deletion_protection = false
 
   template {
-    service_account = google_service_account.run_runtime[each.key].email
+    service_account = google_service_account.run_runtime.email
 
     scaling {
       min_instance_count = 0
@@ -49,15 +43,13 @@ resource "google_cloud_run_v2_service" "app" {
     ignore_changes = [template[0].containers[0].image]
   }
 
-  depends_on = [google_project_service.env]
+  depends_on = [google_project_service.this]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
-  for_each = var.environments
-
-  project  = google_project.env[each.key].project_id
+  project  = google_project.this.project_id
   location = var.region
-  name     = google_cloud_run_v2_service.app[each.key].name
+  name     = google_cloud_run_v2_service.app.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }

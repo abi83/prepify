@@ -3,7 +3,7 @@ terraform {
 
   backend "gcs" {
     bucket = "prepify-tfstate"
-    prefix = "terraform/state"
+    prefix = "terraform/state/dev"
   }
 
   required_providers {

@@ -7,7 +7,7 @@ coverage
 .DS_Store
 
 # Terraform
-terraform/.terraform/
+.terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars

@@ -1,5 +1,5 @@
 provider "google" {
-  region = var.region
+  region = "us-central1"
 }
 
 provider "neon" {

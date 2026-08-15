@@ -48,31 +48,13 @@ resource "google_artifact_registry_repository_iam_member" "github_deploy_push" {
   member     = "serviceAccount:${google_service_account.github_deploy.email}"
 }
 
-resource "google_project_iam_member" "github_deploy_run_admin" {
-  for_each = var.environments
-
-  project = google_project.env[each.key].project_id
-  role    = "roles/run.admin"
-  member  = "serviceAccount:${google_service_account.github_deploy.email}"
-}
-
-# Lets the deploy identity attach the runtime service account to a new Cloud
-# Run revision — required by Cloud Run deploys, separate from run.admin.
-resource "google_service_account_iam_member" "github_deploy_act_as_runtime" {
-  for_each = var.environments
-
-  service_account_id = google_service_account.run_runtime[each.key].name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.github_deploy.email}"
-}
-
 # Separate, more privileged identity for the terraform.yml workflow.
 # github-deploy above is deliberately narrow (Cloud Run + registry only) for
-# routine app deploys; running `terraform apply` against this config also
-# touches project metadata, IAM bindings, and the WIF pool itself, which
-# needs project-level Owner — there's no predefined role that covers exactly
-# "manage this Terraform config" short of that. Kept as its own service
-# account so the app-deploy identity never needs this much power.
+# routine app deploys; running `terraform apply` against dev/prod also
+# touches project metadata and IAM bindings there, which needs project-level
+# Owner — there's no predefined role that covers exactly "manage this
+# Terraform config" short of that. Kept as its own service account so the
+# app-deploy identity never needs this much power.
 resource "google_service_account" "terraform_ci" {
   project      = google_project.infra.project_id
   account_id   = "terraform-ci"
@@ -87,14 +69,6 @@ resource "google_service_account_iam_member" "terraform_ci_wif_binding" {
 
 resource "google_project_iam_member" "terraform_ci_owner_infra" {
   project = google_project.infra.project_id
-  role    = "roles/owner"
-  member  = "serviceAccount:${google_service_account.terraform_ci.email}"
-}
-
-resource "google_project_iam_member" "terraform_ci_owner_env" {
-  for_each = var.environments
-
-  project = google_project.env[each.key].project_id
   role    = "roles/owner"
   member  = "serviceAccount:${google_service_account.terraform_ci.email}"
 }
