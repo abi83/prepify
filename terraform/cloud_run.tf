@@ -6,18 +6,17 @@ resource "google_service_account" "run_runtime" {
   display_name = "Prepify Cloud Run runtime (${each.key})"
 }
 
-resource "google_storage_bucket_iam_member" "run_runtime_photos_access" {
+resource "google_storage_bucket_iam_member" "run_runtime_storage_access" {
   for_each = var.environments
 
-  bucket = google_storage_bucket.photos[each.key].name
+  bucket = google_storage_bucket.storage[each.key].name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.run_runtime[each.key].email}"
 }
 
-# Empty shell service — no app image exists yet, so it runs Google's public
-# hello-world placeholder until the (separate, out-of-scope) deploy pipeline
-# pushes a real image. `ignore_changes` keeps Terraform from fighting that
-# pipeline over the image field once deploys start.
+# TODO(#54): replace the placeholder image below once the deploy pipeline
+# exists. `ignore_changes` keeps Terraform from fighting that pipeline over
+# the image field once it starts deploying real ones.
 resource "google_cloud_run_v2_service" "app" {
   for_each = var.environments
 

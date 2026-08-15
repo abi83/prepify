@@ -2,8 +2,8 @@ output "cloud_run_urls" {
   value = { for env, svc in google_cloud_run_v2_service.app : env => svc.uri }
 }
 
-output "photo_buckets" {
-  value = { for env, b in google_storage_bucket.photos : env => b.name }
+output "storage_buckets" {
+  value = { for env, b in google_storage_bucket.storage : env => b.name }
 }
 
 output "artifact_registry_repo" {

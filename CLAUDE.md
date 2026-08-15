@@ -66,6 +66,15 @@ For every ticket/feature, in order:
 
 A dev/prod environment split is planned but not set up yet — migrations still apply against the one environment we have.
 
+### TODO/FIXME comments
+A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
+
+```
+# TODO(#123): replace with the real container image once the deploy pipeline exists
+```
+
+Remove the comment itself once #123 ships — don't just close the issue and leave the comment behind. A TODO that outlives its ticket reads as still-pending work that isn't.
+
 ---
 
 ## Wiki
