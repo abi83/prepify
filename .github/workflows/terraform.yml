@@ -33,6 +33,12 @@ jobs:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
 
+      - id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |-
+            neon_api_key:prepify-infra/neon-api-key
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.*"
@@ -40,6 +46,8 @@ jobs:
       - run: terraform init
       - run: terraform fmt -check
       - run: terraform plan -no-color
+        env:
+          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
 
   apply:
     if: github.event_name == 'push'
@@ -56,9 +64,17 @@ jobs:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
 
+      - id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |-
+            neon_api_key:prepify-infra/neon-api-key
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.*"
 
       - run: terraform init
       - run: terraform apply -auto-approve -no-color
+        env:
+          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
