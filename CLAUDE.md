@@ -30,7 +30,7 @@ Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 
 ## Database Migrations
 
-All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth). Never edit the schema directly on Neon's dashboard. `supabase/migrations/*.sql` is kept only as historical record of the old Supabase-Postgres schema this replaced — no new migrations go there.
+All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth). `supabase/migrations/*.sql` is historical record only — no new migrations go there.
 
 One-time setup — get the dev Neon connection strings into `.env.local`:
 ```bash
@@ -47,7 +47,7 @@ npm run db:generate   # prisma generate (also runs automatically via postinstall
 Migrations are authored and applied against the **dev** Neon branch locally, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR. CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if you already applied it locally, but catches anything you forgot. The prod step only runs after the same manual-approval gate that already protects prod deploys.
 
 ### Conventions
-- One migration per logical change
+- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several). Easier once per-PR Neon branches (#85) land.
 - Prisma's own naming (`prisma migrate dev --name <descriptive_name>`)
 - Never edit an already-committed migration — create a new one instead
 

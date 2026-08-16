@@ -10,14 +10,8 @@ resource "neon_project" "this" {
   history_retention_seconds = 21600
 }
 
-# Stored in Secret Manager (not passed as a plain env var) so the
-# connection string never appears in Cloud Run's revision config, which is
-# otherwise readable by anyone with run.viewer on the project.
-#
-# Direct (unpooled) connection — used for running Prisma migrations, which
-# need session-level locking the pooler doesn't support. Not granted to the
-# Cloud Run runtime service account; migrations run out-of-band, not at
-# request time.
+# Direct (unpooled) connection, for running migrations — not granted to
+# the Cloud Run runtime service account, only github-deploy (below).
 resource "google_secret_manager_secret" "db_url" {
   project   = google_project.this.project_id
   secret_id = "prepify-db-url"
@@ -34,8 +28,7 @@ resource "google_secret_manager_secret_version" "db_url" {
   secret_data = neon_project.this.connection_uri
 }
 
-# github-deploy runs `prisma migrate deploy` as part of deploy.yml, which
-# needs the direct (unpooled) connection — see .github/workflows/deploy.yml.
+# Needed for CI to run `prisma migrate deploy` (deploy.yml).
 resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_access" {
   secret_id = google_secret_manager_secret.db_url.id
   project   = google_project.this.project_id
