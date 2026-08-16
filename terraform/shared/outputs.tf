@@ -8,7 +8,7 @@ output "github_actions_workload_identity_provider" {
 }
 
 output "github_actions_deploy_service_account" {
-  description = "For app-deploy workflows (build/push/deploy) once that pipeline exists"
+  description = "For app-deploy workflows (build/push/deploy), see .github/workflows/deploy.yml"
   value       = google_service_account.github_deploy.email
 }
 

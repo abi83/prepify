@@ -38,8 +38,10 @@ jobs:
       dev: ${{ steps.filter.outputs.dev }}
       prod: ${{ steps.filter.outputs.prod }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -65,14 +67,18 @@ jobs:
       run:
         working-directory: terraform/shared
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         with:
           working_directory: terraform/shared
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - run: terraform fmt -check
-      - run: terraform plan -no-color
+      - name: Check formatting
+        run: terraform fmt -check
+      - name: Plan
+        run: terraform plan -no-color
 
   plan-dev:
     needs: changes
@@ -84,16 +90,20 @@ jobs:
       run:
         working-directory: terraform/envs/dev
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         id: init
         with:
           working_directory: terraform/envs/dev
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
           needs_neon_secret: "true"
-      - run: terraform fmt -check
-      - run: terraform plan -no-color
+      - name: Check formatting
+        run: terraform fmt -check
+      - name: Plan
+        run: terraform plan -no-color
         env:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
@@ -107,16 +117,20 @@ jobs:
       run:
         working-directory: terraform/envs/prod
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         id: init
         with:
           working_directory: terraform/envs/prod
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
           needs_neon_secret: "true"
-      - run: terraform fmt -check
-      - run: terraform plan -no-color
+      - name: Check formatting
+        run: terraform fmt -check
+      - name: Plan
+        run: terraform plan -no-color
         env:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
@@ -130,13 +144,16 @@ jobs:
       run:
         working-directory: terraform/shared
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         with:
           working_directory: terraform/shared
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - run: terraform apply -auto-approve -no-color
+      - name: Apply
+        run: terraform apply -auto-approve -no-color
 
   # Dev auto-applies on merge — no gate, matches "dev is the thing you
   # break to find out" tier. The "dev" GitHub Environment has no protection
@@ -157,15 +174,18 @@ jobs:
       run:
         working-directory: terraform/envs/dev
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         id: init
         with:
           working_directory: terraform/envs/dev
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
           needs_neon_secret: "true"
-      - run: terraform apply -auto-approve -no-color
+      - name: Apply
+        run: terraform apply -auto-approve -no-color
         env:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
@@ -184,14 +204,17 @@ jobs:
       run:
         working-directory: terraform/envs/prod
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/terraform-init
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Terraform init
+        uses: ./.github/actions/terraform-init
         id: init
         with:
           working_directory: terraform/envs/prod
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
           needs_neon_secret: "true"
-      - run: terraform apply -auto-approve -no-color
+      - name: Apply
+        run: terraform apply -auto-approve -no-color
         env:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}

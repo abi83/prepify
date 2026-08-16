@@ -12,6 +12,11 @@ The app is entirely client-rendered (every route is a client component) — no s
 - CSS Modules
 - OpenAI API (LLM pipeline)
 
+## Code Style
+
+### Comments
+Prefer self-documenting code — clear names for variables, functions, workflow steps, files — over comments that restate what the code already says. Add a comment only for a hidden constraint, a non-obvious workaround, or a reason a reader couldn't otherwise infer. When one is warranted, keep it short: a line or two, not a paragraph.
+
 ## Environment
 Copy `.env.example` to `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
@@ -62,7 +67,7 @@ For every ticket/feature, in order:
 1. Create a branch, implement the code changes
 2. Apply migrations if any (`npm run db:push`)
 3. Commit and push the branch
-4. Open a PR — no direct pushes to `main`
+4. Open a PR — no direct pushes to `main`. PRs are squash-merged, so give the PR itself a [Conventional Commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `refactor:`, etc.) — release-please derives the version bump and changelog from commit history on `main`, so a non-conventional title is an invisible, unlabeled change there.
 5. Once reviewed and merged, close the GitHub issue
 
 Supabase migrations still apply against a single environment — no dev/prod split for the Supabase database. The GCP/Cloud Run/Neon infra provisioned via Terraform (`terraform/`, see `terraform/README.md`) does have dev+prod from the start, but that's a separate, not-yet-wired-in backend, not the current Supabase-backed app.

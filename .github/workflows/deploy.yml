@@ -1,0 +1,128 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing vX.Y.Z tag to redeploy to prod (rollback). Leave empty to deploy the current branch to dev instead."
+        required: false
+      run_tests:
+        description: "Run tests before deploying"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+# Mirrors terraform/shared outputs — can't be wired automatically since
+# Terraform hasn't run yet when this workflow starts. Keep in sync by hand.
+env:
+  WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
+  SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com
+  REGISTRY: us-central1-docker.pkg.dev/prepify-infra/prepify
+  IMAGE: app
+  REGION: us-central1
+
+jobs:
+  # Only workflow_dispatch's run_tests input can skip this.
+  test:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+
+  deploy-dev:
+    needs: test
+    if: |
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+      )
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+      - name: Build and push image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }} .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: prepify
+          region: ${{ env.REGION }}
+          project_id: prepify-dev-vk
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+
+  # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
+  deploy-prod:
+    needs: test
+    if: |
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      )
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Resolve target version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build and push image
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+          docker build \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest \
+            .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: prepify
+          region: ${{ env.REGION }}
+          project_id: prepify-prod
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}

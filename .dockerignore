@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+coverage
+*.tsbuildinfo
+.env
+.env.local
+terraform
+supabase
+.github
+.claude
+README.md
