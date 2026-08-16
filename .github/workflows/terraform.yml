@@ -112,11 +112,13 @@ jobs:
       - run: terraform apply -auto-approve -no-color
 
   # Dev auto-applies on merge — no gate, matches "dev is the thing you
-  # break to find out" tier.
+  # break to find out" tier. The "dev" GitHub Environment has no protection
+  # rules; it's here for deployment history/visibility, same as prod.
   apply-dev:
     if: github.event_name == 'push'
     needs: apply-shared
     runs-on: ubuntu-latest
+    environment: dev
     defaults:
       run:
         working-directory: terraform/envs/dev
