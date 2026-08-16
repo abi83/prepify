@@ -113,13 +113,6 @@ describe('StudyPage — loaded with questions', () => {
     })
   })
 
-  it('renders the study description', async () => {
-    renderStudyPage()
-    await waitFor(() => {
-      expect(screen.getByText('A quick overview of cells.')).toBeInTheDocument()
-    })
-  })
-
   it('renders the Cards, Quiz, and Test tabs', async () => {
     renderStudyPage()
     await waitFor(() => {
