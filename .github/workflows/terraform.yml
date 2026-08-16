@@ -3,12 +3,8 @@ name: terraform
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - "terraform/**"
   push:
     branches: [main]
-    paths:
-      - "terraform/**"
 
 permissions:
   contents: read
@@ -26,9 +22,14 @@ env:
 
 jobs:
   # Scopes plan/apply to the roots actually touched, so a dev-only change
-  # doesn't also plan/apply shared and prod for a guaranteed no-op. Not
-  # meaningful for workflow_dispatch (no base to diff against) — jobs treat
-  # a manual run as "run me" regardless of these outputs.
+  # doesn't also plan/apply shared and prod for a guaranteed no-op. This
+  # workflow deliberately has no `paths:` filter on pull_request/push (even
+  # though only this job needs to run for non-terraform PRs) — plan-shared/
+  # plan-dev/plan-prod are required status checks on main, and a required
+  # check that never gets a check run (workflow never triggered) blocks
+  # merging forever, unlike one that reports "skipped". Not meaningful for
+  # workflow_dispatch (no base to diff against) — jobs treat a manual run
+  # as "run me" regardless of these outputs.
   changes:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
