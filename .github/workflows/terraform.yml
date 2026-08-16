@@ -115,6 +115,7 @@ jobs:
   # break to find out" tier.
   apply-dev:
     if: github.event_name == 'push'
+    needs: apply-shared
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -142,6 +143,7 @@ jobs:
   # required-reviewer protection rule (repo Settings > Environments).
   apply-prod:
     if: github.event_name == 'push'
+    needs: apply-shared
     runs-on: ubuntu-latest
     environment: prod
     defaults:
