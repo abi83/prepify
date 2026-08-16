@@ -1,0 +1,26 @@
+# Provisioned here so Terraform is authoritative, but the underlying project
+# was created once by hand and imported — see README.md. GCP project deletion
+# is a 30-day soft-delete, so `prevent_destroy` guards against an accidental
+# `terraform destroy` making the project ID unusable for a month.
+resource "google_project" "this" {
+  project_id      = var.project_id
+  name            = "Prepify ${title(var.environment)}"
+  billing_account = var.billing_account_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+module "apis" {
+  source = "../apis"
+}
+
+resource "google_project_service" "this" {
+  for_each = toset(module.apis.list)
+
+  project = google_project.this.project_id
+  service = each.value
+
+  disable_on_destroy = false
+}
