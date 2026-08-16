@@ -12,20 +12,12 @@ resource "google_project" "this" {
   }
 }
 
-locals {
-  apis = [
-    "run.googleapis.com",
-    "artifactregistry.googleapis.com",
-    "storage.googleapis.com",
-    "iam.googleapis.com",
-    "iamcredentials.googleapis.com",
-    "cloudresourcemanager.googleapis.com",
-    "secretmanager.googleapis.com",
-  ]
+module "apis" {
+  source = "../apis"
 }
 
 resource "google_project_service" "this" {
-  for_each = toset(local.apis)
+  for_each = toset(module.apis.list)
 
   project = google_project.this.project_id
   service = each.value
