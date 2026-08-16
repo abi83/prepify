@@ -34,6 +34,15 @@ resource "google_secret_manager_secret_version" "db_url" {
   secret_data = neon_project.this.connection_uri
 }
 
+# github-deploy runs `prisma migrate deploy` as part of deploy.yml, which
+# needs the direct (unpooled) connection — see .github/workflows/deploy.yml.
+resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_access" {
+  secret_id = google_secret_manager_secret.db_url.id
+  project   = google_project.this.project_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.github_deploy_service_account_email}"
+}
+
 # Pooled connection — what the app actually connects with at runtime.
 resource "google_secret_manager_secret" "db_url_pooled" {
   project   = google_project.this.project_id
