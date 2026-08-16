@@ -45,10 +45,6 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # Every merge to main (including release-please's own release-PR merges)
-  # deploys to dev, tagged by commit SHA — dev always tracks the tip of main.
-  # workflow_dispatch also deploys the selected branch to dev, as long as
-  # no rollback `tag` was given (that means "deploy to prod instead").
   deploy-dev:
     needs: test
     if: |
@@ -83,10 +79,7 @@ jobs:
           project_id: prepify-dev-vk
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
 
-  # Deploys a released vX.Y.Z (never a SHA or `latest`), gated by the
-  # "prod" environment's required-reviewer rule. workflow_dispatch
-  # redeploys an existing tag for rollback, without rebuilding — only
-  # when a `tag` input was given (empty means "deploy to dev instead").
+  # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
     needs: test
     if: |
