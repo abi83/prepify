@@ -20,19 +20,23 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: google-github-actions/auth@v2
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ inputs.workload_identity_provider }}
         service_account: ${{ inputs.service_account }}
-    - id: secrets
+    - name: Fetch Neon API key
+      id: secrets
       if: inputs.needs_neon_secret == 'true'
       uses: google-github-actions/get-secretmanager-secrets@v2
       with:
         secrets: |-
           neon_api_key:prepify-infra/neon-api-key
-    - uses: hashicorp/setup-terraform@v3
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: "1.9.*"
-    - run: terraform init
+    - name: Terraform init
+      run: terraform init
       shell: bash
       working-directory: ${{ inputs.working_directory }}
