@@ -64,7 +64,7 @@ For every ticket/feature, in order:
 4. Open a PR — no direct pushes to `main`
 5. Once reviewed and merged, close the GitHub issue
 
-A dev/prod environment split is planned but not set up yet — migrations still apply against the one environment we have.
+Supabase migrations still apply against a single environment — no dev/prod split for the Supabase database. The GCP/Cloud Run/Neon infra provisioned via Terraform (`terraform/`, see `terraform/README.md`) does have dev+prod from the start, but that's a separate, not-yet-wired-in backend, not the current Supabase-backed app.
 
 ### TODO/FIXME comments
 A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
