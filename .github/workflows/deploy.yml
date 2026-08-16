@@ -14,11 +14,8 @@ permissions:
   contents: read
   id-token: write
 
-# Duplicates terraform/shared/outputs.tf's github_actions_workload_identity_provider
-# and github_actions_deploy_service_account, and terraform/shared/artifact_registry.tf's
-# repo location — can't be wired automatically because this workflow needs them before
-# any Terraform output exists. If github-deploy, the WIF provider, or the Artifact
-# Registry repo is ever renamed in terraform/shared/*.tf, update both places by hand.
+# Mirrors terraform/shared outputs — can't be wired automatically since
+# Terraform hasn't run yet when this workflow starts. Keep in sync by hand.
 env:
   WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com
@@ -34,31 +31,32 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-      - run: |
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+      - name: Build and push image
+        run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }} .
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
-      - uses: google-github-actions/deploy-cloudrun@v2
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: prepify
           region: ${{ env.REGION }}
           project_id: prepify-dev-vk
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
 
-  # release-please cuts a vX.Y.Z tag on merge to main. Prod only ever
-  # deploys a version already built and proven on dev — never a SHA or
-  # `latest` — gated by the "prod" GitHub Environment's required-reviewer
-  # rule (Terraform-provisioned, see terraform/README.md).
-  #
-  # Also runs on workflow_dispatch for rollback: point `tag` at any older
-  # vX.Y.Z already pushed to Artifact Registry and this redeploys it
-  # without rebuilding.
+  # Deploys a released vX.Y.Z (never a SHA or `latest`), gated by the
+  # "prod" environment's required-reviewer rule. workflow_dispatch
+  # redeploys an existing tag for rollback, without rebuilding.
   deploy-prod:
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
@@ -66,20 +64,25 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - id: version
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Resolve target version
+        id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           fi
-      - if: github.event_name != 'workflow_dispatch'
+      - name: Build and push image
+        if: github.event_name != 'workflow_dispatch'
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
           docker build \
@@ -88,7 +91,8 @@ jobs:
             .
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
-      - uses: google-github-actions/deploy-cloudrun@v2
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: prepify
           region: ${{ env.REGION }}

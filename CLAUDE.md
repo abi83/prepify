@@ -12,6 +12,11 @@ The app is entirely client-rendered (every route is a client component) — no s
 - CSS Modules
 - OpenAI API (LLM pipeline)
 
+## Code Style
+
+### Comments
+Prefer self-documenting code — clear names for variables, functions, workflow steps, files — over comments that restate what the code already says. Add a comment only for a hidden constraint, a non-obvious workaround, or a reason a reader couldn't otherwise infer. When one is warranted, keep it short: a line or two, not a paragraph.
+
 ## Environment
 Copy `.env.example` to `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
