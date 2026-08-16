@@ -25,103 +25,131 @@ env:
   SERVICE_ACCOUNT: terraform-ci@prepify-infra.iam.gserviceaccount.com
 
 jobs:
+  # Scopes plan/apply to the roots actually touched, so a dev-only change
+  # doesn't also plan/apply shared and prod for a guaranteed no-op. Not
+  # meaningful for workflow_dispatch (no base to diff against) — jobs treat
+  # a manual run as "run me" regardless of these outputs.
+  changes:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      shared: ${{ steps.filter.outputs.shared }}
+      dev: ${{ steps.filter.outputs.dev }}
+      prod: ${{ steps.filter.outputs.prod }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared:
+              - 'terraform/shared/**'
+              - 'terraform/modules/apis/**'
+            dev:
+              - 'terraform/envs/dev/**'
+              - 'terraform/modules/environment/**'
+              - 'terraform/modules/apis/**'
+            prod:
+              - 'terraform/envs/prod/**'
+              - 'terraform/modules/environment/**'
+              - 'terraform/modules/apis/**'
+
   plan-shared:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/shared
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
         with:
+          working_directory: terraform/shared
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
       - run: terraform fmt -check
       - run: terraform plan -no-color
 
   plan-dev:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.dev == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/envs/dev
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
+        id: init
         with:
+          working_directory: terraform/envs/dev
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - id: secrets
-        uses: google-github-actions/get-secretmanager-secrets@v2
-        with:
-          secrets: |-
-            neon_api_key:prepify-infra/neon-api-key
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
+          needs_neon_secret: "true"
       - run: terraform fmt -check
       - run: terraform plan -no-color
         env:
-          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
+          TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
   plan-prod:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.prod == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/envs/prod
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
+        id: init
         with:
+          working_directory: terraform/envs/prod
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - id: secrets
-        uses: google-github-actions/get-secretmanager-secrets@v2
-        with:
-          secrets: |-
-            neon_api_key:prepify-infra/neon-api-key
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
+          needs_neon_secret: "true"
       - run: terraform fmt -check
       - run: terraform plan -no-color
         env:
-          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
+          TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
   # Shared infra (Artifact Registry, WIF, CI identities) auto-applies on
   # merge, same as dev — it changes rarely and isn't environment data-plane.
   apply-shared:
-    if: github.event_name == 'push'
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/shared
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
         with:
+          working_directory: terraform/shared
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
       - run: terraform apply -auto-approve -no-color
 
   # Dev auto-applies on merge — no gate, matches "dev is the thing you
   # break to find out" tier. The "dev" GitHub Environment has no protection
   # rules; it's here for deployment history/visibility, same as prod.
+  #
+  # needs.apply-shared.result may be "skipped" (shared untouched by this
+  # push) rather than "success" — both are fine to proceed on, only
+  # "failure"/"cancelled" should block dev.
   apply-dev:
-    if: github.event_name == 'push'
-    needs: apply-shared
+    needs: [changes, apply-shared]
+    if: |
+      github.event_name == 'push' &&
+      needs.changes.outputs.dev == 'true' &&
+      (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
     runs-on: ubuntu-latest
     environment: dev
     defaults:
@@ -129,28 +157,26 @@ jobs:
         working-directory: terraform/envs/dev
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
+        id: init
         with:
+          working_directory: terraform/envs/dev
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - id: secrets
-        uses: google-github-actions/get-secretmanager-secrets@v2
-        with:
-          secrets: |-
-            neon_api_key:prepify-infra/neon-api-key
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
+          needs_neon_secret: "true"
       - run: terraform apply -auto-approve -no-color
         env:
-          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
+          TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
   # Prod requires manual approval — see the "prod" GitHub Environment's
-  # required-reviewer protection rule (repo Settings > Environments).
+  # required-reviewer protection rule (repo Settings > Environments). Same
+  # skip-tolerant needs.apply-shared.result check as apply-dev above.
   apply-prod:
-    if: github.event_name == 'push'
-    needs: apply-shared
+    needs: [changes, apply-shared]
+    if: |
+      github.event_name == 'push' &&
+      needs.changes.outputs.prod == 'true' &&
+      (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
     runs-on: ubuntu-latest
     environment: prod
     defaults:
@@ -158,19 +184,13 @@ jobs:
         working-directory: terraform/envs/prod
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: ./.github/actions/terraform-init
+        id: init
         with:
+          working_directory: terraform/envs/prod
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
-      - id: secrets
-        uses: google-github-actions/get-secretmanager-secrets@v2
-        with:
-          secrets: |-
-            neon_api_key:prepify-infra/neon-api-key
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.*"
-      - run: terraform init
+          needs_neon_secret: "true"
       - run: terraform apply -auto-approve -no-color
         env:
-          TF_VAR_neon_api_key: ${{ steps.secrets.outputs.neon_api_key }}
+          TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
