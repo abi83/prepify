@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { SessionProvider } from '../src/lib/SessionProvider'
-import '../src/index.css'
+import { SessionProvider } from '@/lib/SessionProvider'
+import '@/index.css'
 
 export const metadata: Metadata = {
   title: 'Prepify',

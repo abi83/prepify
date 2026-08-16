@@ -1,7 +1,5 @@
-'use client'
-
-import AuthGuard from '../../src/lib/AuthGuard'
-import MyPreps from '../../src/screens/MyPreps'
+import AuthGuard from '@/lib/AuthGuard'
+import MyPreps from '@/screens/MyPreps'
 
 export default function Page() {
   return (

@@ -1,8 +1,6 @@
-'use client'
-
 import { Suspense } from 'react'
-import AuthGuard from '../../src/lib/AuthGuard'
-import SettingsPage from '../../src/screens/SettingsPage'
+import AuthGuard from '@/lib/AuthGuard'
+import SettingsPage from '@/screens/SettingsPage'
 
 export default function Page() {
   return (

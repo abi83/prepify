@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from '../src/lib/SessionProvider'
-import Home from '../src/screens/Home'
+import { useSession } from '@/lib/SessionProvider'
+import Home from '@/screens/Home'
 
 export default function Page() {
   const session = useSession()

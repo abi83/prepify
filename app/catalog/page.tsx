@@ -1,6 +1,4 @@
-'use client'
-
-import CatalogPage from '../../src/screens/CatalogPage'
+import CatalogPage from '@/screens/CatalogPage'
 
 export default function Page() {
   return <CatalogPage />

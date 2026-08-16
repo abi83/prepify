@@ -1,6 +1,4 @@
-'use client'
-
-import StudyPage from '../../../src/screens/StudyPage'
+import StudyPage from '@/screens/StudyPage'
 
 export default function Page() {
   return <StudyPage />
