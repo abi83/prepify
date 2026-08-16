@@ -10,9 +10,8 @@ resource "neon_project" "this" {
   history_retention_seconds = 21600
 }
 
-# Stored in Secret Manager (not passed as a plain env var) so the
-# connection string never appears in Cloud Run's revision config, which is
-# otherwise readable by anyone with run.viewer on the project.
+# Direct (unpooled) connection, for running migrations — not granted to
+# the Cloud Run runtime service account, only github-deploy (below).
 resource "google_secret_manager_secret" "db_url" {
   project   = google_project.this.project_id
   secret_id = "prepify-db-url"
@@ -29,8 +28,33 @@ resource "google_secret_manager_secret_version" "db_url" {
   secret_data = neon_project.this.connection_uri
 }
 
-resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_access" {
+# Needed for CI to run `prisma migrate deploy` (deploy.yml).
+resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_access" {
   secret_id = google_secret_manager_secret.db_url.id
+  project   = google_project.this.project_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.github_deploy_service_account_email}"
+}
+
+# Pooled connection — what the app actually connects with at runtime.
+resource "google_secret_manager_secret" "db_url_pooled" {
+  project   = google_project.this.project_id
+  secret_id = "prepify-db-url-pooled"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.this]
+}
+
+resource "google_secret_manager_secret_version" "db_url_pooled" {
+  secret      = google_secret_manager_secret.db_url_pooled.id
+  secret_data = neon_project.this.connection_uri_pooler
+}
+
+resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_pooled_access" {
+  secret_id = google_secret_manager_secret.db_url_pooled.id
   project   = google_project.this.project_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run_runtime.email}"

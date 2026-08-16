@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PrepVisibility {
+  private
+  link
+  public
+}
+
+enum PrepDiscipline {
+  History
+  Geography
+  Literature
+  Languages
+  SocialStudies    @map("Social Studies")
+  Economics
+  PhilosophyEthics @map("Philosophy/Ethics")
+  Biology
+  Chemistry
+  Physics
+  Mathematics
+  ComputerScience  @map("Computer Science")
+}
+
+model Prep {
+  id         String          @id @default(uuid())
+  userId     String
+  title      String
+  // TODO(#41): opaque JSON today; #41's resilient-upload work may want
+  // per-page status tracking, which would need this as its own model.
+  pages      Json?
+  createdAt  DateTime        @default(now())
+  tokensUsed Int             @default(0)
+  visibility PrepVisibility  @default(private)
+  grade      Int?
+  discipline PrepDiscipline?
+  language   String?
+
+  questions   Question[]
+  attempts    Attempt[]
+  pipelineRun PipelineRun?
+}
+
+model Question {
+  id        String   @id @default(uuid())
+  prepId    String
+  type      String
+  content   Json
+  createdAt DateTime @default(now())
+
+  prep   Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  assets Asset[]
+}
+
+model Attempt {
+  id        String   @id @default(uuid())
+  prepId    String
+  userId    String
+  mode      String
+  score     Int
+  total     Int
+  createdAt DateTime @default(now())
+
+  prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
+}
+
+// Optional, not 1:1 with Prep: created lazily when generation starts
+// (pipelineStore.loadOrCreateRun), not at prep creation.
+model PipelineRun {
+  id        String   @id @default(uuid())
+  prepId    String   @unique
+  // TODO(#41): concepts as first-class citizens may want their own model
+  // instead of opaque JSON.
+  concepts      Json?
+  questionTasks Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  prep      Prep               @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  questions PipelineQuestion[]
+}
+
+model PipelineQuestion {
+  id        String   @id @default(uuid())
+  runId     String
+  taskIndex Int
+  task      Json
+  question  Json?
+  createdAt DateTime @default(now())
+
+  run PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, taskIndex])
+}
+
+model Asset {
+  id         String   @id @default(uuid())
+  questionId String
+  type       String
+  blob       String
+  createdAt  DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}

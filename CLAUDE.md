@@ -19,8 +19,10 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 
 ## Environment
 Copy `.env.example` to `.env.local`:
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (auth only — see Database Migrations below for the data layer)
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
+- `DATABASE_URL` — pooled Neon connection string (app runtime)
+- `DIRECT_DATABASE_URL` — direct Neon connection string (running migrations only)
 
 Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 
@@ -28,22 +30,26 @@ Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 
 ## Database Migrations
 
-All schema changes via **Supabase CLI migrations**. Never edit the schema directly in the dashboard.
+All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth). `supabase/migrations/*.sql` is historical record only — no new migrations go there.
 
+One-time setup — get the dev Neon connection strings into `.env.local`:
 ```bash
-brew install supabase/tap/supabase          # one-time setup
-supabase migration new <descriptive_name>   # creates supabase/migrations/<timestamp>_<name>.sql
-npm run db:push                             # apply to remote
-npm run db:status                           # check status
+gcloud secrets versions access latest --secret=prepify-db-url --project=prepify-dev-vk        # → DIRECT_DATABASE_URL
+gcloud secrets versions access latest --secret=prepify-db-url-pooled --project=prepify-dev-vk # → DATABASE_URL
 ```
 
-No `supabase login` needed — uses `SUPABASE_DATABASE_PASSWORD` from `.env`. Migrations go directly to remote without a local instance — intentional for this project size.
+```bash
+npm run db:migrate    # prisma migrate dev — authors + applies a new migration against dev
+npm run db:status     # prisma migrate status
+npm run db:generate   # prisma generate (also runs automatically via postinstall)
+```
+
+Migrations are authored and applied against the **dev** Neon branch locally, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR. CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if you already applied it locally, but catches anything you forgot. The prod step only runs after the same manual-approval gate that already protects prod deploys.
 
 ### Conventions
-- One migration per logical change
-- RLS policies in the same migration as the table they protect
-- snake_case verbs: `create_preps_table`, `add_questions_to_preps`
-- Never edit a pushed migration — create a new one instead
+- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several). Easier once per-PR Neon branches (#85) land.
+- Prisma's own naming (`prisma migrate dev --name <descriptive_name>`)
+- Never edit an already-committed migration — create a new one instead
 
 ---
 
@@ -65,12 +71,10 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. Apply migrations if any (`npm run db:push`)
+2. Apply migrations if any (`npm run db:migrate`, against dev — see Database Migrations below)
 3. Commit and push the branch
 4. Open a PR — no direct pushes to `main`. PRs are squash-merged, so give the PR itself a [Conventional Commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `refactor:`, etc.) — release-please derives the version bump and changelog from commit history on `main`, so a non-conventional title is an invisible, unlabeled change there.
 5. Once reviewed and merged, close the GitHub issue
-
-Supabase migrations still apply against a single environment — no dev/prod split for the Supabase database. The GCP/Cloud Run/Neon infra provisioned via Terraform (`terraform/`, see `terraform/README.md`) does have dev+prod from the start, but that's a separate, not-yet-wired-in backend, not the current Supabase-backed app.
 
 ### TODO/FIXME comments
 A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
