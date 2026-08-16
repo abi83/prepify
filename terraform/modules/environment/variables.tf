@@ -17,7 +17,9 @@ variable "billing_account_id" {
 }
 
 # Deterministic — account_id and infra project are fixed, so no cross-state
-# reference to the shared root is needed to know these.
+# reference to the shared root is needed to know these. Values must match
+# the service accounts terraform/shared/github_actions.tf creates; a rename
+# there needs a matching update to these defaults.
 variable "github_deploy_service_account_email" {
   type    = string
   default = "github-deploy@prepify-infra.iam.gserviceaccount.com"

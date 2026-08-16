@@ -15,6 +15,11 @@ permissions:
   id-token: write
   pull-requests: write
 
+# These duplicate terraform/shared/outputs.tf's github_actions_workload_identity_provider
+# and github_actions_terraform_service_account — can't be wired automatically because
+# the auth step below needs them before Terraform runs to produce those outputs. If
+# terraform-ci or the WIF provider is ever renamed in terraform/shared/github_actions.tf,
+# update both places by hand.
 env:
   WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: terraform-ci@prepify-infra.iam.gserviceaccount.com
