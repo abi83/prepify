@@ -18,3 +18,16 @@ variable "github_repo" {
   type        = string
   default     = "abi83/prepify"
 }
+
+# Must match terraform/envs/dev/main.tf and terraform/envs/prod/main.tf's
+# project_id values — needed here so Cloud Run in each environment can be
+# granted read access to this project's Artifact Registry repo.
+variable "dev_project_id" {
+  type    = string
+  default = "prepify-dev-vk"
+}
+
+variable "prod_project_id" {
+  type    = string
+  default = "prepify-prod"
+}
