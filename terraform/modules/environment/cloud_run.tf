@@ -12,9 +12,9 @@ resource "google_storage_bucket_iam_member" "run_runtime_storage_access" {
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
-# TODO(#54): replace the placeholder image below once the deploy pipeline
-# exists. `ignore_changes` keeps Terraform from fighting that pipeline over
-# the image field once it starts deploying real ones.
+# The image below is a placeholder — the real image is deployed by
+# .github/workflows/deploy.yml. `ignore_changes` keeps Terraform from
+# fighting that pipeline over the image field.
 resource "google_cloud_run_v2_service" "app" {
   project  = google_project.this.project_id
   name     = "prepify"
