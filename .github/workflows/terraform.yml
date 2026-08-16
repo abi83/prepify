@@ -59,7 +59,7 @@ jobs:
     needs: changes
     if: |
       github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.shared == 'true'
+      (github.event_name == 'pull_request' && needs.changes.outputs.shared == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -78,7 +78,7 @@ jobs:
     needs: changes
     if: |
       github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.dev == 'true'
+      (github.event_name == 'pull_request' && needs.changes.outputs.dev == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -101,7 +101,7 @@ jobs:
     needs: changes
     if: |
       github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.prod == 'true'
+      (github.event_name == 'pull_request' && needs.changes.outputs.prod == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
