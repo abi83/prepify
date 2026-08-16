@@ -7,8 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing vX.Y.Z tag to redeploy to prod (rollback) — must already be in Artifact Registry"
-        required: true
+        description: "Existing vX.Y.Z tag to redeploy to prod (rollback). Leave empty to deploy the current branch to dev instead."
+        required: false
+      run_tests:
+        description: "Run tests before deploying"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -24,10 +28,37 @@ env:
   REGION: us-central1
 
 jobs:
+  # Skippable only via workflow_dispatch's run_tests input (default true);
+  # push-triggered runs always test. Deploy jobs tolerate this being
+  # skipped, same pattern as apply-dev/apply-prod tolerate apply-shared.
+  test:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+
   # Every merge to main (including release-please's own release-PR merges)
   # deploys to dev, tagged by commit SHA — dev always tracks the tip of main.
+  # workflow_dispatch also deploys the selected branch to dev, as long as
+  # no rollback `tag` was given (that means "deploy to prod instead").
   deploy-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    if: |
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+      )
     runs-on: ubuntu-latest
     environment: dev
     steps:
@@ -56,11 +87,16 @@ jobs:
 
   # Deploys a released vX.Y.Z (never a SHA or `latest`), gated by the
   # "prod" environment's required-reviewer rule. workflow_dispatch
-  # redeploys an existing tag for rollback, without rebuilding.
+  # redeploys an existing tag for rollback, without rebuilding — only
+  # when a `tag` input was given (empty means "deploy to dev instead").
   deploy-prod:
+    needs: test
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      github.event_name == 'workflow_dispatch'
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      )
     runs-on: ubuntu-latest
     environment: prod
     steps:
