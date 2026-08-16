@@ -1,6 +1,7 @@
 FROM node:24-slim AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM node:24-slim AS builder
@@ -9,8 +10,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# Client-only app (see CLAUDE.md) — no server env vars needed at runtime,
-# just the standalone Next.js server itself.
+# Needs DATABASE_URL at runtime (Cloud Run wires it from Secret Manager —
+# see terraform/modules/environment/cloud_run.tf) now that data reads/writes
+# go through Prisma/Neon instead of being entirely client-side.
 FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production

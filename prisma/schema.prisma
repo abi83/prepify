@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PrepVisibility {
+  private
+  link
+  public
+
+  @@map("prep_visibility")
+}
+
+enum PrepDiscipline {
+  History
+  Geography
+  Literature
+  Languages
+  SocialStudies   @map("Social Studies")
+  Economics
+  PhilosophyEthics @map("Philosophy/Ethics")
+  Biology
+  Chemistry
+  Physics
+  Mathematics
+  ComputerScience @map("Computer Science")
+
+  @@map("prep_discipline")
+}
+
+model Prep {
+  id         String          @id @default(uuid())
+  userId     String          @map("user_id")
+  title      String          @default("Prep #1")
+  pages      Json?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  tokensUsed Int             @default(0) @map("tokens_used")
+  visibility PrepVisibility  @default(private)
+  grade      Int?
+  discipline PrepDiscipline?
+  language   String?
+
+  questions   Question[]
+  attempts    Attempt[]
+  pipelineRun PipelineRun?
+
+  @@map("preps")
+}
+
+model Question {
+  id        String   @id @default(uuid())
+  prepId    String   @map("prep_id")
+  type      String
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prep   Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  assets Asset[]
+
+  @@map("questions")
+}
+
+model Attempt {
+  id        String   @id @default(uuid())
+  prepId    String   @map("prep_id")
+  userId    String   @map("user_id")
+  mode      String
+  score     Int
+  total     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
+
+  @@map("attempts")
+}
+
+model PipelineRun {
+  id            String   @id @default(uuid())
+  prepId        String   @unique @map("prep_id")
+  concepts      Json?
+  questionTasks Json?    @map("question_tasks")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  prep      Prep               @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  questions PipelineQuestion[]
+
+  @@map("pipeline_runs")
+}
+
+model PipelineQuestion {
+  id        String   @id @default(uuid())
+  runId     String   @map("run_id")
+  taskIndex Int      @map("task_index")
+  task      Json
+  question  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, taskIndex])
+  @@map("pipeline_questions")
+}
+
+model Asset {
+  id         String   @id @default(uuid())
+  questionId String   @map("question_id")
+  type       String
+  blob       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("assets")
+}

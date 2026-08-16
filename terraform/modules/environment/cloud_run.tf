@@ -32,6 +32,16 @@ resource "google_cloud_run_v2_service" "app" {
 
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
+
+      env {
+        name = "DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.db_url_pooled.secret_id
+            version = "latest"
+          }
+        }
+      }
     }
   }
 
