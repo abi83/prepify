@@ -28,9 +28,7 @@ env:
   REGION: us-central1
 
 jobs:
-  # Skippable only via workflow_dispatch's run_tests input (default true);
-  # push-triggered runs always test. Deploy jobs tolerate this being
-  # skipped, same pattern as apply-dev/apply-prod tolerate apply-shared.
+  # Only workflow_dispatch's run_tests input can skip this.
   test:
     if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
     runs-on: ubuntu-latest
