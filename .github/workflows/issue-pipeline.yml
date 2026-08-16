@@ -29,7 +29,6 @@ jobs:
   refine:
     if: >
       github.event.label.name == 'status:needs-refinement' ||
-      github.event.label.name == 'status:accepted' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'refine')
     runs-on: ubuntu-latest
     steps:
@@ -103,14 +102,14 @@ jobs:
             1. Write your question to ./.issue-pipeline-comment.md
             2. Run ./.github/scripts/gh-safe/comment-issue.sh (no args)
             3. Swap labels:
-               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:needs-attention"
+               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --add-label "status:needs-attention"
             Then stop. Do not edit the body in this case.
 
             Otherwise, in order:
             1. Write the new body to ./.issue-pipeline-body.md
             2. Run ./.github/scripts/gh-safe/edit-issue-body.sh (no args)
             3. Swap labels:
-               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --remove-label "status:accepted" --add-label "status:refined"
+               ./.github/scripts/gh-safe/edit-issue-labels.sh --remove-label "status:needs-refinement" --add-label "status:refined"
 
             Do nothing else — no other comments, no other edits.
           claude_args: |
