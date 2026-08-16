@@ -18,10 +18,7 @@ data "google_project" "prod" {
   project_id = var.prod_project_id
 }
 
-# github-deploy can push here (see github_actions.tf), but pulling at deploy
-# time is done by each environment's own Cloud Run Service Agent — a
-# per-project Google-managed identity, distinct from github-deploy. Without
-# this grant, Cloud Run in dev/prod can't read an image from this project.
+# Pulling is done by each project's own Cloud Run Service Agent, not github-deploy.
 resource "google_artifact_registry_repository_iam_member" "cloud_run_dev_read" {
   project    = google_project.infra.project_id
   location   = google_artifact_registry_repository.images.location
