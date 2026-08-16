@@ -1,20 +1,21 @@
 # Prepify — Claude Instructions
 
 ## Project Overview
-Prepify is a React + Vite + TypeScript app backed by Supabase (auth + database).
+Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth + database).
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
 API keys are BYOK — users supply their own OpenAI key stored in localStorage.
+The app is entirely client-rendered (every route is a client component) — no server-side execution or key handling.
 
 ## Tech Stack
-- React + Vite (TypeScript)
+- Next.js (App Router, TypeScript)
 - Supabase (auth, database)
 - CSS Modules
 - OpenAI API (LLM pipeline)
 
 ## Environment
-Copy `.env.example` to `.env`:
-- `VITE_SUPABASE_URL` — Supabase project URL
-- `VITE_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
+Copy `.env.example` to `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
 
 Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 

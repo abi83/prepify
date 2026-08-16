@@ -1,5 +1,7 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useRouter, useSearchParams } from 'next/navigation'
 import OpenAI from 'openai'
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '../lib/apiKey'
 import type { ModelId } from '../lib/apiKey'
@@ -16,9 +18,9 @@ import styles from './SettingsPage.module.css'
 type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
 
 export default function SettingsPage() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? '/preps'
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo') ?? '/preps'
 
   const [keyValue, setKeyValue] = useState('')
   const [model, setModel] = useState<ModelId>('gpt-5-nano')
@@ -64,7 +66,7 @@ export default function SettingsPage() {
     setTestState('idle')
     setTimeout(() => {
       setSaved(false)
-      navigate(returnTo)
+      router.push(returnTo)
     }, 800)
   }
 
@@ -97,7 +99,7 @@ export default function SettingsPage() {
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <button className={styles.back} onClick={() => navigate(returnTo)}>← Back</button>
+        <button className={styles.back} onClick={() => router.push(returnTo)}>← Back</button>
       </header>
 
       <main className={styles.main}>

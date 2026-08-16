@@ -1,5 +1,7 @@
+'use client'
+
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import type { Prep, PrepVisibility, VisualElement, Page } from '../lib/supabase'
 import type { Question, Attempt, FlashcardContent, Asset } from '../types/questions'
@@ -177,7 +179,7 @@ function PageSection({ page }: { page: Page }) {
 
 export default function PrepPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const [prep, setPrep] = useState<Prep | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -258,7 +260,7 @@ export default function PrepPage() {
   async function handleGenerate() {
     const keyConfig = getApiKey()
     if (!keyConfig) {
-      navigate('/settings', { state: { returnTo: `/preps/${id}` } })
+      router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${id}`)}`)
       return
     }
 
@@ -392,7 +394,7 @@ export default function PrepPage() {
   async function handleDelete() {
     setDeleting(true)
     await supabase.from('preps').delete().eq('id', id!)
-    navigate('/preps')
+    router.push('/preps')
   }
 
   function handleExitAttempt() {
@@ -405,7 +407,7 @@ export default function PrepPage() {
   if (!prep) return (
     <div className={styles.center}>
       <p>Prep not found.</p>
-      <button className={styles.back} onClick={() => navigate('/preps')}>← Back to My Preps</button>
+      <button className={styles.back} onClick={() => router.push('/preps')}>← Back to My Preps</button>
     </div>
   )
 
@@ -480,7 +482,7 @@ export default function PrepPage() {
       )}
 
       <header className={styles.header}>
-        <button className={styles.back} onClick={() => navigate('/preps')}>← My Preps</button>
+        <button className={styles.back} onClick={() => router.push('/preps')}>← My Preps</button>
         <div className={styles.headerRight}>
           {prep.user_id === userId && hasQuestions && (
             <button className={styles.shareBtn} onClick={() => setShowShareModal(true)}>
@@ -490,7 +492,7 @@ export default function PrepPage() {
           {prep.user_id === userId && (
             <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>Delete</button>
           )}
-          <button className={styles.settingsLink} onClick={() => navigate('/settings')}>Settings</button>
+          <button className={styles.settingsLink} onClick={() => router.push('/settings')}>Settings</button>
         </div>
       </header>
 

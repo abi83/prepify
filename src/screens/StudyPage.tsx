@@ -1,5 +1,7 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import type { Question, FlashcardContent, Asset } from '../types/questions'
@@ -11,7 +13,7 @@ type Tab = 'cards' | 'quiz' | 'test'
 
 export default function StudyPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const [prep, setPrep] = useState<Prep | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -50,7 +52,7 @@ export default function StudyPage() {
     return (
       <div className={styles.center}>
         <p className={styles.notFoundText}>This prep is not available.</p>
-        <button className={styles.back} onClick={() => navigate('/')}>← Home</button>
+        <button className={styles.back} onClick={() => router.push('/')}>← Home</button>
       </div>
     )
   }
@@ -84,7 +86,7 @@ export default function StudyPage() {
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <button className={styles.back} onClick={() => navigate('/')}>← Home</button>
+        <button className={styles.back} onClick={() => router.push('/')}>← Home</button>
         {!userId && (
           <span className={styles.anonNote}>Sign in to track your progress</span>
         )}

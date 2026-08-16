@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 // Supabase mock — controlled per test via mockPrep / mockQuestions
 let mockPrep: object | null = null
@@ -27,17 +26,15 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
+vi.mock('next/navigation', () => ({
+  useParams: () => ({ id: 'test-prep-id' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+
 import StudyPage from '../StudyPage'
 
-function renderStudyPage(id = 'test-prep-id') {
-  return render(
-    <MemoryRouter initialEntries={[`/study/${id}`]}>
-      <Routes>
-        <Route path="/study/:id" element={<StudyPage />} />
-        <Route path="/" element={<div>home</div>} />
-      </Routes>
-    </MemoryRouter>,
-  )
+function renderStudyPage() {
+  return render(<StudyPage />)
 }
 
 beforeEach(() => {

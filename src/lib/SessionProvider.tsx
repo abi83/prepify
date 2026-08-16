@@ -1,20 +1,16 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { supabase, supabaseMisconfigured } from './lib/supabase'
-import type { Session } from '@supabase/supabase-js'
-import Home from './pages/Home'
-import MyPreps from './pages/MyPreps'
-import PrepPage from './pages/PrepPage'
-import StudyPage from './pages/StudyPage'
-import SettingsPage from './pages/SettingsPage'
-import CatalogPage from './pages/CatalogPage'
+'use client'
 
-function AuthGuard({ session, children }: { session: Session | null; children: React.ReactNode }) {
-  if (!session) return <Navigate to="/" replace />
-  return <>{children}</>
+import { createContext, useContext, useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase, supabaseMisconfigured } from './supabase'
+
+const SessionContext = createContext<Session | null>(null)
+
+export function useSession() {
+  return useContext(SessionContext)
 }
 
-export default function App() {
+export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
 
   useEffect(() => {
@@ -32,8 +28,8 @@ export default function App() {
           Copy <code>.env.example</code> to <code>.env.local</code> and fill in your Supabase project URL and anon key, then restart the dev server.
         </p>
         <pre style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', fontSize: '0.82rem', textAlign: 'left' }}>
-{`VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key`}
+{`NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key`}
         </pre>
       </div>
     )
@@ -47,17 +43,5 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key`}
     )
   }
 
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={session ? <Navigate to="/preps" replace /> : <Home />} />
-        <Route path="/preps" element={<AuthGuard session={session}><MyPreps /></AuthGuard>} />
-        <Route path="/preps/:id" element={<AuthGuard session={session}><PrepPage /></AuthGuard>} />
-        <Route path="/study/:id" element={<StudyPage />} />
-        <Route path="/catalog" element={<CatalogPage />} />
-        <Route path="/settings" element={<AuthGuard session={session}><SettingsPage /></AuthGuard>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
+  return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>
 }

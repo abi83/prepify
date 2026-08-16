@@ -85,7 +85,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         total_tokens: usage?.total_tokens ?? 0,
       }
 
-      if (import.meta.env.DEV) {
+      if (process.env.NODE_ENV !== 'production') {
         console.log(`[agent:${name}]`, metrics)
       }
 
