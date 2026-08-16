@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../lib/supabase'
 import { DISCIPLINES } from '../lib/agents/PrepLabeler'
 import styles from './CatalogPage.module.css'
@@ -35,7 +38,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
 }
 
 export default function CatalogPage() {
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const [entries, setEntries] = useState<CatalogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,7 +97,7 @@ export default function CatalogPage() {
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <button className={styles.back} onClick={() => navigate('/')}>← Home</button>
+        <button className={styles.back} onClick={() => router.push('/')}>← Home</button>
         <h1 className={styles.logo}>Prepify</h1>
         <div className={styles.headerSpacer} />
       </header>
@@ -161,7 +164,7 @@ export default function CatalogPage() {
           <ul className={styles.grid} role="list">
             {filtered.map(entry => (
               <li key={entry.id}>
-                <Link to={`/study/${entry.id}`} className={styles.card}>
+                <Link href={`/study/${entry.id}`} className={styles.card}>
                   <div className={styles.cardMeta}>
                     {entry.discipline && (
                       <span className={styles.tag}>{entry.discipline}</span>

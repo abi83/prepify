@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 // Mutable state controlled per test
 let mockPreps: object[] = []
 let mockQuestions: object[] = []
 let mockPrepsError: object | null = null
+const mockPush = vi.fn()
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
+}))
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -32,22 +36,14 @@ vi.mock('../../lib/supabase', () => ({
 import CatalogPage from '../CatalogPage'
 
 function renderCatalog() {
-  return render(
-    <MemoryRouter initialEntries={['/catalog']}>
-      <Routes>
-        <Route path="/catalog" element={<CatalogPage />} />
-        <Route path="/" element={<div>home</div>} />
-        <Route path="/study/:id" element={<div>study page</div>} />
-      </Routes>
-    </MemoryRouter>,
-  )
+  return render(<CatalogPage />)
 }
 
 beforeEach(() => {
   mockPreps = []
   mockQuestions = []
   mockPrepsError = null
-  vi.clearAllMocks()
+  mockPush.mockClear()
 })
 
 describe('CatalogPage — loading', () => {
@@ -242,6 +238,6 @@ describe('CatalogPage — navigation', () => {
     renderCatalog()
     await waitFor(() => screen.getByRole('button', { name: /home/i }))
     await user.click(screen.getByRole('button', { name: /home/i }))
-    expect(screen.getByText('home')).toBeInTheDocument()
+    expect(mockPush).toHaveBeenCalledWith('/')
   })
 })

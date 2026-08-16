@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../lib/supabase'
 import type { Prep } from '../lib/supabase'
 import UploadModal from '../components/UploadModal'
@@ -11,7 +14,7 @@ export default function MyPreps() {
   const [showUpload, setShowUpload] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const navigate = useNavigate()
+  const router = useRouter()
 
   useEffect(() => {
     fetchPreps()
@@ -33,7 +36,7 @@ export default function MyPreps() {
 
   function handleDone(prepId: string) {
     setShowUpload(false)
-    navigate(`/preps/${prepId}`)
+    router.push(`/preps/${prepId}`)
   }
 
   async function handleDelete(id: string) {
@@ -49,8 +52,8 @@ export default function MyPreps() {
       <header className={styles.header}>
         <span className={styles.logo}>Prepify</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <Link to="/catalog" className={styles.navLink}>Catalog</Link>
-          <button className={styles.signOut} onClick={() => navigate('/settings')} title="Settings">⚙</button>
+          <Link href="/catalog" className={styles.navLink}>Catalog</Link>
+          <button className={styles.signOut} onClick={() => router.push('/settings')} title="Settings">⚙</button>
           <button className={styles.signOut} onClick={signOut}>Sign out</button>
         </div>
       </header>
@@ -78,7 +81,7 @@ export default function MyPreps() {
           <ul className={styles.list}>
             {preps.map(prep => (
               <li key={prep.id} className={styles.listItem}>
-                <button className={styles.item} onClick={() => navigate(`/preps/${prep.id}`)}>
+                <button className={styles.item} onClick={() => router.push(`/preps/${prep.id}`)}>
                   <span className={styles.itemTitle}>{prep.title}</span>
                   <span className={styles.itemDate}>{formatDate(prep.created_at)}</span>
                 </button>
