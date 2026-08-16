@@ -2,6 +2,8 @@ resource "google_service_account" "run_runtime" {
   project      = google_project.this.project_id
   account_id   = "prepify-run-runtime"
   display_name = "Prepify Cloud Run runtime (${var.environment})"
+
+  depends_on = [google_project_service.this]
 }
 
 resource "google_storage_bucket_iam_member" "run_runtime_storage_access" {

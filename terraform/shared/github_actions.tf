@@ -32,6 +32,8 @@ resource "google_service_account" "github_deploy" {
   project      = google_project.infra.project_id
   account_id   = "github-deploy"
   display_name = "GitHub Actions deploy identity"
+
+  depends_on = [google_project_service.infra]
 }
 
 resource "google_service_account_iam_member" "github_deploy_wif_binding" {
@@ -59,6 +61,8 @@ resource "google_service_account" "terraform_ci" {
   project      = google_project.infra.project_id
   account_id   = "terraform-ci"
   display_name = "GitHub Actions terraform apply identity"
+
+  depends_on = [google_project_service.infra]
 }
 
 resource "google_service_account_iam_member" "terraform_ci_wif_binding" {
