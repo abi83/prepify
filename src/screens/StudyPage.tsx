@@ -1,24 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import type { Prep, Question, Asset } from '@prisma/client'
 import { supabase } from '../lib/supabase'
-import type { Prep } from '../lib/supabase'
-import type { Question, FlashcardContent, Asset } from '../types/questions'
+import type { FlashcardContent } from '../types/questions'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import styles from './StudyPage.module.css'
 
 type Tab = 'cards' | 'quiz' | 'test'
 
-export default function StudyPage() {
-  const { id } = useParams<{ id: string }>()
+interface Props {
+  prep: Prep | null
+  questions?: Question[]
+  assets?: Asset[]
+}
+
+export default function StudyPage({ prep, questions = [], assets = [] }: Props) {
   const router = useRouter()
 
-  const [prep, setPrep] = useState<Prep | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('cards')
   const [activeAttempt, setActiveAttempt] = useState<'quiz' | 'test' | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -26,27 +27,6 @@ export default function StudyPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
   }, [])
-
-  useEffect(() => {
-    if (!id) return
-    Promise.all([
-      supabase.from('preps').select('*').eq('id', id).single(),
-      supabase.from('questions').select('*').eq('prep_id', id).order('created_at'),
-    ]).then(async ([{ data: prepData }, { data: qData }]) => {
-      const qs = (qData ?? []) as Question[]
-      setPrep(prepData)
-      setQuestions(qs)
-      setLoading(false)
-      if (qs.length > 0) {
-        const { data: assetData } = await supabase.from('assets').select('*').in('question_id', qs.map(q => q.id))
-        setAssets((assetData ?? []) as Asset[])
-      }
-    })
-  }, [id])
-
-  if (loading) {
-    return <div className={styles.center}><div className={styles.spinner} /></div>
-  }
 
   if (!prep) {
     return (
@@ -57,7 +37,7 @@ export default function StudyPage() {
     )
   }
 
-  const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as FlashcardContent)
+  const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as unknown as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== 'flashcard')
 
   if (activeAttempt) {

@@ -2,7 +2,7 @@ import { runAgent, AgentResult } from '../agent'
 import { conceptsResponseSchema } from '../../types/pipeline'
 import type { Concept } from '../../types/pipeline'
 import { CHUNK_SIZE } from '../config'
-import type { Page } from '../supabase'
+import type { Page } from '../../types/prep'
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 

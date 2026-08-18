@@ -1,4 +1,5 @@
-import type { Question, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent, Asset } from '../../types/questions'
+import type { Question, Asset } from '@prisma/client'
+import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from '../../types/questions'
 import SingleChoiceQuestion from './SingleChoiceQuestion'
 import MultipleChoiceQuestion from './MultipleChoiceQuestion'
 import FillTheGapQuestion from './FillTheGapQuestion'
@@ -37,7 +38,7 @@ export default function QuestionBody({ question, answer, isReview, asset, onChan
         <>
           {assetEl}
           <SingleChoiceQuestion
-            content={question.content as SingleChoiceContent}
+            content={question.content as unknown as SingleChoiceContent}
             selected={answer.single}
             isReview={isReview}
             onChange={id => onChange?.({ ...answer, single: id })}
@@ -50,7 +51,7 @@ export default function QuestionBody({ question, answer, isReview, asset, onChan
         <>
           {assetEl}
           <MultipleChoiceQuestion
-            content={question.content as MultipleChoiceContent}
+            content={question.content as unknown as MultipleChoiceContent}
             selected={answer.multi}
             isReview={isReview}
             onChange={ids => onChange?.({ ...answer, multi: ids })}
@@ -63,7 +64,7 @@ export default function QuestionBody({ question, answer, isReview, asset, onChan
         <>
           {assetEl}
           <FillTheGapQuestion
-            content={question.content as FillTheGapContent}
+            content={question.content as unknown as FillTheGapContent}
             selected={answer.fill}
             isReview={isReview}
             onChange={(fills) => onChange?.({ ...answer, fill: fills })}
@@ -76,7 +77,7 @@ export default function QuestionBody({ question, answer, isReview, asset, onChan
         <>
           {assetEl}
           <SortingQuestion
-            content={question.content as SortingContent}
+            content={question.content as unknown as SortingContent}
             selected={answer.sort}
             isReview={isReview}
             onChange={(order) => onChange?.({ ...answer, sort: order })}

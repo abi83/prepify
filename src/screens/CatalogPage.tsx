@@ -1,21 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '../lib/supabase'
+import type { CatalogEntry } from '../repositories/prepRepository'
 import { DISCIPLINES } from '../lib/agents/PrepLabeler'
+import { disciplineFromEnum } from '../lib/disciplineMapping'
 import styles from './CatalogPage.module.css'
-
-type CatalogEntry = {
-  id: string
-  title: string
-  grade: number | null
-  discipline: string | null
-  language: string | null
-  created_at: string
-  question_count: number
-}
 
 const ALL_GRADES = Array.from({ length: 13 }, (_, i) => i + 1)
 
@@ -37,55 +28,20 @@ const LANGUAGE_LABELS: Record<string, string> = {
   tr: 'Türkçe',
 }
 
-export default function CatalogPage() {
+interface Props {
+  entries: CatalogEntry[]
+}
+
+export default function CatalogPage({ entries }: Props) {
   const router = useRouter()
 
-  const [entries, setEntries] = useState<CatalogEntry[]>([])
-  const [loading, setLoading] = useState(true)
   const [gradeFilter, setGradeFilter] = useState<number | ''>('')
   const [disciplineFilter, setDisciplineFilter] = useState<string>('')
   const [languageFilter, setLanguageFilter] = useState<string>('')
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
+  const displayEntries = entries.map(e => ({ ...e, discipline: disciplineFromEnum(e.discipline) }))
 
-      const { data: preps } = await supabase
-        .from('preps')
-        .select('id, title, grade, discipline, language, created_at')
-        .eq('visibility', 'public')
-        .order('created_at', { ascending: false })
-
-      if (!preps || preps.length === 0) {
-        setEntries([])
-        setLoading(false)
-        return
-      }
-
-      const prepIds = preps.map((p: { id: string }) => p.id)
-      const { data: questions } = await supabase
-        .from('questions')
-        .select('prep_id')
-        .in('prep_id', prepIds)
-
-      const countMap: Record<string, number> = {}
-      for (const q of questions ?? []) {
-        countMap[q.prep_id] = (countMap[q.prep_id] ?? 0) + 1
-      }
-
-      setEntries(
-        preps.map((p: { id: string; title: string; grade: number | null; discipline: string | null; language: string | null; created_at: string }) => ({
-          ...p,
-          question_count: countMap[p.id] ?? 0,
-        }))
-      )
-      setLoading(false)
-    }
-
-    load()
-  }, [])
-
-  const filtered = entries.filter(e => {
+  const filtered = displayEntries.filter(e => {
     if (gradeFilter !== '' && e.grade !== gradeFilter) return false
     if (disciplineFilter !== '' && e.discipline !== disciplineFilter) return false
     if (languageFilter !== '' && e.language !== languageFilter) return false
@@ -150,11 +106,7 @@ export default function CatalogPage() {
           )}
         </div>
 
-        {loading ? (
-          <div className={styles.center}>
-            <div className={styles.spinner} />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className={styles.empty}>
             {entries.length === 0
               ? 'No public preps yet. Be the first to share one!'
@@ -175,8 +127,8 @@ export default function CatalogPage() {
                   </div>
                   <h3 className={styles.cardTitle}>{entry.title}</h3>
                   <div className={styles.cardFooter}>
-                    <span className={styles.cardStat}>{entry.question_count} questions</span>
-                    <span className={styles.cardDate}>{formatDate(entry.created_at)}</span>
+                    <span className={styles.cardStat}>{entry.questionCount} questions</span>
+                    <span className={styles.cardDate}>{formatDate(entry.createdAt)}</span>
                   </div>
                 </Link>
               </li>
@@ -188,6 +140,6 @@ export default function CatalogPage() {
   )
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+function formatDate(d: Date) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }

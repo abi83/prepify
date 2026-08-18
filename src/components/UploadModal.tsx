@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import OpenAI from 'openai'
-import { supabase } from '../lib/supabase'
-import type { VisualElement, Page } from '../lib/supabase'
+import type { Prisma } from '@prisma/client'
+import type { VisualElement, Page } from '../types/prep'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
+import { listMyPreps, createPrep } from '../actions/preps'
 import styles from './UploadModal.module.css'
 
 const MAX_IMAGES = 10
@@ -190,29 +191,11 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase('saving')
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+      const existing = await listMyPreps()
+      const title = `Prep #${existing.length + 1}`
 
-      const { count } = await supabase
-        .from('preps')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-
-      const title = `Prep #${(count ?? 0) + 1}`
-
-      const { data, error } = await supabase
-        .from('preps')
-        .insert({
-          user_id: user.id,
-          title,
-          pages,
-          language,
-        })
-        .select('id')
-        .single()
-
-      if (error) throw error
-      onDone(data.id)
+      const prep = await createPrep({ title, pages: pages as unknown as Prisma.InputJsonValue, language })
+      onDone(prep.id)
     } catch {
       setPhase('error')
       setErrorMsg('Failed to save. Please try again.')

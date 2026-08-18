@@ -1,7 +1,8 @@
-import type { Question, AssetHint } from '../types/questions'
+import type { Question } from '@prisma/client'
+import type { AssetHint } from '../types/questions'
 import { routeAsset, type ActiveAssetHint } from './agents/assets/assetRouter'
-import { supabase } from './supabase'
-import { incrementPrepTokensInDb } from './tokenUsage'
+import { insertAsset } from '../actions/assets'
+import { incrementPrepTokens } from '../actions/preps'
 
 function extractAssetHint(question: Question): AssetHint | null {
   const content = question.content as Record<string, unknown>
@@ -34,14 +35,10 @@ export async function generateAndSaveAssets(
         const result = await routeAsset(hint, apiKey, model, signal)
         if (!result.output.blob) return
 
-        await supabase.from('assets').insert({
-          question_id: q.id,
-          type: result.output.type,
-          blob: result.output.blob,
-        })
+        await insertAsset(q.id, result.output.type, result.output.blob)
 
         if (result.metrics.total_tokens > 0) {
-          void incrementPrepTokensInDb(prepId, result.metrics.total_tokens)
+          void incrementPrepTokens(prepId, result.metrics.total_tokens)
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {

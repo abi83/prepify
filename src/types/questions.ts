@@ -12,14 +12,6 @@ export const assetHintSchema = z.object({
 })
 export type AssetHint = z.infer<typeof assetHintSchema>
 
-export interface Asset {
-  id: string
-  question_id: string
-  type: AssetType | 'image'
-  blob: string
-  created_at: string
-}
-
 // --- Content schemas ---
 
 export const flashcardContentSchema = z.object({
@@ -132,24 +124,4 @@ export type QuestionContent =
   | MultipleChoiceContent
   | FillTheGapContent
   | SortingContent
-
-export interface Question {
-  id: string
-  prep_id: string
-  type: QuestionType
-  content: QuestionContent
-  created_at: string
-}
-
-// --- Attempt ---
-
-export interface Attempt {
-  id: string
-  prep_id: string
-  user_id: string
-  mode: 'quiz' | 'test'
-  score: number
-  total: number
-  created_at: string
-}
 

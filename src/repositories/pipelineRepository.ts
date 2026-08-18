@@ -95,6 +95,12 @@ export interface PartialRunSummary {
   completedSlots: number  // non-null question slots (craft+review both done)
 }
 
+export async function getConcepts(userId: string, prepId: string): Promise<Concept[] | null> {
+  await assertOwnsPrep(userId, prepId)
+  const run = await prisma.pipelineRun.findUnique({ where: { prepId } })
+  return (run?.concepts as Concept[] | null) ?? null
+}
+
 export async function getExistingRunSummary(userId: string, prepId: string): Promise<PartialRunSummary | null> {
   await assertOwnsPrep(userId, prepId)
 
