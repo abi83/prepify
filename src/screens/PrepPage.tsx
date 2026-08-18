@@ -16,7 +16,7 @@ import type { QuestionType } from '../types/questions'
 import { getExistingRunSummary } from '../actions/pipeline'
 import type { PartialRunSummary } from '../repositories/pipelineRepository'
 import { insertQuestions } from '../actions/questions'
-import { getMyPrep, deletePrep } from '../actions/preps'
+import { getMyPrep, deletePrep, updatePrep } from '../actions/preps'
 import { generateAndSaveAssets } from '../lib/assetGeneration'
 import { disciplineFromEnum, disciplineToEnum } from '../lib/disciplineMapping'
 import FlashCard from '../components/questions/FlashCard'
@@ -317,6 +317,7 @@ function PrepPageInner({
           if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
         },
         onTitleReady: (title) => {
+          void updatePrep(id, { title })
           setPrep(p => ({ ...p, title }))
           setTitleReady(true)
         },
