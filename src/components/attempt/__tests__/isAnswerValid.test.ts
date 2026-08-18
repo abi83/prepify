@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { isAnswerValid } from '../AttemptFlow'
 import { emptyAnswer } from '../../questions/QuestionBody'
-import type { Question } from '../../../types/questions'
+import type { Question } from '@prisma/client'
 
 const NO_ASSET = { needed: false, type: null, description: null } as const
 
 const singleQ: Question = {
-  id: 'q1', prep_id: 'p1', created_at: '', type: 'single_choice',
+  id: 'q1', prepId: 'p1', createdAt: new Date(0), type: 'single_choice',
   content: {
     question: 'Q?', rationale: '', asset_hint: NO_ASSET,
     answers: [
@@ -19,7 +19,7 @@ const singleQ: Question = {
 }
 
 const multiQ: Question = {
-  id: 'q2', prep_id: 'p1', created_at: '', type: 'multiple_choice',
+  id: 'q2', prepId: 'p1', createdAt: new Date(0), type: 'multiple_choice',
   content: {
     question: 'Q?', rationale: '', asset_hint: NO_ASSET,
     answers: [

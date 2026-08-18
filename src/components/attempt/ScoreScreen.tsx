@@ -1,4 +1,4 @@
-import type { Question, Asset } from '../../types/questions'
+import type { Question, Asset } from '@prisma/client'
 import type { AnswerState } from '../questions/QuestionBody'
 import QuestionBody from '../questions/QuestionBody'
 import { isAnswerCorrect } from '../../lib/scoring'
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function ScoreScreen({ score, total, mode, questions, answers, assets, onExit }: Props) {
-  const assetByQuestion = new Map(assets.map(a => [a.question_id, a]))
+  const assetByQuestion = new Map(assets.map(a => [a.questionId, a]))
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
   const isGood = pct >= 60
 
@@ -45,7 +45,7 @@ export default function ScoreScreen({ score, total, mode, questions, answers, as
                       {correct ? '✓' : '✗'}
                     </span>
                     <span className={styles.reviewQuestion}>
-                      {(q.content as { question?: string }).question ?? ''}
+                      {(q.content as unknown as { question?: string }).question ?? ''}
                     </span>
                   </div>
                   <QuestionBody question={q} answer={answer} isReview={true} asset={assetByQuestion.get(q.id)} />

@@ -1,14 +1,15 @@
 # Prepify — Claude Instructions
 
 ## Project Overview
-Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth + database).
+Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth) and Neon Postgres via Prisma (data).
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
-API keys are BYOK — users supply their own OpenAI key stored in localStorage.
-The app is entirely client-rendered (every route is a client component) — no server-side execution or key handling.
+API keys are BYOK — users supply their own OpenAI key stored in localStorage; the OpenAI-calling pipeline stays entirely client-side.
+`app/**/page.tsx` are Server Components that fetch initial data via server actions (`src/actions/*.ts`, backed by `src/repositories/*.ts`) and pass it as props into the client screens (`src/screens/*.tsx`). Client-triggered mutations call the same server actions directly.
 
 ## Tech Stack
 - Next.js (App Router, TypeScript)
-- Supabase (auth, database)
+- Supabase (auth only)
+- Neon Postgres + Prisma (data layer)
 - CSS Modules
 - OpenAI API (LLM pipeline)
 

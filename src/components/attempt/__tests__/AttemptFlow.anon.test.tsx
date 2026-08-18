@@ -1,20 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Question } from '../../../types/questions'
+import type { Question } from '@prisma/client'
 
-const insertMock = vi.fn().mockResolvedValue({ error: null })
+const insertAttemptMock = vi.fn().mockResolvedValue({})
 
-vi.mock('../../../lib/supabase', () => ({
-  supabase: {
-    from: () => ({ insert: insertMock }),
-  },
+vi.mock('../../../actions/attempts', () => ({
+  insertAttempt: (...args: unknown[]) => insertAttemptMock(...args),
 }))
 
 import AttemptFlow from '../AttemptFlow'
 
 const singleQ: Question = {
-  id: 'q1', prep_id: 'p1', created_at: '', type: 'single_choice',
+  id: 'q1', prepId: 'p1', createdAt: new Date(0), type: 'single_choice',
   content: {
     question: 'What is 2+2?', rationale: '',
     asset_hint: { needed: false, type: null, description: null },
@@ -61,23 +59,21 @@ async function runThroughAttempt(userId: string | null, mode: 'quiz' | 'test') {
 }
 
 beforeEach(() => {
-  insertMock.mockClear()
+  insertAttemptMock.mockClear()
 })
 
 describe('AttemptFlow — attempt saving', () => {
   it('saves attempt when userId is provided', async () => {
     await runThroughAttempt('user-123', 'quiz')
     await waitFor(() => {
-      expect(insertMock).toHaveBeenCalledWith(
-        expect.objectContaining({ user_id: 'user-123', prep_id: 'prep-1', mode: 'quiz' }),
-      )
+      expect(insertAttemptMock).toHaveBeenCalledWith('prep-1', 'quiz', expect.any(Number), expect.any(Number))
     })
   })
 
   it('skips DB insert when userId is null', async () => {
     await runThroughAttempt(null, 'quiz')
     await waitFor(() => screen.getByText(/quiz complete/i))
-    expect(insertMock).not.toHaveBeenCalled()
+    expect(insertAttemptMock).not.toHaveBeenCalled()
   })
 
   it('shows score screen after finalize regardless of userId', async () => {

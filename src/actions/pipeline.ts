@@ -29,3 +29,7 @@ export async function deleteRun(prepId: string): Promise<void> {
 export async function getExistingRunSummary(prepId: string): Promise<PartialRunSummary | null> {
   return pipelineRepository.getExistingRunSummary(STUB_USER_ID, prepId)
 }
+
+export async function getConcepts(prepId: string): Promise<Concept[] | null> {
+  return pipelineRepository.getConcepts(STUB_USER_ID, prepId)
+}

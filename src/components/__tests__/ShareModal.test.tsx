@@ -2,12 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-vi.mock('../../lib/supabase', () => ({
-  supabase: {
-    from: () => ({
-      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
-    }),
-  },
+vi.mock('../../actions/preps', () => ({
+  updatePrep: vi.fn().mockResolvedValue({}),
 }))
 
 vi.mock('../../lib/agents/PrepLabeler', async () => {
