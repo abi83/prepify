@@ -165,6 +165,7 @@ jobs:
   apply-dev:
     needs: [changes, apply-shared]
     if: |
+      always() &&
       github.event_name == 'push' &&
       needs.changes.outputs.dev == 'true' &&
       (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
@@ -195,6 +196,7 @@ jobs:
   apply-prod:
     needs: [changes, apply-shared]
     if: |
+      always() &&
       github.event_name == 'push' &&
       needs.changes.outputs.prod == 'true' &&
       (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
