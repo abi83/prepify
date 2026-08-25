@@ -75,7 +75,7 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DIRECT_DATABASE_URL="$(gcloud secrets versions access latest --secret=prepify-db-url --project=prepify-dev-vk)"
+          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk)"
           npx prisma migrate deploy
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -121,7 +121,7 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DIRECT_DATABASE_URL="$(gcloud secrets versions access latest --secret=prepify-db-url --project=prepify-prod)"
+          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=prepify-prod)"
           npx prisma migrate deploy
       - name: Resolve target version
         id: version

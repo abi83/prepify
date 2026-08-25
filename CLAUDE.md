@@ -20,10 +20,10 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 
 ## Environment
 Copy `.env.example` to `.env.local`:
-- `DATABASE_URL` — pooled Neon connection string (app runtime)
-- `DIRECT_DATABASE_URL` — direct Neon connection string (running migrations only)
+- `DATABASE_URL_POOLING` — pooled Neon connection string (app runtime)
+- `DATABASE_URL_DIRECT` — direct Neon connection string (running migrations only)
 - `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
-- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials (Auth.js's Google provider picks these up by convention)
+- `AUTH_GOOGLE_CLIENT_ID` / `AUTH_GOOGLE_CLIENT_SECRET` — Google OAuth client credentials, passed explicitly to Auth.js's Google provider
 
 Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 
@@ -35,8 +35,8 @@ All schema changes via **Prisma migrations** against Neon Postgres (`prisma/sche
 
 One-time setup — get the dev Neon connection strings into `.env.local`:
 ```bash
-gcloud secrets versions access latest --secret=prepify-db-url --project=prepify-dev-vk        # → DIRECT_DATABASE_URL
-gcloud secrets versions access latest --secret=prepify-db-url-pooled --project=prepify-dev-vk # → DATABASE_URL
+gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk  # → DATABASE_URL_DIRECT
+gcloud secrets versions access latest --secret=database-url-pooling --project=prepify-dev-vk # → DATABASE_URL_POOLING
 ```
 
 ```bash

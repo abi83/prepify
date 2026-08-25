@@ -12,9 +12,11 @@ resource "neon_project" "this" {
 
 # Direct (unpooled) connection, for running migrations — not granted to
 # the Cloud Run runtime service account, only github-deploy (below).
-resource "google_secret_manager_secret" "db_url" {
+# Secret ID and downstream env var name (DATABASE_URL_DIRECT) are kept in
+# lockstep on purpose — see issue #95.
+resource "google_secret_manager_secret" "db_url_direct" {
   project   = google_project.this.project_id
-  secret_id = "prepify-db-url"
+  secret_id = "database-url-direct"
 
   replication {
     auto {}
@@ -23,23 +25,23 @@ resource "google_secret_manager_secret" "db_url" {
   depends_on = [google_project_service.this]
 }
 
-resource "google_secret_manager_secret_version" "db_url" {
-  secret      = google_secret_manager_secret.db_url.id
+resource "google_secret_manager_secret_version" "db_url_direct" {
+  secret      = google_secret_manager_secret.db_url_direct.id
   secret_data = neon_project.this.connection_uri
 }
 
 # Needed for CI to run `prisma migrate deploy` (deploy.yml).
-resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_access" {
-  secret_id = google_secret_manager_secret.db_url.id
+resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_direct_access" {
+  secret_id = google_secret_manager_secret.db_url_direct.id
   project   = google_project.this.project_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${var.github_deploy_service_account_email}"
 }
 
 # Pooled connection — what the app actually connects with at runtime.
-resource "google_secret_manager_secret" "db_url_pooled" {
+resource "google_secret_manager_secret" "db_url_pooling" {
   project   = google_project.this.project_id
-  secret_id = "prepify-db-url-pooled"
+  secret_id = "database-url-pooling"
 
   replication {
     auto {}
@@ -48,13 +50,13 @@ resource "google_secret_manager_secret" "db_url_pooled" {
   depends_on = [google_project_service.this]
 }
 
-resource "google_secret_manager_secret_version" "db_url_pooled" {
-  secret      = google_secret_manager_secret.db_url_pooled.id
+resource "google_secret_manager_secret_version" "db_url_pooling" {
+  secret      = google_secret_manager_secret.db_url_pooling.id
   secret_data = neon_project.this.connection_uri_pooler
 }
 
-resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_pooled_access" {
-  secret_id = google_secret_manager_secret.db_url_pooled.id
+resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_pooling_access" {
+  secret_id = google_secret_manager_secret.db_url_pooling.id
   project   = google_project.this.project_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run_runtime.email}"

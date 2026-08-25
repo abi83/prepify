@@ -34,10 +34,10 @@ resource "google_cloud_run_v2_service" "app" {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       env {
-        name = "DATABASE_URL"
+        name = "DATABASE_URL_POOLING"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.db_url_pooled.secret_id
+            secret  = google_secret_manager_secret.db_url_pooling.secret_id
             version = "latest"
           }
         }
@@ -54,20 +54,20 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name = "AUTH_GOOGLE_ID"
+        name = "AUTH_GOOGLE_CLIENT_ID"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.google_client_id.secret_id
+            secret  = google_secret_manager_secret.auth_google_client_id.secret_id
             version = "latest"
           }
         }
       }
 
       env {
-        name = "AUTH_GOOGLE_SECRET"
+        name = "AUTH_GOOGLE_CLIENT_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.google_client_secret.secret_id
+            secret  = google_secret_manager_secret.auth_google_client_secret.secret_id
             version = "latest"
           }
         }
