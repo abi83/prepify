@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../lib/supabase'
-import type { PrepVisibility } from '../lib/supabase'
-import { runPrepLabeler, DISCIPLINES } from '../lib/agents/PrepLabeler'
+import type { PrepVisibility } from '@prisma/client'
+import { updatePrep } from '../actions/preps'
+import { runPrepLabeler, DISCIPLINES, type Discipline } from '../lib/agents/PrepLabeler'
+import { disciplineToEnum } from '../lib/disciplineMapping'
 import type { Concept } from '../types/pipeline'
 import styles from './ShareModal.module.css'
 
@@ -12,8 +13,8 @@ interface Props {
   model: string
   initialVisibility: PrepVisibility
   initialGrade: number | null
-  initialDiscipline: string | null
-  onSave: (visibility: PrepVisibility, grade: number | null, discipline: string | null) => void
+  initialDiscipline: Discipline | null
+  onSave: (visibility: PrepVisibility, grade: number | null, discipline: Discipline | null) => void
   onClose: () => void
 }
 
@@ -36,7 +37,7 @@ export default function ShareModal({
     initialVisibility === 'public' ? 'public' : 'link',
   )
   const [grade, setGrade] = useState<number | null>(initialGrade)
-  const [discipline, setDiscipline] = useState<string | null>(initialDiscipline)
+  const [discipline, setDiscipline] = useState<Discipline | null>(initialDiscipline)
   const [labelPhase, setLabelPhase] = useState<LabelPhase>('loading')
   const [lowConfidence, setLowConfidence] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -76,25 +77,23 @@ export default function ShareModal({
 
   async function handleConfirm() {
     setSaving(true)
-    const { error } = await supabase
-      .from('preps')
-      .update({ visibility, grade, discipline })
-      .eq('id', prepId)
-    setSaving(false)
-    if (!error) {
+    try {
+      await updatePrep(prepId, { visibility, grade, discipline: disciplineToEnum(discipline) })
       onSave(visibility, grade, discipline)
       setSaved(true)
+    } finally {
+      setSaving(false)
     }
   }
 
   async function handleUnpublish() {
     setSaving(true)
-    const { error } = await supabase
-      .from('preps')
-      .update({ visibility: 'private' })
-      .eq('id', prepId)
-    setSaving(false)
-    if (!error) onSave('private', grade, discipline)
+    try {
+      await updatePrep(prepId, { visibility: 'private' })
+      onSave('private', grade, discipline)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleCopyLink() {
@@ -198,7 +197,7 @@ export default function ShareModal({
                 <select
                   className={styles.select}
                   value={discipline ?? ''}
-                  onChange={e => setDiscipline(e.target.value || null)}
+                  onChange={e => setDiscipline((e.target.value || null) as Discipline | null)}
                 >
                   <option value="">—</option>
                   {DISCIPLINES.map(d => (

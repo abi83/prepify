@@ -2,7 +2,7 @@ import { runConceptExtractor } from './agents/ConceptExtractor'
 import { runConceptMerger } from './agents/ConceptMerger'
 import { deduplicateExact } from './mergeConceptLists'
 import { BYOK_TEXT_HARD_LIMIT } from './config'
-import type { Page } from './supabase'
+import type { Page } from '../types/prep'
 import { runPrepNamer } from './agents/PrepNamer'
 import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
 import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
@@ -13,7 +13,7 @@ import { runQuestionReviewer } from './agents/QuestionReviewer'
 import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipeline'
 import type { GeneratedQuestion, QuestionType } from '../types/questions'
 import type { AgentResult } from './agent'
-import { incrementPrepTokensInDb } from './tokenUsage'
+import { incrementPrepTokens } from '../actions/preps'
 import { buildQuestionTasks } from './taskBuilder'
 import { DEFAULT_GEN_CONFIG } from './generationConfig'
 import {
@@ -21,7 +21,7 @@ import {
   saveConcepts,
   saveQuestionTasksAndInitSlots,
   saveQuestionSlot,
-} from './pipelineStore'
+} from '../actions/pipeline'
 
 /** Thrown when total page text exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
 export class TextTooLongError extends Error {
@@ -123,7 +123,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'concepts' })
     const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
     totalTokens += metrics.total_tokens
-    void incrementPrepTokensInDb(prepId, metrics.total_tokens)
+    void incrementPrepTokens(prepId, metrics.total_tokens)
 
     // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
     // Skip merger on single-chunk runs — there's nothing to merge across.
@@ -131,7 +131,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const merged = chunkCount > 1
       ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
           totalTokens += r.metrics.total_tokens
-          void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
+          void incrementPrepTokens(prepId, r.metrics.total_tokens)
           return r.output
         })
       : deduped
@@ -177,7 +177,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .then(r => {
       prepTitle = r.output.title
       totalTokens += r.metrics.total_tokens
-      void incrementPrepTokensInDb(prepId, r.metrics.total_tokens)
+      void incrementPrepTokens(prepId, r.metrics.total_tokens)
       onTitleReady?.(r.output.title)
     })
     .catch(() => null)
@@ -205,21 +205,21 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       // Build
       const buildResult = await BUILDERS[task.type](task, apiKey, model, language, signal)
       totalTokens += buildResult.metrics.total_tokens
-      void incrementPrepTokensInDb(prepId, buildResult.metrics.total_tokens)
+      void incrementPrepTokens(prepId, buildResult.metrics.total_tokens)
       craftDone++
       onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
       const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
       totalTokens += reviewed.metrics.total_tokens
-      void incrementPrepTokensInDb(prepId, reviewed.metrics.total_tokens)
+      void incrementPrepTokens(prepId, reviewed.metrics.total_tokens)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
         const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
         totalTokens += retry.metrics.total_tokens
-        void incrementPrepTokensInDb(prepId, retry.metrics.total_tokens)
+        void incrementPrepTokens(prepId, retry.metrics.total_tokens)
         question = retry.output
       } else {
         question = reviewed.output.question

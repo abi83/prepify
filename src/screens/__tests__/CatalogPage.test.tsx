@@ -1,170 +1,113 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { CatalogEntry } from '../../repositories/prepRepository'
 
-// Mutable state controlled per test
-let mockPreps: object[] = []
-let mockQuestions: object[] = []
-let mockPrepsError: object | null = null
 const mockPush = vi.fn()
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: vi.fn() }),
 }))
 
-vi.mock('../../lib/supabase', () => ({
-  supabase: {
-    from: (table: string) => ({
-      select: () => ({
-        eq: (_col: string, _val: string) => ({
-          order: () =>
-            Promise.resolve({
-              data: table === 'preps' ? mockPreps : null,
-              error: mockPrepsError,
-            }),
-          in: () => ({
-            // questions count query
-          }),
-        }),
-        in: (_col: string, _val: string[]) =>
-          Promise.resolve({ data: mockQuestions, error: null }),
-      }),
-    }),
-  },
-}))
-
 import CatalogPage from '../CatalogPage'
 
-function renderCatalog() {
-  return render(<CatalogPage />)
+function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
+  return {
+    id: 'prep-1',
+    userId: 'owner-1',
+    title: 'Untitled',
+    pages: null,
+    createdAt: new Date('2026-01-15T00:00:00Z'),
+    tokensUsed: 0,
+    visibility: 'public',
+    grade: null,
+    discipline: null,
+    language: null,
+    questionCount: 0,
+    ...overrides,
+  }
+}
+
+function renderCatalog(entries: CatalogEntry[] = []) {
+  return render(<CatalogPage entries={entries} />)
 }
 
 beforeEach(() => {
-  mockPreps = []
-  mockQuestions = []
-  mockPrepsError = null
   mockPush.mockClear()
 })
 
-describe('CatalogPage — loading', () => {
-  it('shows a spinner while loading', () => {
-    renderCatalog()
-    const spinner = document.querySelector('[class*="spinner"]')
-    expect(spinner).toBeInTheDocument()
-  })
-})
-
 describe('CatalogPage — empty state', () => {
-  it('shows empty message when no public preps exist', async () => {
-    mockPreps = []
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByText(/no public preps yet/i)).toBeInTheDocument()
-    })
+  it('shows empty message when no public preps exist', () => {
+    renderCatalog([])
+    expect(screen.getByText(/no public preps yet/i)).toBeInTheDocument()
   })
 })
 
 describe('CatalogPage — listing preps', () => {
-  beforeEach(() => {
-    mockPreps = [
-      {
-        id: 'prep-1',
-        title: 'Cell Biology',
-        grade: 10,
-        discipline: 'Biology',
-        created_at: '2026-01-15T00:00:00Z',
-      },
-      {
-        id: 'prep-2',
-        title: 'World War II',
-        grade: 9,
-        discipline: 'History',
-        created_at: '2026-01-10T00:00:00Z',
-      },
-    ]
-    mockQuestions = [
-      { prep_id: 'prep-1' },
-      { prep_id: 'prep-1' },
-      { prep_id: 'prep-2' },
-    ]
+  const entries = [
+    entry({
+      id: 'prep-1',
+      title: 'Cell Biology',
+      grade: 10,
+      discipline: 'Biology',
+      createdAt: new Date('2026-01-15T00:00:00Z'),
+      questionCount: 2,
+    }),
+    entry({
+      id: 'prep-2',
+      title: 'World War II',
+      grade: 9,
+      discipline: 'History',
+      createdAt: new Date('2026-01-10T00:00:00Z'),
+      questionCount: 1,
+    }),
+  ]
+
+  it('renders page title', () => {
+    renderCatalog(entries)
+    expect(screen.getByText('Study Catalog')).toBeInTheDocument()
   })
 
-  it('renders page title', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByText('Study Catalog')).toBeInTheDocument()
-    })
+  it('renders prep titles as links', () => {
+    renderCatalog(entries)
+    expect(screen.getByText('Cell Biology')).toBeInTheDocument()
+    expect(screen.getByText('World War II')).toBeInTheDocument()
   })
 
-  it('renders prep titles as links', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByText('Cell Biology')).toBeInTheDocument()
-      expect(screen.getByText('World War II')).toBeInTheDocument()
-    })
+  it('renders discipline and grade tags', () => {
+    renderCatalog(entries)
+    const list = within(screen.getByRole('list'))
+    expect(list.getByText('Biology')).toBeInTheDocument()
+    expect(list.getByText('Grade 10')).toBeInTheDocument()
+    expect(list.getByText('History')).toBeInTheDocument()
+    expect(list.getByText('Grade 9')).toBeInTheDocument()
   })
 
-  it('renders discipline and grade tags', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByText('Biology')).toBeInTheDocument()
-      expect(screen.getByText('Grade 10')).toBeInTheDocument()
-      expect(screen.getByText('History')).toBeInTheDocument()
-      expect(screen.getByText('Grade 9')).toBeInTheDocument()
-    })
+  it('renders question counts', () => {
+    renderCatalog(entries)
+    expect(screen.getByText('2 questions')).toBeInTheDocument()
+    expect(screen.getByText('1 questions')).toBeInTheDocument()
   })
 
-  it('renders question counts', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByText('2 questions')).toBeInTheDocument()
-      expect(screen.getByText('1 questions')).toBeInTheDocument()
-    })
-  })
-
-  it('each prep card links to the study page', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      const links = screen.getAllByRole('link').filter(l => l.getAttribute('href')?.startsWith('/study/'))
-      expect(links.length).toBe(2)
-      expect(links[0]).toHaveAttribute('href', '/study/prep-1')
-      expect(links[1]).toHaveAttribute('href', '/study/prep-2')
-    })
+  it('each prep card links to the study page', () => {
+    renderCatalog(entries)
+    const links = screen.getAllByRole('link').filter(l => l.getAttribute('href')?.startsWith('/study/'))
+    expect(links.length).toBe(2)
+    expect(links[0]).toHaveAttribute('href', '/study/prep-1')
+    expect(links[1]).toHaveAttribute('href', '/study/prep-2')
   })
 })
 
 describe('CatalogPage — filtering', () => {
-  beforeEach(() => {
-    mockPreps = [
-      {
-        id: 'prep-1',
-        title: 'Cell Biology',
-        grade: 10,
-        discipline: 'Biology',
-        created_at: '2026-01-15T00:00:00Z',
-      },
-      {
-        id: 'prep-2',
-        title: 'World War II',
-        grade: 9,
-        discipline: 'History',
-        created_at: '2026-01-10T00:00:00Z',
-      },
-      {
-        id: 'prep-3',
-        title: 'Genetics',
-        grade: 11,
-        discipline: 'Biology',
-        created_at: '2026-01-05T00:00:00Z',
-      },
-    ]
-    mockQuestions = []
-  })
+  const entries = [
+    entry({ id: 'prep-1', title: 'Cell Biology', grade: 10, discipline: 'Biology', createdAt: new Date('2026-01-15T00:00:00Z') }),
+    entry({ id: 'prep-2', title: 'World War II', grade: 9, discipline: 'History', createdAt: new Date('2026-01-10T00:00:00Z') }),
+    entry({ id: 'prep-3', title: 'Genetics', grade: 11, discipline: 'Biology', createdAt: new Date('2026-01-05T00:00:00Z') }),
+  ]
 
   it('filters preps by discipline', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByText('Cell Biology'))
+    renderCatalog(entries)
 
     const disciplineSelect = screen.getByRole('combobox', { name: /filter by subject/i })
     await user.selectOptions(disciplineSelect, 'Biology')
@@ -176,8 +119,7 @@ describe('CatalogPage — filtering', () => {
 
   it('filters preps by grade', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByText('Cell Biology'))
+    renderCatalog(entries)
 
     const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
     await user.selectOptions(gradeSelect, 'Grade 9')
@@ -189,8 +131,7 @@ describe('CatalogPage — filtering', () => {
 
   it('shows empty message when filters match nothing', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByText('Cell Biology'))
+    renderCatalog(entries)
 
     const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
     await user.selectOptions(gradeSelect, 'Grade 13')
@@ -200,8 +141,7 @@ describe('CatalogPage — filtering', () => {
 
   it('restores all preps when filter is cleared', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByText('Cell Biology'))
+    renderCatalog(entries)
 
     const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
     await user.selectOptions(gradeSelect, 'Grade 9')
@@ -213,8 +153,7 @@ describe('CatalogPage — filtering', () => {
 
   it('combines grade and discipline filters', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByText('Cell Biology'))
+    renderCatalog(entries)
 
     await user.selectOptions(screen.getByRole('combobox', { name: /filter by subject/i }), 'Biology')
     await user.selectOptions(screen.getByRole('combobox', { name: /filter by grade/i }), 'Grade 10')
@@ -226,17 +165,14 @@ describe('CatalogPage — filtering', () => {
 })
 
 describe('CatalogPage — navigation', () => {
-  it('renders a back-to-home button', async () => {
-    renderCatalog()
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
-    })
+  it('renders a back-to-home button', () => {
+    renderCatalog([])
+    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
   })
 
   it('clicking back navigates to home', async () => {
     const user = userEvent.setup()
-    renderCatalog()
-    await waitFor(() => screen.getByRole('button', { name: /home/i }))
+    renderCatalog([])
     await user.click(screen.getByRole('button', { name: /home/i }))
     expect(mockPush).toHaveBeenCalledWith('/')
   })

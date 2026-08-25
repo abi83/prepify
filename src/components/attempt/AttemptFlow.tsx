@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import type { Question, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent, Asset } from '../../types/questions'
+import type { Question, Asset } from '@prisma/client'
+import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from '../../types/questions'
 import QuestionBody, { AnswerState, emptyAnswer } from '../questions/QuestionBody'
 import ScoreScreen from './ScoreScreen'
-import { supabase } from '../../lib/supabase'
+import { insertAttempt } from '../../actions/attempts'
 import { isAnswerCorrect } from '../../lib/scoring'
 import styles from './AttemptFlow.module.css'
 
@@ -18,19 +19,19 @@ function shuffleArray<T>(arr: T[]): T[] {
 function shuffleQuestionAnswers(q: Question): Question {
   switch (q.type) {
     case 'single_choice': {
-      const c = q.content as SingleChoiceContent
+      const c = q.content as unknown as SingleChoiceContent
       return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
     }
     case 'multiple_choice': {
-      const c = q.content as MultipleChoiceContent
+      const c = q.content as unknown as MultipleChoiceContent
       return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
     }
     case 'fill_the_gap': {
-      const c = q.content as FillTheGapContent
+      const c = q.content as unknown as FillTheGapContent
       return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
     }
     case 'sorting': {
-      const c = q.content as SortingContent
+      const c = q.content as unknown as SortingContent
       return { ...q, content: { ...c, answers: shuffleArray(c.answers) } }
     }
     default:
@@ -53,12 +54,12 @@ export function isAnswerValid(q: Question, a: AnswerState): boolean {
   switch (q.type) {
     case 'single_choice': return a.single !== null
     case 'multiple_choice': {
-      const c = q.content as MultipleChoiceContent
+      const c = q.content as unknown as MultipleChoiceContent
       const correctCount = c.answers.filter(x => x.is_correct).length
       return a.multi.length === correctCount
     }
     case 'fill_the_gap': {
-      const { gaps } = q.content as { gaps: { index: number }[] }
+      const { gaps } = q.content as unknown as { gaps: { index: number }[] }
       return gaps.every(g => !!a.fill[g.index - 1])
     }
     case 'sorting': return a.sort.length > 0
@@ -72,7 +73,7 @@ function getAttemptQuestions(questions: Question[]): Question[] {
 }
 
 export default function AttemptFlow({ questions, assets, mode, prepId, userId, onExit }: Props) {
-  const assetByQuestion = new Map(assets.map(a => [a.question_id, a]))
+  const assetByQuestion = new Map(assets.map(a => [a.questionId, a]))
   const attemptQuestions = getAttemptQuestions(questions)
   const total = attemptQuestions.length
 
@@ -114,7 +115,7 @@ export default function AttemptFlow({ questions, assets, mode, prepId, userId, o
     setSaving(true)
     const score = attemptQuestions.reduce((acc, q, i) => acc + (isAnswerCorrect(q, answers[i]) ? 1 : 0), 0)
     if (userId) {
-      await supabase.from('attempts').insert({ prep_id: prepId, user_id: userId, mode, score, total })
+      await insertAttempt(prepId, mode, score, total)
     }
     setSaving(false)
     setPhase('score')
@@ -148,7 +149,7 @@ export default function AttemptFlow({ questions, assets, mode, prepId, userId, o
       </div>
 
       <p className={styles.questionText}>{
-        (current.content as { question?: string }).question ?? ''
+        (current.content as unknown as { question?: string }).question ?? ''
       }</p>
 
       <div className={styles.body}>

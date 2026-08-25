@@ -12,7 +12,7 @@ import {
 } from '../lib/generationConfig'
 import type { GenerationConfig } from '../lib/generationConfig'
 import type { QuestionType } from '../types/questions'
-import { getTotalTokensFromDb } from '../lib/tokenUsage'
+import { getTotalTokens } from '../actions/preps'
 import styles from './SettingsPage.module.css'
 
 type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
@@ -37,7 +37,7 @@ export default function SettingsPage() {
       setKeyValue(existing.key)
       setModel(existing.model)
     }
-      getTotalTokensFromDb().then(setTotalTokens)
+      getTotalTokens().then(setTotalTokens)
   }, [])
 
   function handleGenConfigSave() {

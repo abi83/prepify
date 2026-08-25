@@ -3,32 +3,24 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import type { Prep } from '@prisma/client'
 import { supabase } from '../lib/supabase'
-import type { Prep } from '../lib/supabase'
+import { deletePrep } from '../actions/preps'
 import UploadModal from '../components/UploadModal'
 import styles from './MyPreps.module.css'
 
-export default function MyPreps() {
-  const [preps, setPreps] = useState<Prep[]>([])
-  const [loading, setLoading] = useState(true)
+interface Props {
+  preps: Prep[]
+}
+
+export default function MyPreps({ preps: initialPreps }: Props) {
+  const [preps, setPreps] = useState<Prep[]>(initialPreps)
   const [showUpload, setShowUpload] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    fetchPreps()
-  }, [])
-
-  async function fetchPreps() {
-    setLoading(true)
-    const { data } = await supabase
-      .from('preps')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setPreps(data ?? [])
-    setLoading(false)
-  }
+  useEffect(() => setPreps(initialPreps), [initialPreps])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -41,10 +33,11 @@ export default function MyPreps() {
 
   async function handleDelete(id: string) {
     setDeleting(true)
-    await supabase.from('preps').delete().eq('id', id)
+    await deletePrep(id)
     setPreps(prev => prev.filter(p => p.id !== id))
     setConfirmDeleteId(null)
     setDeleting(false)
+    router.refresh()
   }
 
   return (
@@ -66,9 +59,7 @@ export default function MyPreps() {
           </button>
         </div>
 
-        {loading ? (
-          <div className={styles.spinner} />
-        ) : preps.length === 0 ? (
+        {preps.length === 0 ? (
           <div className={styles.empty}>
             <span>📚</span>
             <p>No preps yet.</p>
@@ -83,7 +74,7 @@ export default function MyPreps() {
               <li key={prep.id} className={styles.listItem}>
                 <button className={styles.item} onClick={() => router.push(`/preps/${prep.id}`)}>
                   <span className={styles.itemTitle}>{prep.title}</span>
-                  <span className={styles.itemDate}>{formatDate(prep.created_at)}</span>
+                  <span className={styles.itemDate}>{formatDate(prep.createdAt)}</span>
                 </button>
                 {confirmDeleteId === prep.id ? (
                   <div className={styles.deleteConfirm}>
@@ -117,6 +108,6 @@ export default function MyPreps() {
   )
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+function formatDate(d: Date) {
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
