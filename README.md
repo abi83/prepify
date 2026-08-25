@@ -18,13 +18,13 @@ You bring your own OpenAI API key — stored in `localStorage`, used only to cal
 
 ## Getting started
 
-Node 18+, a Supabase project, an OpenAI API key.
+Node 18+, a Neon Postgres database, a Google OAuth client, an OpenAI API key.
 
 ```bash
 git clone https://github.com/abi83/prepify.git
 cd prepify
 npm install
-cp .env.example .env.local   # fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+cp .env.example .env.local   # fill in DATABASE_URL, AUTH_SECRET, AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET
 npm run dev
 ```
 
@@ -34,4 +34,4 @@ Open the app → Settings → paste your OpenAI key.
 
 ## Stack
 
-Next.js (App Router) · React 18 · TypeScript · Supabase (auth + Postgres) · OpenAI API · CSS Modules · @dnd-kit (drag-and-drop sorting)
+Next.js (App Router) · React 18 · TypeScript · Auth.js (Google OAuth) · Neon Postgres + Prisma · OpenAI API · CSS Modules · @dnd-kit (drag-and-drop sorting)

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import type { Prep, Question, Attempt, Asset } from '@prisma/client'
-import { supabase } from '../lib/supabase'
 import type { VisualElement, Page } from '../types/prep'
 import type { FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
@@ -261,15 +261,12 @@ function PrepPageInner({
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
 
-  const [userId, setUserId] = useState<string | null>(null)
+  const { data: session } = useSession()
+  const userId = session?.user.id ?? null
   const [concepts] = useState<Concept[]>(initialConcepts)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
-  }, [])
 
   async function refreshRunSummary() {
     const s = await getExistingRunSummary(id)

@@ -1,4 +1,5 @@
-import AuthGuard from '@/lib/AuthGuard'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
 import PrepPage from '@/screens/PrepPage'
 import { getMyPrep } from '@/actions/preps'
 import { listMyQuestions } from '@/actions/questions'
@@ -13,16 +14,15 @@ export const dynamic = 'force-dynamic'
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
+  const session = await auth()
+  if (!session) redirect('/')
+
   let prep
   try {
     prep = await getMyPrep(id)
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return (
-        <AuthGuard>
-          <PrepPage prep={null} />
-        </AuthGuard>
-      )
+      return <PrepPage prep={null} />
     }
     throw e
   }
@@ -37,15 +37,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const assets = questions.length > 0 ? await listMyAssets(questions.map(q => q.id)) : []
 
   return (
-    <AuthGuard>
-      <PrepPage
-        prep={prep}
-        questions={questions}
-        attempts={attempts}
-        assets={assets}
-        runSummary={runSummary}
-        concepts={concepts ?? []}
-      />
-    </AuthGuard>
+    <PrepPage
+      prep={prep}
+      questions={questions}
+      attempts={attempts}
+      assets={assets}
+      runSummary={runSummary}
+      concepts={concepts ?? []}
+    />
   )
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Prep } from '@prisma/client'
-import { supabase } from '../lib/supabase'
+import { signOut as authSignOut } from 'next-auth/react'
 import { deletePrep } from '../actions/preps'
 import UploadModal from '../components/UploadModal'
 import styles from './MyPreps.module.css'
@@ -23,7 +23,7 @@ export default function MyPreps({ preps: initialPreps }: Props) {
   useEffect(() => setPreps(initialPreps), [initialPreps])
 
   async function signOut() {
-    await supabase.auth.signOut()
+    await authSignOut({ redirectTo: '/' })
   }
 
   function handleDone(prepId: string) {

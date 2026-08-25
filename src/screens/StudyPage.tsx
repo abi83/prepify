@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import type { Prep, Question, Asset } from '@prisma/client'
-import { supabase } from '../lib/supabase'
 import type { FlashcardContent } from '../types/questions'
 import FlashCard from '../components/questions/FlashCard'
 import AttemptFlow from '../components/attempt/AttemptFlow'
@@ -22,11 +22,8 @@ export default function StudyPage({ prep, questions = [], assets = [] }: Props) 
 
   const [tab, setTab] = useState<Tab>('cards')
   const [activeAttempt, setActiveAttempt] = useState<'quiz' | 'test' | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
-  }, [])
+  const { data: session } = useSession()
+  const userId = session?.user.id ?? null
 
   if (!prep) {
     return (

@@ -1,13 +1,15 @@
 import { Suspense } from 'react'
-import AuthGuard from '@/lib/AuthGuard'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
 import SettingsPage from '@/screens/SettingsPage'
 
-export default function Page() {
+export default async function Page() {
+  const session = await auth()
+  if (!session) redirect('/')
+
   return (
-    <AuthGuard>
-      <Suspense fallback={null}>
-        <SettingsPage />
-      </Suspense>
-    </AuthGuard>
+    <Suspense fallback={null}>
+      <SettingsPage />
+    </Suspense>
   )
 }

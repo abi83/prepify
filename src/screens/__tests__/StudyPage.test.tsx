@@ -3,17 +3,17 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Prep, Question } from '@prisma/client'
 
-vi.mock('../../lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: () => Promise.resolve({ data: { user: null } }),
-    },
-  },
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({ data: null, status: 'unauthenticated' }),
 }))
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'test-prep-id' }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+
+vi.mock('../../actions/attempts', () => ({
+  insertAttempt: vi.fn().mockResolvedValue({}),
 }))
 
 import StudyPage from '../StudyPage'
