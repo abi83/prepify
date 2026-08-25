@@ -1,2 +1,7 @@
-// TODO(#69): replace with the real Auth.js session userId once auth migration lands.
-export const STUB_USER_ID = '00000000-0000-0000-0000-000000000001'
+import { auth } from './auth'
+
+export async function requireUserId(): Promise<string> {
+  const session = await auth()
+  if (!session?.user.id) throw new Error('Not authenticated')
+  return session.user.id
+}

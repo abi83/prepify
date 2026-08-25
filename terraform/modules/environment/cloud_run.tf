@@ -42,6 +42,36 @@ resource "google_cloud_run_v2_service" "app" {
           }
         }
       }
+
+      env {
+        name = "AUTH_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.auth_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "AUTH_GOOGLE_ID"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_client_id.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "AUTH_GOOGLE_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_client_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
     }
   }
 

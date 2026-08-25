@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '../lib/supabase'
+import { signIn } from 'next-auth/react'
 import styles from './Home.module.css'
 
 export default function Home() {
@@ -10,10 +10,7 @@ export default function Home() {
 
   async function signInWithGoogle() {
     setLoading(true)
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    })
+    await signIn('google', { redirectTo: '/preps' })
   }
 
   return (

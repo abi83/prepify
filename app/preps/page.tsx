@@ -1,4 +1,5 @@
-import AuthGuard from '@/lib/AuthGuard'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
 import MyPreps from '@/screens/MyPreps'
 import { listMyPreps } from '@/actions/preps'
 
@@ -6,10 +7,9 @@ import { listMyPreps } from '@/actions/preps'
 export const dynamic = 'force-dynamic'
 
 export default async function Page() {
+  const session = await auth()
+  if (!session) redirect('/')
+
   const preps = await listMyPreps()
-  return (
-    <AuthGuard>
-      <MyPreps preps={preps} />
-    </AuthGuard>
-  )
+  return <MyPreps preps={preps} />
 }

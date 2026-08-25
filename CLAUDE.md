@@ -20,10 +20,10 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 
 ## Environment
 Copy `.env.example` to `.env.local`:
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (auth only — see Database Migrations below for the data layer)
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase anon/public key
 - `DATABASE_URL` — pooled Neon connection string (app runtime)
 - `DIRECT_DATABASE_URL` — direct Neon connection string (running migrations only)
+- `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
+- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth client credentials (Auth.js's Google provider picks these up by convention)
 
 Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
 

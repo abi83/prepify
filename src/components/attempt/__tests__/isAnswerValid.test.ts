@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('../../../actions/attempts', () => ({
+  insertAttempt: vi.fn().mockResolvedValue({}),
+}))
+
 import { isAnswerValid } from '../AttemptFlow'
 import { emptyAnswer } from '../../questions/QuestionBody'
 import type { Question } from '@prisma/client'

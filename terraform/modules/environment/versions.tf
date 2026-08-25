@@ -6,5 +6,8 @@ terraform {
     neon = {
       source = "kislerdm/neon"
     }
+    random = {
+      source = "hashicorp/random"
+    }
   }
 }
