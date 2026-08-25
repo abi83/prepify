@@ -16,6 +16,13 @@ variable "region" {
 # Auth.js's host inference picks that up instead of the request's real host
 # even with trustHost: true (a known upstream issue, not fixable via request
 # headers) — so the public URL has to be supplied explicitly instead.
+#
+# Must exactly match the Authorized redirect URI configured on the Google
+# OAuth client. Cloud Run exposes each service under two equivalent domains
+# (a hash-based one, e.g. *.a.run.app, and a project-number-based one, e.g.
+# *.<project-number>.<region>.run.app) — Google's redirect_uri check is an
+# exact string match, so whichever one is registered in Console is the one
+# that has to go here.
 variable "auth_url" {
   type = string
 }
