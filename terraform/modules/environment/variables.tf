@@ -12,6 +12,14 @@ variable "region" {
   default = "us-central1"
 }
 
+# Next.js standalone mode sets HOSTNAME=0.0.0.0 for its own bind address, and
+# Auth.js's host inference picks that up instead of the request's real host
+# even with trustHost: true (a known upstream issue, not fixable via request
+# headers) — so the public URL has to be supplied explicitly instead.
+variable "auth_url" {
+  type = string
+}
+
 variable "billing_account_id" {
   type = string
 }

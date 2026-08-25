@@ -7,7 +7,7 @@ resource "random_password" "auth_secret" {
 
 resource "google_secret_manager_secret" "auth_secret" {
   project   = google_project.this.project_id
-  secret_id = "prepify-auth-secret"
+  secret_id = "auth-secret"
 
   replication {
     auto {}
