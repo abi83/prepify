@@ -7,7 +7,7 @@ resource "random_password" "auth_secret" {
 
 resource "google_secret_manager_secret" "auth_secret" {
   project   = google_project.this.project_id
-  secret_id = "prepify-auth-secret"
+  secret_id = "auth-secret"
 
   replication {
     auto {}
@@ -34,9 +34,11 @@ resource "google_secret_manager_secret_iam_member" "run_runtime_auth_secret_acce
 # client in Google Cloud Console (APIs & Services > Credentials) with an
 # authorized redirect URI of https://<cloud-run-url>/api/auth/callback/google,
 # then populate these two secrets by hand the same way as neon-api-key.
-resource "google_secret_manager_secret" "google_client_id" {
+# Secret IDs and downstream env var names (AUTH_GOOGLE_CLIENT_ID/_SECRET) are
+# kept in lockstep on purpose — see issue #95.
+resource "google_secret_manager_secret" "auth_google_client_id" {
   project   = google_project.this.project_id
-  secret_id = "prepify-google-client-id"
+  secret_id = "auth-google-client-id"
 
   replication {
     auto {}
@@ -45,9 +47,9 @@ resource "google_secret_manager_secret" "google_client_id" {
   depends_on = [google_project_service.this]
 }
 
-resource "google_secret_manager_secret" "google_client_secret" {
+resource "google_secret_manager_secret" "auth_google_client_secret" {
   project   = google_project.this.project_id
-  secret_id = "prepify-google-client-secret"
+  secret_id = "auth-google-client-secret"
 
   replication {
     auto {}
@@ -56,15 +58,15 @@ resource "google_secret_manager_secret" "google_client_secret" {
   depends_on = [google_project_service.this]
 }
 
-resource "google_secret_manager_secret_iam_member" "run_runtime_google_client_id_access" {
-  secret_id = google_secret_manager_secret.google_client_id.id
+resource "google_secret_manager_secret_iam_member" "run_runtime_auth_google_client_id_access" {
+  secret_id = google_secret_manager_secret.auth_google_client_id.id
   project   = google_project.this.project_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "run_runtime_google_client_secret_access" {
-  secret_id = google_secret_manager_secret.google_client_secret.id
+resource "google_secret_manager_secret_iam_member" "run_runtime_auth_google_client_secret_access" {
+  secret_id = google_secret_manager_secret.auth_google_client_secret.id
   project   = google_project.this.project_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run_runtime.email}"

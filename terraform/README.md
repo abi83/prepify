@@ -22,10 +22,10 @@ Three things exist outside this config on purpose, to break the chicken-and-egg 
    ```bash
    read -s -p "Neon API key: " NEON_KEY && printf '%s' "$NEON_KEY" | gcloud secrets versions add neon-api-key --project=prepify-infra --data-file=-
    ```
-4. Google OAuth client credentials (Auth.js sign-in) — same shape as the Neon key: Terraform manages the Secret Manager containers (`google_secret_manager_secret.google_client_id` / `google_client_secret` in `modules/environment/auth.tf`), one pair per environment, but the client itself has to be created by hand in Google Cloud Console (APIs & Services → Credentials → OAuth client ID → Web application), with an authorized redirect URI of `https://<cloud-run-url>/api/auth/callback/google`. Populate each environment's secrets with:
+4. Google OAuth client credentials (Auth.js sign-in) — same shape as the Neon key: Terraform manages the Secret Manager containers (`google_secret_manager_secret.auth_google_client_id` / `auth_google_client_secret` in `modules/environment/auth.tf`), one pair per environment, but the client itself has to be created by hand in Google Cloud Console (APIs & Services → Credentials → OAuth client ID → Web application), with an authorized redirect URI of `https://<cloud-run-url>/api/auth/callback/google`. Populate each environment's secrets with:
    ```bash
-   read -s -p "Google OAuth client ID: " GOOGLE_ID && printf '%s' "$GOOGLE_ID" | gcloud secrets versions add prepify-google-client-id --project=prepify-dev-vk --data-file=-
-   read -s -p "Google OAuth client secret: " GOOGLE_SECRET && printf '%s' "$GOOGLE_SECRET" | gcloud secrets versions add prepify-google-client-secret --project=prepify-dev-vk --data-file=-
+   read -s -p "Google OAuth client ID: " GOOGLE_ID && printf '%s' "$GOOGLE_ID" | gcloud secrets versions add auth-google-client-id --project=prepify-dev-vk --data-file=-
+   read -s -p "Google OAuth client secret: " GOOGLE_SECRET && printf '%s' "$GOOGLE_SECRET" | gcloud secrets versions add auth-google-client-secret --project=prepify-dev-vk --data-file=-
    ```
    (swap `prepify-dev-vk` for `prepify-prod` for the prod client). `AUTH_SECRET` itself doesn't need this — Terraform generates and stores it directly (`random_password.auth_secret`).
 
@@ -47,4 +47,4 @@ CI (`.github/workflows/terraform.yml`) runs six jobs — plan+apply for each of 
 
 ## Neon (Postgres)
 
-Two Neon projects (`prepify-dev`, `prepify-prod`), one per environment root, managed via the Neon Terraform provider (see `modules/environment/neon.tf`). Connection strings live in per-environment Secret Manager entries (`prepify-db-url`), readable only by that environment's Cloud Run runtime service account — never a plain Cloud Run env var. The Neon account-level API key (management-plane, not scoped to one database) is readable only by `terraform-ci`, deliberately not granted to the runtime service accounts.
+Two Neon projects (`prepify-dev`, `prepify-prod`), one per environment root, managed via the Neon Terraform provider (see `modules/environment/neon.tf`). Connection strings live in per-environment Secret Manager entries (`database-url-direct` / `database-url-pooling`), readable only by that environment's Cloud Run runtime service account — never a plain Cloud Run env var. The Neon account-level API key (management-plane, not scoped to one database) is readable only by `terraform-ci`, deliberately not granted to the runtime service accounts.
