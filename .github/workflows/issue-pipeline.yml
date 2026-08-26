@@ -25,6 +25,15 @@ permissions:
   issues: write
   id-token: write
 
+env:
+  # Bash permission matching is a literal prefix match on the command string
+  # (not a resolved path), so each gh-safe script needs an entry for every
+  # form the agent might type it in: relative with ./, relative without it,
+  # and workspace-absolute.
+  ALLOWED_EDIT_BODY: "Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-body.sh:*)"
+  ALLOWED_EDIT_LABELS: "Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+  ALLOWED_COMMENT: "Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*)"
+
 jobs:
   refine:
     if: >
@@ -116,7 +125,7 @@ jobs:
             Do nothing else — no other comments, no other edits.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-body.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_EDIT_BODY }},${{ env.ALLOWED_EDIT_LABELS }},${{ env.ALLOWED_COMMENT }}"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
@@ -233,7 +242,7 @@ jobs:
             Do nothing else.
           claude_args: |
             --model claude-haiku-4-5-20251001
-            --allowedTools "Read,Grep,Glob,Write,Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*),Bash(./.github/scripts/gh-safe/edit-issue-labels.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/edit-issue-labels.sh:*)"
+            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_COMMENT }},${{ env.ALLOWED_EDIT_LABELS }}"
 
       - name: Report run
         if: always() && steps.claude.outputs.execution_file != ''
