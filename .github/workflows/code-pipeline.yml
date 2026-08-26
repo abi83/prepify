@@ -348,7 +348,15 @@ jobs:
             COST=$(printf '%.4f' "$RAW_COST")
           fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh pr comment "${{ github.event.pull_request.number || github.event.inputs.pr_number }}" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
+          ISSUE="${{ steps.linked.outputs.issue_number }}"
+          if [[ -n "$ISSUE" ]]; then
+            # Cost tracking lives on the ticket (refine/estimate/coder all post
+            # there too — see #105) so it's one place to aggregate from, not
+            # split across the issue and every PR it goes through.
+            gh issue comment "$ISSUE" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
+          else
+            gh pr comment "${{ github.event.pull_request.number || github.event.inputs.pr_number }}" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
+          fi
 
       - name: Set changes-requested / approved
         if: steps.check.outputs.skip != 'true' && success()
