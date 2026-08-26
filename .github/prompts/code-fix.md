@@ -35,7 +35,7 @@ already-open PR directly and is what re-triggers the reviewer.
 ```
 git add -A
 git commit -m "..."
-git push
+./.github/scripts/gh-safe/push-branch.sh
 ```
 
 Do nothing else — no label edits, no PR creation, no other comments. The

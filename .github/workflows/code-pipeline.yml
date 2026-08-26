@@ -41,10 +41,14 @@ env:
   ALLOWED_COMMENT_PR: "Bash(./.github/scripts/gh-safe/comment-pr.sh:*),Bash(.github/scripts/gh-safe/comment-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-pr.sh:*)"
   ALLOWED_OPEN_PR: "Bash(./.github/scripts/gh-safe/open-pr.sh:*),Bash(.github/scripts/gh-safe/open-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/open-pr.sh:*)"
   ALLOWED_SUBMIT_REVIEW: "Bash(./.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/submit-pr-review.sh:*)"
+  ALLOWED_PUSH_BRANCH: "Bash(./.github/scripts/gh-safe/push-branch.sh:*),Bash(.github/scripts/gh-safe/push-branch.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/push-branch.sh:*)"
   # git/npm commands the agents run directly — not gh-safe scripts, so no
   # path-form variation, but each subcommand still needs its own entry
-  # since Bash access isn't otherwise open.
-  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*)"
+  # since Bash access isn't otherwise open. git push is NOT in this list —
+  # it's the one operation here that leaves the sandbox and reaches a
+  # shared remote, so it's routed through push-branch.sh (ALLOWED_PUSH_BRANCH)
+  # instead of being grantable with arbitrary flags/targets.
+  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*)"
   ALLOWED_GIT_READ: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
   ALLOWED_BUILD_TEST: "Bash(npm install:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run build:*)"
 
@@ -118,25 +122,29 @@ jobs:
       - name: Resolve existing PR (fix round)
         id: pr
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
+        uses: ./.github/actions/find-pr-for-issue
+        with:
+          issue_number: ${{ steps.issue.outputs.number }}
+
+      - name: Check out PR branch and gather feedback (fix round)
+        id: feedback
+        if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NUM="${{ steps.issue.outputs.number }}"
-          PR_JSON=$(gh pr list --repo ${{ github.repository }} --state open --json number,headRefName,body \
-            --jq '[.[] | select(.body | test("Closes #'"$NUM"'\\b"))][0]')
-          if [[ -z "$PR_JSON" || "$PR_JSON" == "null" ]]; then
-            echo "Error: status:changes-requested but no open PR references issue #$NUM" >&2
+          PR="${{ steps.pr.outputs.pr_number }}"
+          HEAD_REF="${{ steps.pr.outputs.head_ref }}"
+          if [[ -z "$PR" ]]; then
+            echo "Error: status:changes-requested but no open PR references issue #${{ steps.issue.outputs.number }}" >&2
             exit 1
           fi
-          echo "number=$(echo "$PR_JSON" | jq -r .number)" >> "$GITHUB_OUTPUT"
-          echo "head_ref=$(echo "$PR_JSON" | jq -r .headRefName)" >> "$GITHUB_OUTPUT"
 
-          git fetch origin "$(echo "$PR_JSON" | jq -r .headRefName)"
-          git checkout "$(echo "$PR_JSON" | jq -r .headRefName)"
+          git fetch origin "$HEAD_REF"
+          git checkout "$HEAD_REF"
 
           {
-            echo 'feedback<<EOF_FEEDBACK'
-            gh pr view "$(echo "$PR_JSON" | jq -r .number)" --repo ${{ github.repository }} --json reviews,comments \
+            echo 'text<<EOF_FEEDBACK'
+            gh pr view "$PR" --repo ${{ github.repository }} --json reviews,comments \
               --jq '(.reviews // []) + (.comments // []) | map("### " + (.author.login // "unknown") + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")'
             echo 'EOF_FEEDBACK'
           } >> "$GITHUB_OUTPUT"
@@ -163,14 +171,14 @@ jobs:
             PR-opening rules and apply them to the issue above.
           claude_args: |
             --model claude-sonnet-5
-            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_OPEN_PR }},${{ env.ALLOWED_COMMENT_ISSUE }}"
+            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_OPEN_PR }},${{ env.ALLOWED_COMMENT_ISSUE }}"
 
       - name: Run Claude coder (fix round)
         id: claude_fix
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
         uses: anthropics/claude-code-action@v1
         env:
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -179,17 +187,17 @@ jobs:
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
             TITLE: ${{ steps.issue.outputs.title }}
-            PR NUMBER: ${{ steps.pr.outputs.number }}
+            PR NUMBER: ${{ steps.pr.outputs.pr_number }}
             BRANCH: ${{ steps.pr.outputs.head_ref }} (already checked out)
 
             REVIEWER FEEDBACK:
-            ${{ steps.pr.outputs.feedback }}
+            ${{ steps.feedback.outputs.text }}
 
             Read .github/prompts/code-fix.md for the exact rules and
             apply them to the feedback above.
           claude_args: |
             --model claude-sonnet-5
-            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
+            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
 
       - name: Report run
         if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
@@ -205,6 +213,13 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Coder [pipeline run]($RUN_URL) — cost: \$$COST"
 
+      - name: Check PR now exists
+        id: verify_pr
+        if: steps.guard.outputs.skip != 'true' && success()
+        uses: ./.github/actions/find-pr-for-issue
+        with:
+          issue_number: ${{ steps.issue.outputs.number }}
+
       - name: Verify outcome / set in-review
         if: steps.guard.outputs.skip != 'true' && success()
         env:
@@ -212,9 +227,7 @@ jobs:
         run: |
           NUM="${{ steps.issue.outputs.number }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          PR_EXISTS=$(gh pr list --repo ${{ github.repository }} --state open --json body \
-            --jq '[.[] | select(.body | test("Closes #'"$NUM"'\\b"))] | length')
-          if [[ "$PR_EXISTS" -gt 0 ]]; then
+          if [[ -n "${{ steps.verify_pr.outputs.pr_number }}" ]]; then
             gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:in-review" --remove-label "status:in-progress"
           else
             gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-progress"
@@ -234,6 +247,19 @@ jobs:
       github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'reviewer')
     runs-on: ubuntu-latest
+    # GITHUB_TOKEN-authored label edits don't fire new workflow runs (GitHub's
+    # anti-recursion rule for the default token), so setting status:changes-
+    # requested alone would never re-trigger the coder job. actions: write
+    # lets this job explicitly dispatch it instead (see "Set changes-requested
+    # / approved" below) — an intentional workflow_dispatch call, which is
+    # exempt from that restriction. Overriding permissions at job level means
+    # every permission this job needs must be listed here, not just the new one.
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: write
+      id-token: write
     concurrency:
       group: reviewer-pr-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
     steps:
@@ -275,7 +301,10 @@ jobs:
           if [[ "$REQUEST_CHANGES_COUNT" -ge 2 ]]; then
             echo "Round cap (2) reached for PR #$PR — skipping reviewer, escalating."
             gh pr comment "$PR" --repo ${{ github.repository }} --body "Review round cap (2 requested-changes rounds) reached — needs a human look."
-            gh issue edit "${{ steps.linked.outputs.issue_number }}" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+            ISSUE="${{ steps.linked.outputs.issue_number }}"
+            if [[ -n "$ISSUE" ]]; then
+              gh issue edit "$ISSUE" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+            fi
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -325,12 +354,26 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           LAST_STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login=="claude[bot]")] | last | .state // empty')
 
+          if [[ -z "$NUM" ]]; then
+            echo "PR #$PR has no linked issue — verdict ($LAST_STATE) recorded on the PR only, no status label to set."
+            exit 0
+          fi
+
           case "$LAST_STATE" in
             APPROVED)
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:approved" --remove-label "status:in-review"
               ;;
             CHANGES_REQUESTED)
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
+              # Label edits made with the default GITHUB_TOKEN don't fire new
+              # workflow runs (GitHub's anti-recursion rule), so the coder
+              # job's issues.labeled trigger would never see this. Dispatch
+              # it explicitly instead — an intentional workflow_dispatch
+              # call is exempt from that restriction. The dispatched run
+              # detects it's a fix round from the issue's actual labels
+              # (just set above), the same way a real label event would.
+              gh workflow run code-pipeline.yml --repo ${{ github.repository }} \
+                --field phase=coder --field issue_number="$NUM"
               ;;
             *)
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
@@ -345,4 +388,7 @@ jobs:
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           gh pr comment "$PR" --repo ${{ github.repository }} --body "Automated review failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue edit "${{ steps.linked.outputs.issue_number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
+          ISSUE="${{ steps.linked.outputs.issue_number }}"
+          if [[ -n "$ISSUE" ]]; then
+            gh issue edit "$ISSUE" --repo ${{ github.repository }} --add-label "status:needs-attention"
+          fi

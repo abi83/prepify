@@ -48,7 +48,7 @@ readable on its own without needing to open the issue.
 1. Write the PR title (single line) to `./.pr-title.txt`.
 2. Write the PR body to `./.pr-body.md`. Do not add a "Closes #N" line
    yourself — the script that opens the PR adds it automatically.
-3. Push your branch: `git push -u origin HEAD`.
+3. Push your branch: `./.github/scripts/gh-safe/push-branch.sh` (no arguments).
 4. Run `./.github/scripts/gh-safe/open-pr.sh` (no arguments).
 
 Do nothing else — no label edits, no other comments. The workflow
