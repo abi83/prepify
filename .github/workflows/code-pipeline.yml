@@ -100,6 +100,16 @@ jobs:
           if [[ "$LABELS" == *"status:in-progress"* || "$LABELS" == *"status:in-review"* || "$LABELS" == *"status:approved"* || "$LABELS" == *"status:needs-attention"* ]]; then
             echo "Issue #$NUM is already past status:ready/status:changes-requested ($LABELS) — stale or duplicate trigger, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$LABELS" != *"type:coding-task"* && "$LABELS" != *"type:bug"* ]]; then
+            # Deterministic type gate: only type:coding-task and type:bug are
+            # implementable. status:ready can also land on an epic (via its
+            # estimate-phase bypass) or a spike, neither of which the coder
+            # should ever attempt — see #112.
+            echo "Issue #$NUM is not type:coding-task or type:bug ($LABELS) — not implementable, escalating."
+            gh issue edit "$NUM" --repo ${{ github.repository }} \
+              --add-label "status:needs-attention" --remove-label "status:ready" --remove-label "status:changes-requested"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "This issue reached \`status:ready\` without a \`type:coding-task\` or \`type:bug\` label, so the coder agent won't attempt it — only those two types are implementable code deliverables. If this should be implemented, add the correct type label and re-apply \`status:ready\`."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
