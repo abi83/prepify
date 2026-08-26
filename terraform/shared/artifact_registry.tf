@@ -7,6 +7,40 @@ resource "google_artifact_registry_repository" "images" {
   repository_id = "prepify"
   format        = "DOCKER"
 
+  # Release images are tagged vX.Y.Z (see deploy.yml); keeping them takes
+  # priority over the tagged-image delete rule below, so they survive as
+  # the rollback pool until they age out of this window themselves.
+  cleanup_policies {
+    id     = "keep-recent-releases"
+    action = "KEEP"
+
+    condition {
+      tag_state    = "TAGGED"
+      tag_prefixes = ["v"]
+      newer_than   = "31536000s" # 1 year
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-old-tagged"
+    action = "DELETE"
+
+    condition {
+      tag_state  = "TAGGED"
+      older_than = "2592000s" # 30 days
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-old-untagged"
+    action = "DELETE"
+
+    condition {
+      tag_state  = "UNTAGGED"
+      older_than = "604800s" # 7 days
+    }
+  }
+
   depends_on = [google_project_service.infra]
 }
 
