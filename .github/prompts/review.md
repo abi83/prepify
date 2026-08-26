@@ -23,6 +23,23 @@ conventions.
 Read the actual code and run build/test yourself — don't rubber-stamp
 based on the PR description alone.
 
+## Changes you can't build/test locally
+
+Some changes are verified by CI in ways you can't reproduce in this
+sandbox — e.g. a Terraform diff: there's no `terraform` CLI here, so you
+can't run `plan` yourself. Passing CI is not the same as a correct
+diff — "plan succeeded" only means the HCL is valid, not that the
+resource-level changes are what the issue actually asked for. For these:
+
+1. Run `gh pr checks` to see this PR's checks and find the relevant one
+   (e.g. `plan-shared`, `plan-dev`, `plan-prod`).
+2. Run `gh run view --job=<job-id> --log` (the job ID is in the check's
+   URL) to read that job's actual output — for Terraform, the real
+   add/change/destroy diff, not just pass/fail.
+3. Judge the diff itself against the Acceptance Criteria, the same way
+   you'd judge a code diff — a passing plan with the wrong resource
+   changes is still wrong.
+
 ## Verdict
 
 Decide `APPROVE` or `REQUEST_CHANGES`. There's no middle ground — if you
@@ -34,6 +51,18 @@ Acceptance Criteria, or a real convention violation.
 Inline comments should point at the exact `path`/`line` they concern and
 say specifically what's wrong and (where it's not obvious) what would
 fix it — not vague "consider improving this."
+
+## If you can't verify something
+
+If something genuinely blocks you from forming a real verdict — a check
+you can't interpret even after reading its log, a tool you need but
+don't have, context that's missing from the issue or PR — don't force
+an APPROVE to get unstuck, and don't guess at REQUEST_CHANGES either.
+Write what specifically blocked you to `./.pr-comment.md` and run
+`./.github/scripts/gh-safe/comment-pr.sh` (no arguments), then stop
+without submitting a review. The workflow's own fallback will flag the
+issue `status:needs-attention` for a human to look at — your comment
+is what tells them why, instead of just "stopped partway through."
 
 ## Submitting
 
@@ -55,5 +84,6 @@ is the only way to submit the review; do not call `gh pr review` or the
 GitHub API directly.
 
 Do nothing else: never merge the PR, never edit labels, never comment
-outside of the review itself. The workflow handles status transitions
+outside of the review itself — except the "can't verify" case above,
+the one deliberate exception. The workflow handles status transitions
 after your run completes based on what you actually submitted.
