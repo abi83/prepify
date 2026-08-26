@@ -4,13 +4,15 @@ Input: the raw issue title and body.
 
 ## Step 1: pick the type
 
-Three issue types exist, each with a template at
+Four issue types exist, each with a template at
 `.github/ISSUE_TEMPLATE/`: `spike.md` (research/decision, no code
 deliverable), `bug.md` (something is broken), `coding-task.md` (pure
-implementation work). Determine which one applies:
+implementation work), `epic.md` (a raw idea or theme that will break
+down into several tickets — no Acceptance Criteria, since the work
+itself isn't scoped yet). Determine which one applies:
 
-- If the issue already has a `type:spike`, `type:bug`, or
-  `type:coding-task` label, use that — do not second-guess it.
+- If the issue already has a `type:spike`, `type:bug`, `type:coding-task`,
+  or `type:epic` label, use that — do not second-guess it.
 - Otherwise, infer the type from the title and body content.
 - If it's genuinely ambiguous between two types (not just unclear in
   detail, but shaped differently enough that the template choice changes
