@@ -129,7 +129,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
       - name: Build and push image
         if: github.event_name != 'workflow_dispatch'
