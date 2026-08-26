@@ -51,6 +51,10 @@ env:
   ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*)"
   ALLOWED_GIT_READ: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
   ALLOWED_BUILD_TEST: "Bash(npm install:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run build:*)"
+  # Read-only, no model-authored text involved, so no gh-safe wrapper needed —
+  # lets the reviewer inspect a CI check it can't reproduce locally (e.g. the
+  # actual terraform plan diff behind a passing/failing plan-shared check).
+  ALLOWED_CI_READ: "Bash(gh pr checks:*),Bash(gh run view:*)"
 
 jobs:
   coder:
@@ -315,6 +319,8 @@ jobs:
         id: claude
         if: steps.check.outputs.skip != 'true'
         uses: anthropics/claude-code-action@v1
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -329,7 +335,7 @@ jobs:
             PR's diff against the linked issue's Acceptance Criteria.
           claude_args: |
             --model claude-sonnet-5
-            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_SUBMIT_REVIEW }}"
+            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
 
       - name: Report run
         if: steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
