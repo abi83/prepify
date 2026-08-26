@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: read
@@ -29,9 +30,12 @@ jobs:
   # check that never gets a check run (workflow never triggered) blocks
   # merging forever, unlike one that reports "skipped". Not meaningful for
   # workflow_dispatch (no base to diff against) — jobs treat a manual run
-  # as "run me" regardless of these outputs.
+  # as "run me" regardless of these outputs. Also not meaningful for a
+  # tag push: dorny/paths-filter diffs against the push's "before" SHA,
+  # which for a newly-created tag isn't a meaningful base to diff against.
+  # apply-prod (tag-gated) doesn't consult these outputs for that reason.
   changes:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     outputs:
       shared: ${{ steps.filter.outputs.shared }}
@@ -138,7 +142,7 @@ jobs:
   # merge, same as dev — it changes rarely and isn't environment data-plane.
   apply-shared:
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.shared == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -166,7 +170,7 @@ jobs:
     needs: [changes, apply-shared]
     if: |
       always() &&
-      github.event_name == 'push' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.dev == 'true' &&
       (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
     runs-on: ubuntu-latest
@@ -190,15 +194,21 @@ jobs:
         env:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
-  # Prod requires manual approval — see the "prod" GitHub Environment's
-  # required-reviewer protection rule (repo Settings > Environments). Same
-  # skip-tolerant needs.apply-shared.result check as apply-dev above.
+  # Prod is gated on a version tag push (release), not merge to main —
+  # mirrors deploy.yml's deploy-prod. Also requires manual approval, see
+  # the "prod" GitHub Environment's required-reviewer protection rule
+  # (repo Settings > Environments). Deliberately doesn't consult
+  # needs.changes.outputs.prod: that's computed by diffing against the
+  # push's base ref, which isn't meaningful for a tag push (see the
+  # `changes` job above) — a release tag applies prod regardless of
+  # whether prod paths changed since the last push. apply-shared still
+  # only runs for branch pushes to main, so on a tag push it's always
+  # "skipped" and the skip-tolerant check below just falls through.
   apply-prod:
-    needs: [changes, apply-shared]
+    needs: apply-shared
     if: |
       always() &&
-      github.event_name == 'push' &&
-      needs.changes.outputs.prod == 'true' &&
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
       (needs.apply-shared.result == 'success' || needs.apply-shared.result == 'skipped')
     runs-on: ubuntu-latest
     environment: prod
