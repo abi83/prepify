@@ -55,6 +55,12 @@ env:
   # lets the reviewer inspect a CI check it can't reproduce locally (e.g. the
   # actual terraform plan diff behind a passing/failing plan-shared check).
   ALLOWED_CI_READ: "Bash(gh pr checks:*),Bash(gh run view:*)"
+  # Also read-only. resolve-linked-issue only resolves the linked issue's
+  # *number*, never its content, and issues reference each other in ways a
+  # single fixed number can't cover — a parent epic, a sub-issue, another
+  # ticket mentioned in the body. Any-issue read access lets the reviewer
+  # follow those references itself instead of reviewing blind.
+  ALLOWED_ISSUE_READ: "Bash(gh issue view:*)"
 
 jobs:
   coder:
@@ -335,7 +341,7 @@ jobs:
             PR's diff against the linked issue's Acceptance Criteria.
           claude_args: |
             --model claude-sonnet-5
-            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
+            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_ISSUE_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
 
       - name: Report run
         if: steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
