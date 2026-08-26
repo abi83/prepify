@@ -1,0 +1,348 @@
+name: Coding Agents
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number (coder phase)"
+        required: false
+      pr_number:
+        description: "PR number (reviewer phase)"
+        required: false
+      phase:
+        description: "Which phase to run"
+        required: true
+        type: choice
+        options:
+          - coder
+          - reviewer
+      debug:
+        description: "Show full Claude output in logs"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+env:
+  # Bash permission matching is a literal prefix match on the command string
+  # (not a resolved path), so each gh-safe script needs an entry for every
+  # form the agent might type it in: relative with ./, relative without it,
+  # and workspace-absolute. See #104.
+  ALLOWED_COMMENT_ISSUE: "Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*)"
+  ALLOWED_COMMENT_PR: "Bash(./.github/scripts/gh-safe/comment-pr.sh:*),Bash(.github/scripts/gh-safe/comment-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-pr.sh:*)"
+  ALLOWED_OPEN_PR: "Bash(./.github/scripts/gh-safe/open-pr.sh:*),Bash(.github/scripts/gh-safe/open-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/open-pr.sh:*)"
+  ALLOWED_SUBMIT_REVIEW: "Bash(./.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/submit-pr-review.sh:*)"
+  # git/npm commands the agents run directly — not gh-safe scripts, so no
+  # path-form variation, but each subcommand still needs its own entry
+  # since Bash access isn't otherwise open.
+  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*)"
+  ALLOWED_GIT_READ: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
+  ALLOWED_BUILD_TEST: "Bash(npm install:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run build:*)"
+
+jobs:
+  coder:
+    if: >
+      (github.event_name == 'issues' &&
+        (github.event.label.name == 'status:ready' || github.event.label.name == 'status:changes-requested')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'coder')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: coder-issue-${{ github.event.issue.number || github.event.inputs.issue_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout wiki
+        uses: actions/checkout@v4
+        with:
+          repository: abi83/prepify.wiki
+          path: wiki
+
+      - name: Resolve issue
+        id: issue
+        uses: ./.github/actions/resolve-issue
+        with:
+          issue_number: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+
+      - name: Guard against duplicate or stale trigger
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NUM="${{ steps.issue.outputs.number }}"
+          LABELS=$(gh issue view "$NUM" --repo ${{ github.repository }} --json labels --jq '[.labels[].name] | join(",")')
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+          if [[ "$LABELS" == *"status:in-progress"* || "$LABELS" == *"status:in-review"* || "$LABELS" == *"status:approved"* || "$LABELS" == *"status:needs-attention"* ]]; then
+            echo "Issue #$NUM is already past status:ready/status:changes-requested ($LABELS) — stale or duplicate trigger, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine fix round
+        id: mode
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          # Derived from the issue's actual current labels (from the guard
+          # step above), not from event metadata — this is what makes a
+          # manual workflow_dispatch re-run behave the same as a real
+          # label event, since there's no separate "fix_round" input to
+          # pass in by hand.
+          LABELS="${{ steps.guard.outputs.labels }}"
+          if [[ "$LABELS" == *"status:changes-requested"* ]]; then
+            echo "fix_round=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fix_round=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set in-progress
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} \
+            --add-label "status:in-progress" \
+            --remove-label "status:ready" --remove-label "status:changes-requested" || true
+
+      - name: Resolve existing PR (fix round)
+        id: pr
+        if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NUM="${{ steps.issue.outputs.number }}"
+          PR_JSON=$(gh pr list --repo ${{ github.repository }} --state open --json number,headRefName,body \
+            --jq '[.[] | select(.body | test("Closes #'"$NUM"'\\b"))][0]')
+          if [[ -z "$PR_JSON" || "$PR_JSON" == "null" ]]; then
+            echo "Error: status:changes-requested but no open PR references issue #$NUM" >&2
+            exit 1
+          fi
+          echo "number=$(echo "$PR_JSON" | jq -r .number)" >> "$GITHUB_OUTPUT"
+          echo "head_ref=$(echo "$PR_JSON" | jq -r .headRefName)" >> "$GITHUB_OUTPUT"
+
+          git fetch origin "$(echo "$PR_JSON" | jq -r .headRefName)"
+          git checkout "$(echo "$PR_JSON" | jq -r .headRefName)"
+
+          {
+            echo 'feedback<<EOF_FEEDBACK'
+            gh pr view "$(echo "$PR_JSON" | jq -r .number)" --repo ${{ github.repository }} --json reviews,comments \
+              --jq '(.reviews // []) + (.comments // []) | map("### " + (.author.login // "unknown") + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")'
+            echo 'EOF_FEEDBACK'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude coder (initial implementation)
+        id: claude_initial
+        if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
+          allowed_bots: "claude[bot]"
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ steps.issue.outputs.number }}
+            TITLE: ${{ steps.issue.outputs.title }}
+            OWNER: @${{ github.repository_owner }}
+            BODY:
+            ${{ steps.issue.outputs.body }}
+
+            ${{ steps.issue.outputs.comments }}
+
+            Read .github/prompts/code.md for the exact implementation and
+            PR-opening rules and apply them to the issue above.
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_OPEN_PR }},${{ env.ALLOWED_COMMENT_ISSUE }}"
+
+      - name: Run Claude coder (fix round)
+        id: claude_fix
+        if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
+        uses: anthropics/claude-code-action@v1
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
+          allowed_bots: "claude[bot]"
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ steps.issue.outputs.number }}
+            TITLE: ${{ steps.issue.outputs.title }}
+            PR NUMBER: ${{ steps.pr.outputs.number }}
+            BRANCH: ${{ steps.pr.outputs.head_ref }} (already checked out)
+
+            REVIEWER FEEDBACK:
+            ${{ steps.pr.outputs.feedback }}
+
+            Read .github/prompts/code-fix.md for the exact rules and
+            apply them to the feedback above.
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
+
+      - name: Report run
+        if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXEC_FILE="${{ steps.claude_initial.outputs.execution_file }}${{ steps.claude_fix.outputs.execution_file }}"
+          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "$EXEC_FILE" 2>/dev/null)
+          COST="unknown"
+          if [[ -n "$RAW_COST" ]]; then
+            COST=$(printf '%.4f' "$RAW_COST")
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Coder [pipeline run]($RUN_URL) — cost: \$$COST"
+
+      - name: Verify outcome / set in-review
+        if: steps.guard.outputs.skip != 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NUM="${{ steps.issue.outputs.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          PR_EXISTS=$(gh pr list --repo ${{ github.repository }} --state open --json body \
+            --jq '[.[] | select(.body | test("Closes #'"$NUM"'\\b"))] | length')
+          if [[ "$PR_EXISTS" -gt 0 ]]; then
+            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:in-review" --remove-label "status:in-progress"
+          else
+            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-progress"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Coder run completed without leaving an open PR referencing this issue — likely stopped for clarification or partway through. See the run: $RUN_URL"
+          fi
+
+      - name: Flag failure
+        if: steps.guard.outputs.skip != 'true' && failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
+          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated implementation failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  reviewer:
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'reviewer')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: reviewer-pr-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout wiki
+        uses: actions/checkout@v4
+        with:
+          repository: abi83/prepify.wiki
+          path: wiki
+
+      - name: Resolve linked issue
+        id: linked
+        uses: ./.github/actions/resolve-linked-issue
+        with:
+          pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+
+      - name: Dedup and round-cap check
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          HEAD_SHA=$(gh pr view "$PR" --repo ${{ github.repository }} --json headRefOid --jq .headRefOid)
+          LAST_REVIEW=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login=="claude[bot]")] | last')
+          LAST_SHA=$(echo "$LAST_REVIEW" | jq -r '.commit_id // empty')
+
+          if [[ -n "$LAST_SHA" && "$LAST_SHA" == "$HEAD_SHA" ]]; then
+            echo "Head commit $HEAD_SHA already reviewed — duplicate event, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          REQUEST_CHANGES_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
+            --jq '[.[] | select(.user.login=="claude[bot]" and .state=="CHANGES_REQUESTED")] | length')
+          if [[ "$REQUEST_CHANGES_COUNT" -ge 2 ]]; then
+            echo "Round cap (2) reached for PR #$PR — skipping reviewer, escalating."
+            gh pr comment "$PR" --repo ${{ github.repository }} --body "Review round cap (2 requested-changes rounds) reached — needs a human look."
+            gh issue edit "${{ steps.linked.outputs.issue_number }}" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude reviewer
+        id: claude
+        if: steps.check.outputs.skip != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
+          allowed_bots: "claude[bot]"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+            LINKED ISSUE: ${{ steps.linked.outputs.issue_number }}
+
+            Read .github/prompts/review.md for the exact review rubric
+            and the mechanic for submitting your verdict, and review this
+            PR's diff against the linked issue's Acceptance Criteria.
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_SUBMIT_REVIEW }}"
+
+      - name: Report run
+        if: steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
+          COST="unknown"
+          if [[ -n "$RAW_COST" ]]; then
+            COST=$(printf '%.4f' "$RAW_COST")
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr comment "${{ github.event.pull_request.number || github.event.inputs.pr_number }}" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
+
+      - name: Set changes-requested / approved
+        if: steps.check.outputs.skip != 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          NUM="${{ steps.linked.outputs.issue_number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          LAST_STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login=="claude[bot]")] | last | .state // empty')
+
+          case "$LAST_STATE" in
+            APPROVED)
+              gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:approved" --remove-label "status:in-review"
+              ;;
+            CHANGES_REQUESTED)
+              gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
+              ;;
+            *)
+              gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+              gh pr comment "$PR" --repo ${{ github.repository }} --body "Review run completed without submitting a recognized verdict — likely stopped partway through. See the run: $RUN_URL"
+              ;;
+          esac
+
+      - name: Flag failure
+        if: steps.check.outputs.skip != 'true' && failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          gh pr comment "$PR" --repo ${{ github.repository }} --body "Automated review failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue edit "${{ steps.linked.outputs.issue_number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
