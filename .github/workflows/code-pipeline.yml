@@ -300,14 +300,25 @@ jobs:
         with:
           pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
 
+      # The reviewer runs under its own GitHub App identity, distinct from the
+      # coder's claude[bot], so it can actually submit an APPROVE review —
+      # GitHub forbids approving a PR authored by the same identity (#119).
+      - name: Generate reviewer app token
+        id: reviewer_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.REVIEWER_APP_ID }}
+          private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
+
       - name: Dedup and round-cap check
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEWER_BOT: ${{ steps.reviewer_token.outputs.app-slug }}[bot]
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           HEAD_SHA=$(gh pr view "$PR" --repo ${{ github.repository }} --json headRefOid --jq .headRefOid)
-          LAST_REVIEW=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login=="claude[bot]")] | last')
+          LAST_REVIEW=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last')
           LAST_SHA=$(echo "$LAST_REVIEW" | jq -r '.commit_id // empty')
 
           if [[ -n "$LAST_SHA" && "$LAST_SHA" == "$HEAD_SHA" ]]; then
@@ -317,7 +328,7 @@ jobs:
           fi
 
           REQUEST_CHANGES_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
-            --jq '[.[] | select(.user.login=="claude[bot]" and .state=="CHANGES_REQUESTED")] | length')
+            --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
           if [[ "$REQUEST_CHANGES_COUNT" -ge 2 ]]; then
             echo "Round cap (2) reached for PR #$PR — skipping reviewer, escalating."
             gh pr comment "$PR" --repo ${{ github.repository }} --body "Review round cap (2 requested-changes rounds) reached — needs a human look."
@@ -339,6 +350,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.reviewer_token.outputs.token }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
           allowed_bots: "claude[bot]"
           prompt: |
@@ -378,11 +390,12 @@ jobs:
         if: steps.check.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEWER_BOT: ${{ steps.reviewer_token.outputs.app-slug }}[bot]
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           NUM="${{ steps.linked.outputs.issue_number }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          LAST_STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login=="claude[bot]")] | last | .state // empty')
+          LAST_STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .state // empty')
 
           if [[ -z "$NUM" ]]; then
             echo "PR #$PR has no linked issue — verdict ($LAST_STATE) recorded on the PR only, no status label to set."
