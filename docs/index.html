@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prepify Dev Dashboard — demo</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1f2328; --muted: #656d76;
+    --card: #f6f8fa; --border: #d0d7de; --accent: #0969da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e;
+      --card: #161b22; --border: #30363d; --accent: #2f81f7;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem; background: var(--bg); color: var(--fg);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); margin: 0 0 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem; margin-bottom: 2rem; }
+  .tile { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .tile .n { font-size: 1.6rem; font-weight: 600; }
+  .tile .l { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+  .note { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: .85rem 1rem; color: var(--muted); font-size: .9rem; }
+  a { color: var(--accent); }
+  footer { margin-top: 2.5rem; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prepify Dev Dashboard</h1>
+  <p class="sub">Static demo page served by GitHub Pages. All numbers below are hard-coded placeholders.</p>
+
+  <div class="grid">
+    <div class="tile"><div class="n">12</div><div class="l">Bugs closed (30d)</div></div>
+    <div class="tile"><div class="n">3</div><div class="l">Epics closed (30d)</div></div>
+    <div class="tile"><div class="n">28</div><div class="l">PRs merged (30d)</div></div>
+    <div class="tile"><div class="n">$41.80</div><div class="l">Pipeline spend (30d)</div></div>
+    <div class="tile"><div class="n">18.2M</div><div class="l">Tokens (30d)</div></div>
+    <div class="tile"><div class="n">1,447</div><div class="l">Agent tool calls (30d)</div></div>
+  </div>
+
+  <h2 style="font-size:1.1rem">Needs attention</h2>
+  <table>
+    <thead><tr><th>Queue</th><th>Count</th></tr></thead>
+    <tbody>
+      <tr><td>status:estimated (awaiting owner approval)</td><td>4</td></tr>
+      <tr><td>status:needs-attention (pipeline failed)</td><td>1</td></tr>
+      <tr><td>status:changes-requested</td><td>2</td></tr>
+      <tr><td>Open PRs</td><td>1</td></tr>
+    </tbody>
+  </table>
+
+  <p class="note">
+    This is a throwaway example to show what a GitHub Pages site in this repo looks like.
+    A real version would swap these placeholders for live data — e.g. a Looker Studio report
+    (embedded via <code>&lt;iframe&gt;</code>, which works here but not in README/issues) or charts
+    rendered from a metrics file the pipeline appends to.
+  </p>
+
+  <footer>
+    Source: <code>docs/index.html</code> · deployed by <code>.github/workflows/pages.yml</code> ·
+    <a href="https://github.com/abi83/prepify">abi83/prepify</a>
+  </footer>
+</main>
+</body>
+</html>

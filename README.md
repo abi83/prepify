@@ -32,6 +32,12 @@ Open the app → Settings → paste your OpenAI key.
 
 ---
 
+## Dev dashboard
+
+Demo of a GitHub Pages site in this repo: **https://abi83.github.io/prepify/** (live once Pages is enabled — see the PR).
+
+---
+
 ## Stack
 
 Next.js (App Router) · React 18 · TypeScript · Auth.js (Google OAuth) · Neon Postgres + Prisma · OpenAI API · CSS Modules · @dnd-kit (drag-and-drop sorting)
