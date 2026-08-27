@@ -24,6 +24,11 @@ opening a partial PR: write an explanation to
 Follow this repo's code style: self-documenting names over comments,
 no speculative abstraction, no unrequested refactors of surrounding code.
 
+Never modify `.github/workflows/` or `.github/scripts/gh-safe/` — these
+define this pipeline's own sandbox, and the push you do as `GITHUB_TOKEN`
+is not permitted to touch workflow files. If the issue seems to require
+changing them, stop and comment on the issue instead of opening a PR.
+
 Before opening the PR: run the project's build and test commands and
 make sure they pass. Fix any failures your change caused.
 
@@ -32,8 +37,8 @@ make sure they pass. Fix any failures your change caused.
 Branch name: `<type>/<short-slug>`, matching the type your PR title will
 carry (see `wiki/Contributing.md`) — e.g. `feat/quiz-export` for a PR
 titled `feat: ...`. Commit your changes with a normal, clear commit
-message (this branch will be squash-merged, so the individual commit
-messages don't matter much, but keep them sane).
+message. `push-branch.sh` collapses the branch to a single commit before
+pushing, so don't rely on your intermediate commit structure surviving.
 
 ## Open the PR
 
