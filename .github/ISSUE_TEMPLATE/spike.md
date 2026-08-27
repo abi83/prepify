@@ -30,4 +30,8 @@ labels: type:spike
 ## Deliverable
 
 <!-- Where the decision gets recorded (e.g, wiki/ADR section) so dependent
-     tickets can reference it. -->
+     tickets can reference it. If the deliverable is an ADR: it must include
+     a comparison matrix (alternatives as columns, Decision Criteria as rows,
+     an explicit winner per row) — not prose merged into table cells, and not
+     justification that traces back to "the requester wants X" instead of a
+     fact. -->

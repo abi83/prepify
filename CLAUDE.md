@@ -18,6 +18,12 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage; 
 ### Comments
 Prefer self-documenting code — clear names for variables, functions, workflow steps, files — over comments that restate what the code already says. Add a comment only for a hidden constraint, a non-obvious workaround, or a reason a reader couldn't otherwise infer. When one is warranted, keep it short: a line or two, not a paragraph.
 
+### Prose (ADRs, wiki pages, issue/PR bodies, docs)
+- State the claim once, in the section it belongs to. Don't restate the same point across Context/Decision/Reasoning in different words — that's padding, not clarity.
+- Ground every claim in a fact — code, a measurement, a doc, an ecosystem data point — not in "the user/owner wants/said X." Authority isn't evidence; if the only reason given is that someone asked for it, find or state the actual reason.
+- A comparison between options is a table: options as columns (or rows), criteria as the other axis, one fact per cell, and an explicit winner per criterion. Prose describing each option in turn is not a comparison table even if it's formatted as one.
+- Cut qualifying clauses and hedges that don't change what a reader does with the sentence.
+
 ## Environment
 Copy `.env.example` to `.env.local`:
 - `DATABASE_URL_POOLING` — pooled Neon connection string (app runtime)
