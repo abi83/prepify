@@ -21,6 +21,10 @@ permissions:
 
 # Mirrors terraform/shared outputs — can't be wired automatically since
 # Terraform hasn't run yet when this workflow starts. Keep in sync by hand.
+#
+# vars.GCP_PROJECT_ID is an environment-scoped Actions variable (repo
+# Settings → Environments → dev / prod), not defined in this file — it
+# resolves to prepify-dev-vk or prepify-prod based on each job's `environment:`.
 env:
   WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com
@@ -75,7 +79,7 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk)"
+          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
           npx prisma migrate deploy
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -88,7 +92,7 @@ jobs:
         with:
           service: prepify
           region: ${{ env.REGION }}
-          project_id: prepify-dev-vk
+          project_id: ${{ vars.GCP_PROJECT_ID }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
 
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
@@ -121,7 +125,7 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=prepify-prod)"
+          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
           npx prisma migrate deploy
       - name: Resolve target version
         id: version
@@ -146,5 +150,5 @@ jobs:
         with:
           service: prepify
           region: ${{ env.REGION }}
-          project_id: prepify-prod
+          project_id: ${{ vars.GCP_PROJECT_ID }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
