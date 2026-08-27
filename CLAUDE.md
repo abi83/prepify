@@ -4,7 +4,7 @@
 Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth) and Neon Postgres via Prisma (data).
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
 API keys are BYOK — users supply their own OpenAI key stored in localStorage; the OpenAI-calling pipeline stays entirely client-side.
-`app/**/page.tsx` are Server Components that fetch initial data via server actions (`src/actions/*.ts`, backed by `src/repositories/*.ts`) and pass it as props into the client screens (`src/screens/*.tsx`). Client-triggered mutations call the same server actions directly.
+`app/**/page.tsx` are Server Components that fetch initial data via server actions (`src/actions/*.ts`, backed by `src/repositories/*.ts`). Client-triggered mutations call the same server actions directly. `src/screens/*.tsx` (one client component per page) is legacy — not the target pattern; migrating it is tracked in separate tickets, not prescribed here.
 
 ## Tech Stack
 - Next.js (App Router, TypeScript)
@@ -17,6 +17,12 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage; 
 
 ### Comments
 Prefer self-documenting code — clear names for variables, functions, workflow steps, files — over comments that restate what the code already says. Add a comment only for a hidden constraint, a non-obvious workaround, or a reason a reader couldn't otherwise infer. When one is warranted, keep it short: a line or two, not a paragraph.
+
+### Prose (ADRs, wiki pages, issue/PR bodies, docs)
+- State the claim once, in the section it belongs to. Don't restate the same point across Context/Decision/Reasoning in different words — that's padding, not clarity.
+- Ground every claim in a fact — code, a measurement, a doc, an ecosystem data point — not in "the user/owner wants/said X." Authority isn't evidence; if the only reason given is that someone asked for it, find or state the actual reason.
+- A comparison between options is a table: options as columns (or rows), criteria as the other axis, one fact per cell, and an explicit winner per criterion. Prose describing each option in turn is not a comparison table even if it's formatted as one.
+- Cut qualifying clauses and hedges that don't change what a reader does with the sentence.
 
 ## Environment
 Copy `.env.example` to `.env.local`:
