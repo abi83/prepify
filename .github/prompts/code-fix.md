@@ -23,7 +23,11 @@ is supplied in your environment as `PR_NUMBER`).
 
 Never modify `.github/workflows/` or `.github/scripts/gh-safe/` — these
 define this pipeline's own sandbox, and the push you do as `GITHUB_TOKEN`
-is not permitted to touch workflow files.
+is not permitted to touch workflow files. `push-branch.sh` checks the
+whole squashed diff against `origin/main`, so it rejects the push even if
+the reviewer's feedback is unrelated to those paths and the PR already
+touches them. If addressing the feedback genuinely requires changing
+them, stop and explain that on the PR (`comment-pr.sh`) instead.
 
 Read `CLAUDE.md` and `wiki/Contributing.md` if you need a refresher on
 conventions, and re-run the project's build and test commands before
