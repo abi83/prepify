@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 #
-# Pushes the current branch to origin. Takes no arguments — anything the
-# model types after the script name is ignored, not passed through — and
-# refuses to push a protected branch directly.
+# Squashes the current branch to one commit and pushes it to origin.
+# Arguments are ignored, so untrusted prompt text can't steer this into
+# --force over main, a different remote, or an explicit refspec.
 #
-# This is the one Bash-invoked git operation that leaves the sandbox and
-# reaches a shared remote. checkout/add/commit stay broadly allowed
-# (sandbox-local, no external blast radius per this repo's own tool-
-# access philosophy), but push needs a script precisely so that untrusted
-# issue/review text in the prompt can't steer it into force-pushing over
-# main via an injected instruction — no argument the model is tricked
-# into typing (--force, a different remote, an explicit main:main refspec)
-# has any effect, since none of it is read.
-#
-# Usage: run with no arguments from the branch you want pushed.
+# Squash before the guard, not after: squashing collapses an
+# intermediate-only edit to a protected path, and the guard is the
+# backstop for a net change that really touches one.
 
 set -euo pipefail
+
+PROTECTED_PATHS_RE='^\.github/(workflows|scripts/gh-safe)/'
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
@@ -26,4 +21,25 @@ case "$BRANCH" in
     ;;
 esac
 
-git push -u origin "$BRANCH"
+git fetch origin main --quiet
+BASE=$(git merge-base origin/main HEAD)
+
+if [ "$BASE" = "$(git rev-parse HEAD)" ]; then
+  echo "Error: no commits beyond origin/main — nothing to push" >&2
+  exit 1
+fi
+
+MESSAGE=$(git log -1 --format=%B)
+git reset --soft "$BASE"
+git commit --quiet -m "$MESSAGE"
+
+PROTECTED=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E "$PROTECTED_PATHS_RE" || true)
+
+if [ -n "$PROTECTED" ]; then
+  echo "Error: you are not allowed to change these paths (they define this pipeline's own sandbox):" >&2
+  echo "$PROTECTED" | sed 's/^/  /' >&2
+  echo "Drop these edits and push again." >&2
+  exit 1
+fi
+
+git push --force-with-lease -u origin "$BRANCH"
