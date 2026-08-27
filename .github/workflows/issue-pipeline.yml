@@ -47,7 +47,7 @@ jobs:
       - name: Checkout wiki
         uses: actions/checkout@v4
         with:
-          repository: abi83/prepify.wiki
+          repository: ${{ vars.WIKI_REPO }}
           path: wiki
 
       - name: Resolve issue
@@ -156,7 +156,7 @@ jobs:
       - name: Checkout wiki
         uses: actions/checkout@v4
         with:
-          repository: abi83/prepify.wiki
+          repository: ${{ vars.WIKI_REPO }}
           path: wiki
 
       - name: Resolve issue
