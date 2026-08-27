@@ -44,6 +44,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # vars.WIKI_REPO is a repo-level Actions variable (Settings → Secrets
+      # and variables → Actions → Variables), set to abi83/prepify.wiki.
       - name: Checkout wiki
         uses: actions/checkout@v4
         with:

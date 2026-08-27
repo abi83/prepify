@@ -21,6 +21,10 @@ permissions:
 
 # Mirrors terraform/shared outputs — can't be wired automatically since
 # Terraform hasn't run yet when this workflow starts. Keep in sync by hand.
+#
+# vars.GCP_PROJECT_ID is an environment-scoped Actions variable (repo
+# Settings → Environments → dev / prod), not defined in this file — it
+# resolves to prepify-dev-vk or prepify-prod based on each job's `environment:`.
 env:
   WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com
