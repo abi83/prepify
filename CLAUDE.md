@@ -13,7 +13,9 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage; 
 - CSS Modules
 - OpenAI API (LLM pipeline)
 
-## Code Style
+## Style
+
+Concise and direct, everywhere — code, comments, docs, commit messages, issues, PRs, and chat replies. Say it once, at the shortest length that stays clear. Long output is a cost the reader pays; default to less and expand only where a reader genuinely needs it.
 
 ### Comments
 Prefer self-documenting code — clear names for variables, functions, workflow steps, files — over comments that restate what the code already says. Add a comment only for a hidden constraint, a non-obvious workaround, or a reason a reader couldn't otherwise infer. When one is warranted, keep it short: a line or two, not a paragraph.
@@ -23,6 +25,7 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 - Ground every claim in a fact — code, a measurement, a doc, an ecosystem data point — not in "the user/owner wants/said X." Authority isn't evidence; if the only reason given is that someone asked for it, find or state the actual reason.
 - A comparison between options is a table: options as columns (or rows), criteria as the other axis, one fact per cell, and an explicit winner per criterion. Prose describing each option in turn is not a comparison table even if it's formatted as one.
 - Cut qualifying clauses and hedges that don't change what a reader does with the sentence.
+- PR bodies use exactly three sections — **What changed** / **Before merging** / **After merging** — and nothing else; rationale belongs on the linked issue. A **Notes** section is for genuine exceptions, not routine. Full convention on the wiki's Contributing page.
 
 ## Environment
 Copy `.env.example` to `.env.local`:
