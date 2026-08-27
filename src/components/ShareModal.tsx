@@ -4,7 +4,11 @@ import { updatePrep } from '../actions/preps'
 import { runPrepLabeler, DISCIPLINES, type Discipline } from '../lib/agents/PrepLabeler'
 import { disciplineToEnum } from '../lib/disciplineMapping'
 import type { Concept } from '../types/pipeline'
-import styles from './ShareModal.module.css'
+import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 interface Props {
   prepId: string
@@ -21,6 +25,7 @@ interface Props {
 type LabelPhase = 'loading' | 'done' | 'error'
 
 const GRADE_OPTIONS = Array.from({ length: 13 }, (_, i) => i + 1)
+const UNSET = '__unset__'
 
 export default function ShareModal({
   prepId,
@@ -44,6 +49,10 @@ export default function ShareModal({
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(initialVisibility !== 'private')
   const abortRef = useRef<AbortController | null>(null)
+  // ShareModal is mounted/unmounted by its parent rather than opened via a
+  // DialogTrigger, so Radix has no trigger element to return focus to on
+  // close — capture it ourselves and restore it in onCloseAutoFocus below.
+  const triggerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null)
 
   useEffect(() => {
     if (initialVisibility !== 'private') {
@@ -104,123 +113,132 @@ export default function ShareModal({
     })
   }
 
-  function handleOverlayClick(e: React.MouseEvent) {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   const shareUrl = `${window.location.origin}/study/${prepId}`
 
   return (
-    <div className={styles.overlay} onClick={handleOverlayClick}>
-      <div className={styles.modal}>
-        <div className={styles.header}>
-          <h2>Share prep</h2>
-          <button className={styles.close} onClick={onClose} aria-label="Close">×</button>
-        </div>
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent
+        onCloseAutoFocus={e => {
+          e.preventDefault()
+          triggerRef.current?.focus()
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Share prep</DialogTitle>
+          <DialogDescription className="sr-only">
+            Choose who can access this prep and set its grade and subject.
+          </DialogDescription>
+        </DialogHeader>
 
         {saved ? (
-          <div className={styles.publishedBox}>
-            <p className={styles.publishedText}>
+          <div className="flex flex-col gap-3.5">
+            <p className="text-sm text-muted-foreground">
               {visibility === 'link' ? 'Anyone with the link can study this prep.' : 'This prep is publicly listed.'}
             </p>
-            <div className={styles.linkRow}>
-              <input
-                className={styles.linkInput}
-                readOnly
-                value={shareUrl}
-                onFocus={e => e.currentTarget.select()}
-              />
-              <button className={styles.copyBtn} onClick={handleCopyLink}>
+            <div className="flex gap-2">
+              <Input readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} className="text-xs" />
+              <Button onClick={handleCopyLink} className="shrink-0">
                 {copied ? 'Copied!' : 'Copy'}
-              </button>
+              </Button>
             </div>
-            <button className={styles.unpublishBtn} onClick={handleUnpublish} disabled={saving}>
+            <Button
+              variant="link"
+              onClick={handleUnpublish}
+              disabled={saving}
+              className="h-auto self-start p-0 text-muted-foreground"
+            >
               {saving ? 'Saving…' : 'Make private'}
-            </button>
+            </Button>
           </div>
         ) : (
           <>
             {labelPhase === 'loading' && (
-              <div className={styles.labelingRow}>
-                <span className={styles.dotPulse} />
-                <span className={styles.labelingText}>Detecting subject and grade…</span>
+              <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" />
+                <span>Detecting subject and grade…</span>
               </div>
             )}
 
             {labelPhase === 'error' && (
-              <p className={styles.hint}>Could not auto-detect subject — you can set it manually below.</p>
+              <p className="text-sm text-muted-foreground">Could not auto-detect subject — you can set it manually below.</p>
             )}
 
             {lowConfidence && labelPhase === 'done' && (
-              <p className={styles.warning}>
+              <p className="rounded-md border border-error/30 bg-error/5 px-3.5 py-2.5 text-sm text-muted-foreground">
                 This material doesn't look like school curriculum. Grade and subject may not apply.
               </p>
             )}
 
-            <div className={styles.field}>
-              <label>Visibility</label>
-              <div className={styles.visibilityGroup}>
+            <div className="flex flex-col gap-2">
+              <Label>Visibility</Label>
+              <div className="flex gap-2">
                 {(['link', 'public'] as const).map(v => (
-                  <button
+                  <Button
                     key={v}
-                    className={`${styles.visBtn} ${visibility === v ? styles.visBtnActive : ''}`}
+                    type="button"
+                    variant={visibility === v ? 'default' : 'outline'}
+                    aria-pressed={visibility === v}
                     onClick={() => setVisibility(v)}
+                    className="flex-1"
                   >
                     {v === 'link' ? 'Link only' : 'Public'}
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <span className={styles.visHint}>
+              <span className="text-xs text-muted-foreground">
                 {visibility === 'link'
                   ? 'Only people with the link can access this prep.'
                   : 'Listed publicly — anyone can find and study it.'}
               </span>
             </div>
 
-            <div className={styles.row}>
-              <div className={styles.field}>
-                <label>Grade</label>
-                <select
-                  className={styles.select}
-                  value={grade ?? ''}
-                  onChange={e => setGrade(e.target.value ? Number(e.target.value) : null)}
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-2">
+                <Label>Grade</Label>
+                <Select
+                  value={grade === null ? UNSET : String(grade)}
+                  onValueChange={v => setGrade(v === UNSET ? null : Number(v))}
                 >
-                  <option value="">—</option>
-                  {GRADE_OPTIONS.map(g => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET}>—</SelectItem>
+                    {GRADE_OPTIONS.map(g => (
+                      <SelectItem key={g} value={String(g)}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className={`${styles.field} ${styles.fieldGrow}`}>
-                <label>Subject</label>
-                <select
-                  className={styles.select}
-                  value={discipline ?? ''}
-                  onChange={e => setDiscipline((e.target.value || null) as Discipline | null)}
+              <div className="flex flex-1 flex-col gap-2">
+                <Label>Subject</Label>
+                <Select
+                  value={discipline ?? UNSET}
+                  onValueChange={v => setDiscipline(v === UNSET ? null : (v as Discipline))}
                 >
-                  <option value="">—</option>
-                  {DISCIPLINES.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET}>—</SelectItem>
+                    {DISCIPLINES.map(d => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className={styles.actions}>
-              <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-              <button
-                className={styles.publishBtn}
-                onClick={handleConfirm}
-                disabled={saving || labelPhase === 'loading'}
-              >
+            <div className="mt-1 flex justify-end gap-2.5">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={handleConfirm} disabled={saving || labelPhase === 'loading'}>
                 {saving ? 'Publishing…' : 'Publish'}
-              </button>
+              </Button>
             </div>
           </>
         )}
-
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

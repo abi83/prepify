@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('../../actions/preps', () => ({
@@ -61,7 +61,7 @@ describe('ShareModal — initial render', () => {
   it('defaults to Link only visibility', () => {
     render(<ShareModal {...baseProps} />)
     const linkBtn = screen.getByRole('button', { name: /link only/i })
-    expect(linkBtn).toHaveClass(/visBtnActive/)
+    expect(linkBtn).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows "publicly listed" text when initialVisibility is public', () => {
@@ -84,16 +84,55 @@ describe('ShareModal — dismiss', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     render(<ShareModal {...baseProps} onClose={onClose} />)
-    await user.click(screen.getByLabelText('Close'))
+    await user.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('calls onClose when overlay is clicked', async () => {
+  it('calls onClose when Escape is pressed', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    const { container } = render(<ShareModal {...baseProps} onClose={onClose} />)
-    const overlay = container.firstChild as HTMLElement
-    await user.click(overlay)
+    render(<ShareModal {...baseProps} onClose={onClose} />)
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onClose when clicking outside the dialog', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<ShareModal {...baseProps} onClose={onClose} />)
+    await user.click(document.documentElement)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ShareModal — accessibility', () => {
+  it('renders as an accessible modal dialog', () => {
+    render(<ShareModal {...baseProps} />)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAccessibleName('Share prep')
+  })
+
+  it('moves focus inside the dialog on open', () => {
+    render(<ShareModal {...baseProps} />)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+  })
+
+  it('returns focus to the trigger element on close', async () => {
+    const user = userEvent.setup()
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Share'
+    document.body.appendChild(trigger)
+    trigger.focus()
+
+    const onClose = vi.fn()
+    const { unmount } = render(<ShareModal {...baseProps} onClose={onClose} />)
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    unmount()
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+    trigger.remove()
   })
 })
