@@ -1,9 +1,11 @@
 You are addressing reviewer feedback on an already-open PR for a Prepify
 issue — not implementing from scratch.
 
-Input: the original issue, and the reviewer's most recent
-`REQUEST_CHANGES` review (its body and any inline comments) on the PR
-already open for this issue. You're on the PR's existing branch.
+Input: the original issue, and — scoped to the latest review round only —
+the reviewer's most recent `REQUEST_CHANGES` review (its summary body and
+its line-anchored inline comments) plus any PR conversation posted after
+it. Earlier rounds are already addressed in prior commits; don't reopen
+them. You're on the PR's existing branch.
 
 ## Scope your changes to the feedback
 
