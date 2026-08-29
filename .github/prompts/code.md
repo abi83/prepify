@@ -24,12 +24,10 @@ opening a partial PR: write an explanation to
 Follow this repo's code style: self-documenting names over comments,
 no speculative abstraction, no unrequested refactors of surrounding code.
 
-Never modify `.github/workflows/`, `.github/scripts/gh-safe/`, or
-`.github/scripts/pipeline/` — these define this pipeline's own sandbox,
-`push-branch.sh` rejects any push that touches them, and the push you do
-as `GITHUB_TOKEN` is not permitted to touch workflow files. If the issue
-seems to require changing them, stop and comment on the issue instead of
-opening a PR.
+Never modify `.github/workflows/` or `.github/scripts/` — they define this
+pipeline's own sandbox and `push-branch.sh` rejects any push that touches
+them. If the issue seems to require such a change, stop and comment on the
+issue instead of opening a PR.
 
 Tests are your responsibility. Add or update tests for the behaviour you
 change, then run the project's build and test commands and make sure they
