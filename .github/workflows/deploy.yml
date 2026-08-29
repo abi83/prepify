@@ -99,7 +99,8 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          export DATABASE_URL_DIRECT
           npx prisma migrate deploy
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -146,7 +147,8 @@ jobs:
         run: npm ci
       - name: Run database migrations
         run: |
-          export DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          export DATABASE_URL_DIRECT
           npx prisma migrate deploy
       - name: Resolve target version
         id: version

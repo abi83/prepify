@@ -37,7 +37,7 @@ PROTECTED=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E "$PROTECT
 
 if [ -n "$PROTECTED" ]; then
   echo "Error: you are not allowed to change these paths (they define this pipeline's own sandbox):" >&2
-  echo "$PROTECTED" | sed 's/^/  /' >&2
+  while IFS= read -r path; do echo "  $path" >&2; done <<< "$PROTECTED"
   echo "Drop these edits and push again." >&2
   exit 1
 fi

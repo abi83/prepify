@@ -1,0 +1,24 @@
+name: Lint pipeline
+
+on:
+  # No paths: filter — a required check must report on every PR, not sit pending.
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lint workflows and their inline run blocks
+        # docker://rhysd/actionlint:1.7.12, pinned by digest
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+
+      - name: Lint standalone shell scripts
+        run: find .github/scripts -name '*.sh' -print0 | xargs -0 -r shellcheck
