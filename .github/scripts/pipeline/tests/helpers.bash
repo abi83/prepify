@@ -31,6 +31,7 @@ case "$1" in
   api)
     case "$*" in
       *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
+      *commit_id*) echo "${STUB_LAST_SHA-}" ;;
       *) echo "${STUB_LAST_STATE-}" ;;
     esac ;;
 esac

@@ -34,13 +34,26 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   ! summary | grep -q 'Files changed'
 }
 
-@test "coder: fix round shows the round number from prior changes-requested reviews" {
+@test "coder: fix round that pushed a new commit shows PR updated" {
   echo '[{"type":"result"}]' >"$EXEC"
   export STUB_RC_COUNT=2
+  export STUB_LAST_SHA="oldsha"
+  export STUB_HEAD_SHA="newsha"
   run "$PIPELINE_DIR/run-summary.sh" Coder "$EXEC" --issue 42 --pr 99 --round fix
   [ "$status" -eq 0 ]
   summary | grep -qF '**Round:** Fix round 2'
   summary | grep -qF '**Outcome:** PR updated — [#99](https://github.com/owner/repo/pull/99)'
+}
+
+@test "coder: fix round that pushed nothing shows the blocked outcome" {
+  echo '[{"type":"result","result":"Could not push: guarded path."}]' >"$EXEC"
+  export STUB_RC_COUNT=1
+  export STUB_LAST_SHA="samesha"
+  export STUB_HEAD_SHA="samesha"
+  run "$PIPELINE_DIR/run-summary.sh" Coder "$EXEC" --issue 42 --pr 99 --round fix
+  [ "$status" -eq 0 ]
+  summary | grep -qF '**Outcome:** ⚠️ No new commit pushed — see the final message below.'
+  summary | grep -qF '> Could not push: guarded path.'
 }
 
 @test "review: approved verdict" {
@@ -48,6 +61,8 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   export STUB_PR_TITLE="feat: widget"
   export STUB_LAST_STATE="APPROVED"
   export STUB_RC_COUNT=0
+  export STUB_HEAD_SHA="headsha"
+  export STUB_LAST_SHA="headsha"
   export REVIEWER_BOT="prepify-reviewer[bot]"
   run "$PIPELINE_DIR/run-summary.sh" Review "$EXEC" --pr 99 --issue 42
   [ "$status" -eq 0 ]
@@ -61,9 +76,22 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   echo '[{"type":"result","result":"Could not use the review tool, posting here."}]' >"$EXEC"
   export STUB_LAST_STATE=""
   export STUB_RC_COUNT=1
+  export STUB_HEAD_SHA="headsha"
+  export STUB_LAST_SHA=""
   run "$PIPELINE_DIR/run-summary.sh" Review "$EXEC" --pr 99
   [ "$status" -eq 0 ]
   summary | grep -qF '**Round:** re-review (after 1 changes-requested)'
+  summary | grep -qF '**Outcome:** ⚠️ No verdict submitted — see the final message below.'
+}
+
+@test "review: a stale verdict against an old commit is not counted as this run's" {
+  echo '[{"type":"result","result":"Stopped early."}]' >"$EXEC"
+  export STUB_LAST_STATE="CHANGES_REQUESTED"
+  export STUB_RC_COUNT=1
+  export STUB_HEAD_SHA="newsha"
+  export STUB_LAST_SHA="oldsha"
+  run "$PIPELINE_DIR/run-summary.sh" Review "$EXEC" --pr 99
+  [ "$status" -eq 0 ]
   summary | grep -qF '**Outcome:** ⚠️ No verdict submitted — see the final message below.'
 }
 

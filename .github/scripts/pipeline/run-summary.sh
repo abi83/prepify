@@ -77,18 +77,31 @@ case "$phase" in
     emit "**Issue:** [#$issue](${GITHUB_SERVER_URL}/${repo}/issues/${issue})${title:+ — $title}"
 
     fix_n=""
+    last_flagged_sha=""
     if [[ "$round" == "fix" && -n "$pr" ]]; then
       fix_n=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
         --jq '[.[] | select(.state=="CHANGES_REQUESTED")] | length')
+      last_flagged_sha=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
+        --jq '[.[] | select(.state=="CHANGES_REQUESTED")] | last | .commit_id // empty')
     fi
     rl=$(round_line "$fix_n")
     [[ -n "$rl" ]] && emit "**Round:** $rl"
 
-    if [[ -n "$pr" ]]; then
-      verb="opened"; [[ "$round" == "fix" ]] && verb="updated"
-      emit "**Outcome:** PR $verb — [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})"
-    else
+    # `pr` only resolves an already-open PR — for a fix round it says nothing
+    # about whether this run pushed anything. Treat it as "updated" only when
+    # the head has moved off the commit the reviewer flagged; otherwise the
+    # run failed silently after the PR already existed (AC: show the block).
+    if [[ -z "$pr" ]]; then
       emit "**Outcome:** ⚠️ No PR — see the final message below."
+    elif [[ "$round" == "fix" ]]; then
+      head_sha=$(gh_q pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)
+      if [[ -n "$head_sha" && -n "$last_flagged_sha" && "$head_sha" != "$last_flagged_sha" ]]; then
+        emit "**Outcome:** PR updated — [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})"
+      else
+        emit "**Outcome:** ⚠️ No new commit pushed — see the final message below."
+      fi
+    else
+      emit "**Outcome:** PR opened — [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})"
     fi
 
     if [[ -n "$pr" ]]; then
@@ -113,13 +126,23 @@ case "$phase" in
       emit "**Round:** initial review"
     fi
 
+    # A verdict is this run's outcome only if it was submitted against the PR's
+    # current head — otherwise it's a stale review from an earlier round and
+    # this run submitted nothing (same headRefOid check as the Dedup step).
+    head_sha=$(gh_q pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)
     last_state=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
       --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\")] | last | .state // empty")
-    case "$last_state" in
-      APPROVED)          emit "**Outcome:** ✅ Approved" ;;
-      CHANGES_REQUESTED) emit "**Outcome:** 🔴 Changes requested" ;;
-      *)                 emit "**Outcome:** ⚠️ No verdict submitted — see the final message below." ;;
-    esac
+    last_sha=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
+      --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\")] | last | .commit_id // empty")
+    if [[ -n "$head_sha" && -n "$last_sha" && "$head_sha" == "$last_sha" ]]; then
+      case "$last_state" in
+        APPROVED)          emit "**Outcome:** ✅ Approved" ;;
+        CHANGES_REQUESTED) emit "**Outcome:** 🔴 Changes requested" ;;
+        *)                 emit "**Outcome:** ⚠️ No verdict submitted — see the final message below." ;;
+      esac
+    else
+      emit "**Outcome:** ⚠️ No verdict submitted — see the final message below."
+    fi
     ;;
 
   Refinement)
