@@ -162,15 +162,13 @@ jobs:
         with:
           issue_number: ${{ steps.issue.outputs.number }}
 
-      - name: Mark PR pipeline:coding (fix round)
+      - name: Mark PR pr:coding (fix round)
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true' && steps.pr.outputs.pr_number != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr edit "${{ steps.pr.outputs.pr_number }}" --repo ${{ github.repository }} \
-            --add-label "pipeline:coding" \
-            --remove-label "pipeline:in-review" --remove-label "pipeline:changes-requested" \
-            --remove-label "pipeline:tests-failed" --remove-label "pipeline:blocked" || true
+            --add-label "pr:coding" --remove-label "pr:in-review" || true
 
       - name: Check out PR branch and gather feedback (fix round)
         id: feedback
@@ -309,14 +307,12 @@ jobs:
           PR="${{ steps.verify_pr.outputs.pr_number }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           if [[ -n "$PR" ]]; then
-            # Issue stays status:in-progress for the whole active run — the
-            # fine-grained "review phase" state lives on the PR (#133). The
-            # reviewer job gates itself on the test + build checks; a red
-            # check flips the PR to pipeline:tests-failed there.
+            # Issue stays status:in-progress for the whole active run (#133).
+            # The PR label just says which agent is on it now: hand to the
+            # reviewer. A red check / rejection is read from native PR state,
+            # not a label.
             gh pr edit "$PR" --repo ${{ github.repository }} \
-              --add-label "pipeline:in-review" \
-              --remove-label "pipeline:coding" --remove-label "pipeline:changes-requested" \
-              --remove-label "pipeline:tests-failed" --remove-label "pipeline:blocked" || true
+              --add-label "pr:in-review" --remove-label "pr:coding" || true
           else
             gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-progress"
             gh issue comment "$NUM" --repo ${{ github.repository }} --body "Coder run completed without leaving an open PR referencing this issue — likely stopped for clarification or partway through. See the run: $RUN_URL"
@@ -333,8 +329,10 @@ jobs:
             --add-label "status:needs-attention" --remove-label "status:in-progress"
           if [[ "${{ steps.mode.outputs.fix_round }}" == "true" ]]; then
             PR="${{ steps.pr.outputs.pr_number }}"
-            [[ -n "$PR" ]] && gh pr edit "$PR" --repo ${{ github.repository }} \
-              --add-label "pipeline:blocked" --remove-label "pipeline:coding" || true
+            if [[ -n "$PR" ]]; then
+              gh pr edit "$PR" --repo ${{ github.repository }} \
+                --remove-label "pr:coding" --remove-label "pr:in-review" || true
+            fi
             gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated fix round failed — issue set to \`status:needs-attention\`. Re-dispatch once the cause is addressed: \`gh workflow run code-pipeline.yml -f phase=coder -f issue_number=$NUM -f fix_round=true\`. Run: $RUN_URL"
           else
             gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated implementation failed. See the run: $RUN_URL"
@@ -435,7 +433,7 @@ jobs:
           NUM="${{ steps.linked.outputs.issue_number }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh pr edit "$PR" --repo ${{ github.repository }} \
-            --add-label "pipeline:tests-failed" --remove-label "pipeline:in-review" --remove-label "pipeline:coding" || true
+            --remove-label "pr:in-review" --remove-label "pr:coding" || true
           gh pr comment "$PR" --repo ${{ github.repository }} --body "Required checks are not green (${{ steps.checks.outputs.reason }}) — the reviewer won't run. The coder writes and runs tests before pushing, so this is being sent straight to a human rather than retried. Run: $RUN_URL"
           if [[ -n "$NUM" ]]; then
             gh issue edit "$NUM" --repo ${{ github.repository }} \
@@ -539,17 +537,18 @@ jobs:
           RUN_URL="${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
           LAST_STATE=$(gh api "repos/$REPO/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .state // empty')
 
-          # Issue status:* is coarse ("whose turn?"). It has exactly two active
-          # values — status:in-progress for the whole run, status:needs-attention
-          # when a human is needed — plus closure on merge. There is no
-          # "approved" issue state: an approved PR carries pipeline:approved and
-          # the issue stays status:in-progress until the owner merges (which
-          # closes it via "Closes #N"). Fine-grained state is the PR label (#133).
-          # PR labels are set unconditionally; issue edits only when a linked
-          # issue exists (a PR without one still gets a pipeline verdict).
+          # Issue status:* is coarse: status:in-progress for the whole run,
+          # status:needs-attention when a human is needed, closed on merge.
+          # There is no "approved" issue state — an approved PR is found via
+          # its native review state (review:approved), and the pr:* label only
+          # marks which agent is currently working (none, once the reviewer is
+          # done). The fix-round decision is read from the review verdict, not
+          # a label (#133).
           case "$LAST_STATE" in
             APPROVED)
-              gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:approved" --remove-label "pipeline:in-review" || true
+              # Reviewer done; no agent active. Native review:approved is the
+              # merge signal — no label needed.
+              gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
               if [[ -n "$NUM" ]]; then
                 gh issue comment "$NUM" --repo "$REPO" --body "Reviewer approved [PR #$PR](${{ github.server_url }}/$REPO/pull/$PR) — awaiting owner merge. Run: $RUN_URL"
               fi
@@ -559,25 +558,26 @@ jobs:
               RC_COUNT=$(gh api "repos/$REPO/pulls/$PR/reviews" \
                 --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
               if [[ "$RC_COUNT" -ge 2 ]]; then
-                gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:blocked" --remove-label "pipeline:in-review" --remove-label "pipeline:changes-requested" || true
+                gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
                 if [[ -n "$NUM" ]]; then
                   gh issue edit "$NUM" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress" || true
                 fi
                 gh pr comment "$PR" --repo "$REPO" --body "Second review still requests changes — the automatic fix round didn't converge. Escalating to a human. See the run: $RUN_URL"
               else
-                gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:changes-requested" --remove-label "pipeline:in-review" || true
                 if [[ -n "$NUM" ]]; then
+                  gh pr edit "$PR" --repo "$REPO" --add-label "pr:coding" --remove-label "pr:in-review" || true
                   # GITHUB_TOKEN label edits don't fire workflow runs (anti-recursion),
                   # so dispatch the coder explicitly as a fix round.
                   gh workflow run code-pipeline.yml --repo "$REPO" \
                     --field phase=coder --field issue_number="$NUM" --field fix_round=true
                 else
+                  gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
                   gh pr comment "$PR" --repo "$REPO" --body "Changes requested but this PR has no linked issue — can't dispatch a coder fix round automatically. See the run: $RUN_URL"
                 fi
               fi
               ;;
             *)
-              gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:blocked" --remove-label "pipeline:in-review" || true
+              gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
               if [[ -n "$NUM" ]]; then
                 gh issue edit "$NUM" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress" || true
               fi
@@ -593,7 +593,7 @@ jobs:
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           REPO="${{ github.repository }}"
           gh pr comment "$PR" --repo "$REPO" --body "Automated review failed. See the run: ${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
-          gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:blocked" --remove-label "pipeline:in-review" || true
+          gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
           ISSUE="${{ steps.linked.outputs.issue_number }}"
           if [[ -n "$ISSUE" ]]; then
             gh issue edit "$ISSUE" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress"
