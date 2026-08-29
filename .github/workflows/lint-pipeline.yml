@@ -1,11 +1,7 @@
 name: Lint pipeline
 
-# Lints everything under .github/ so the AI-authored workflows and scripts
-# can't drift further. Runs unconditionally (no paths: filter) — a required
-# check must report on every PR, not hang "pending" on the ones that don't
-# touch .github/. Two static binaries, no npm install.
-
 on:
+  # No paths: filter — a required check must report on every PR, not sit pending.
   pull_request:
   workflow_dispatch:
 
@@ -18,19 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # actionlint checks workflow YAML (if: expressions, steps.<id>.outputs.*
-      # refs, permissions blocks, deprecated syntax) and the local composite
-      # actions the workflows call. It bundles shellcheck for inline `run:`
-      # blocks, so today's inline bash is covered before any extraction.
+      # Installer script pinned to the v1.7.12 tag commit — it's curl|bash in CI.
       - name: Install actionlint
         run: |
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.12
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash) 1.7.12
           echo "$PWD" >> "$GITHUB_PATH"
 
-      - name: actionlint
+      - name: Lint workflows and their inline run blocks
         run: actionlint -color
 
-      # shellcheck ships on the runner. Covers the standalone scripts that
-      # actionlint's inline-block pass never sees.
-      - name: shellcheck
+      - name: Lint standalone shell scripts
         run: find .github/scripts -name '*.sh' -print0 | xargs -0 -r shellcheck
