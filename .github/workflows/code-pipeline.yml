@@ -112,30 +112,6 @@ jobs:
               --add-label "status:needs-attention" --remove-label "status:ready" --remove-label "status:changes-requested"
             gh issue comment "$NUM" --repo ${{ github.repository }} --body "This issue reached \`status:ready\` without a \`type:coding-task\` or \`type:bug\` label, so the coder agent won't attempt it — only those two types are implementable code deliverables. If this should be implemented, add the correct type label and re-apply \`status:ready\`."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-          elif [[ "$LABELS" == *"status:changes-requested"* ]]; then
-            # Fix-round cap. The reviewer's own cap counts *submitted*
-            # CHANGES_REQUESTED reviews, so a fix round that fails before any
-            # re-review never advances it — a stuck loop could retry forever.
-            # Count coder rounds directly from the issue timeline instead: every
-            # run adds status:in-progress once, so (total - 1) is the number of
-            # fix rounds already attempted (the -1 drops the initial
-            # implementation). This check runs before *this* run's own
-            # "Set in-progress", so the count is of strictly prior rounds. Cap at
-            # 3 attempts — the two normal fix rounds plus one retry to absorb a
-            # transient failure — then escalate.
-            IN_PROGRESS=$(gh api "repos/${{ github.repository }}/issues/$NUM/timeline" --paginate \
-              --jq '[.[] | select(.event=="labeled" and .label.name=="status:in-progress")] | length' \
-              | awk '{s+=$1} END {print s+0}')
-            FIX_ROUNDS=$((IN_PROGRESS - 1))
-            if [[ "$FIX_ROUNDS" -ge 3 ]]; then
-              echo "Fix-round cap: $FIX_ROUNDS fix rounds already attempted on #$NUM without converging — escalating."
-              gh issue edit "$NUM" --repo ${{ github.repository }} \
-                --add-label "status:needs-attention" --remove-label "status:changes-requested"
-              gh issue comment "$NUM" --repo ${{ github.repository }} --body "Fix-round cap reached ($FIX_ROUNDS fix rounds without converging) — needs a human look. Resolve the cause, then re-dispatch the coder or push a manual fix."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "skip=false" >> "$GITHUB_OUTPUT"
-            fi
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -327,8 +303,8 @@ jobs:
             # skips on status:needs-attention, so leaving both would need manual
             # label surgery to recover (see #132 defect 2). Drop in-progress,
             # restore changes-requested — a human re-dispatches the coder once
-            # the cause is fixed. The fix-round cap in the guard step stops this
-            # from looping forever.
+            # the cause is fixed. This is a crash, not a review round, so it
+            # doesn't count against the one-fix-round cap.
             gh issue edit "$NUM" --repo ${{ github.repository }} \
               --add-label "status:changes-requested" \
               --remove-label "status:in-progress" --remove-label "status:needs-attention"
@@ -406,7 +382,11 @@ jobs:
         id: ident
         run: echo "bot=${{ steps.reviewer_token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
 
-      - name: Dedup and round-cap check
+      # Dedup only. The round cap lives in "Set changes-requested / approved":
+      # the reviewer always runs and submits a verdict (so a second review can
+      # still land on APPROVE), and the escalate-vs-dispatch-coder decision is
+      # made from that verdict — see #132 defect 6.
+      - name: Dedup check
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
@@ -414,29 +394,15 @@ jobs:
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           HEAD_SHA=$(gh pr view "$PR" --repo ${{ github.repository }} --json headRefOid --jq .headRefOid)
-          LAST_REVIEW=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last')
-          LAST_SHA=$(echo "$LAST_REVIEW" | jq -r '.commit_id // empty')
+          LAST_SHA=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
+            --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .commit_id // empty')
 
           if [[ -n "$LAST_SHA" && "$LAST_SHA" == "$HEAD_SHA" ]]; then
             echo "Head commit $HEAD_SHA already reviewed — duplicate event, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-
-          REQUEST_CHANGES_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
-            --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
-          if [[ "$REQUEST_CHANGES_COUNT" -ge 2 ]]; then
-            echo "Round cap (2) reached for PR #$PR — skipping reviewer, escalating."
-            gh pr comment "$PR" --repo ${{ github.repository }} --body "Review round cap (2 requested-changes rounds) reached — needs a human look."
-            ISSUE="${{ steps.linked.outputs.issue_number }}"
-            if [[ -n "$ISSUE" ]]; then
-              gh issue edit "$ISSUE" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
-            fi
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude reviewer
         id: claude
@@ -503,16 +469,27 @@ jobs:
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:approved" --remove-label "status:in-review"
               ;;
             CHANGES_REQUESTED)
-              gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
-              # Label edits made with the default GITHUB_TOKEN don't fire new
-              # workflow runs (GitHub's anti-recursion rule), so the coder
-              # job's issues.labeled trigger would never see this. Dispatch
-              # it explicitly instead — an intentional workflow_dispatch
-              # call is exempt from that restriction. The dispatched run
-              # detects it's a fix round from the issue's actual labels
-              # (just set above), the same way a real label event would.
-              gh workflow run code-pipeline.yml --repo ${{ github.repository }} \
-                --field phase=coder --field issue_number="$NUM"
+              # Round cap: one automatic fix round. The first CHANGES_REQUESTED
+              # dispatches the coder; a second one means the fix didn't converge,
+              # so escalate to a human instead of looping again. Counts this
+              # run's just-submitted verdict.
+              RC_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
+                --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
+              if [[ "$RC_COUNT" -ge 2 ]]; then
+                gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+                gh pr comment "$PR" --repo ${{ github.repository }} --body "Second review still requests changes — the automatic fix round didn't converge. Escalating to a human. See the run: $RUN_URL"
+              else
+                gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
+                # Label edits made with the default GITHUB_TOKEN don't fire new
+                # workflow runs (GitHub's anti-recursion rule), so the coder
+                # job's issues.labeled trigger would never see this. Dispatch
+                # it explicitly instead — an intentional workflow_dispatch
+                # call is exempt from that restriction. The dispatched run
+                # detects it's a fix round from the issue's actual labels
+                # (just set above), the same way a real label event would.
+                gh workflow run code-pipeline.yml --repo ${{ github.repository }} \
+                  --field phase=coder --field issue_number="$NUM"
+              fi
               ;;
             *)
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
