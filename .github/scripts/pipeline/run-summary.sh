@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+#
+# Writes a Markdown run summary to $GITHUB_STEP_SUMMARY so the Actions run page
+# shows what an agent phase did without opening the turn-by-turn step log.
+# Complements report-run.sh: same cost figure, but richer detail and on the run
+# page only, never the ticket.
+#
+# Best-effort — never fails the job. Every gh lookup falls back to a plain line
+# and the caller runs it with `if: always()`, so a summary lands even when the
+# Claude step itself failed.
+#
+# Usage: run-summary.sh <phase> <execution-file> [--issue N] [--pr N] [--round initial|fix]
+#   phase   Coder | Review | Refinement | Estimation
+#   --round Coder/Review only: whether this run is an initial pass or a fix round
+#   Env: GH_TOKEN; REVIEWER_BOT for the Review phase
+
+set -euo pipefail
+# shellcheck source=.github/scripts/pipeline/lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+phase="$1"
+exec_file="$2"
+shift 2
+
+issue=""
+pr=""
+round=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --issue) issue="$2"; shift 2 ;;
+    --pr) pr="$2"; shift 2 ;;
+    --round) round="$2"; shift 2 ;;
+    *) echo "run-summary: unknown argument $1" >&2; exit 1 ;;
+  esac
+done
+
+repo="$GITHUB_REPOSITORY"
+summary="${GITHUB_STEP_SUMMARY:?run-summary: GITHUB_STEP_SUMMARY is not set}"
+
+# --- execution-file fields (all optional; a failed run may have none) ----------
+result_field() {
+  jq -r "[.[] | select(.type==\"result\")][0].$1 // empty" "$exec_file" 2>/dev/null || true
+}
+raw_cost=$(result_field total_cost_usd)
+num_turns=$(result_field num_turns)
+final_msg=$(result_field result)
+
+emit() { printf '%s\n' "$1" >>"$summary"; }
+
+emit_quote() {
+  if [[ -z "$final_msg" ]]; then
+    emit "> _No final message — the run produced no result output._"
+    return
+  fi
+  while IFS= read -r line; do
+    emit "> ${line}"
+  done <<<"$final_msg"
+}
+
+# `gh` wrapper that never aborts the script.
+gh_q() { gh "$@" 2>/dev/null || true; }
+
+round_line() {
+  case "$round" in
+    fix)     echo "Fix round${1:+ $1}" ;;
+    initial) echo "Initial implementation" ;;
+    *)       echo "" ;;
+  esac
+}
+
+emit "## $phase run"
+emit ""
+
+case "$phase" in
+  Coder)
+    title=$(gh_q issue view "$issue" --repo "$repo" --json title --jq .title)
+    emit "**Issue:** [#$issue](${GITHUB_SERVER_URL}/${repo}/issues/${issue})${title:+ — $title}"
+
+    fix_n=""
+    if [[ "$round" == "fix" && -n "$pr" ]]; then
+      fix_n=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
+        --jq '[.[] | select(.state=="CHANGES_REQUESTED")] | length')
+    fi
+    rl=$(round_line "$fix_n")
+    [[ -n "$rl" ]] && emit "**Round:** $rl"
+
+    if [[ -n "$pr" ]]; then
+      verb="opened"; [[ "$round" == "fix" ]] && verb="updated"
+      emit "**Outcome:** PR $verb — [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})"
+    else
+      emit "**Outcome:** ⚠️ No PR — see the final message below."
+    fi
+
+    if [[ -n "$pr" ]]; then
+      checks=$(gh_q pr checks "$pr" --repo "$repo" --json name,state \
+        | jq -r '.[] | select(.name=="test" or .name=="build") | "\(.name): \(.state)"' 2>/dev/null || true)
+      [[ -n "$checks" ]] && emit "**Checks:** $(echo "$checks" | awk 'NR>1{printf ", "}{printf "%s",$0}END{if(NR)print ""}')"
+
+      files=$(gh_q pr diff "$pr" --repo "$repo" --name-only | grep -c . || true)
+      [[ -n "$files" ]] && emit "**Files changed:** $files"
+    fi
+    ;;
+
+  Review)
+    title=$(gh_q pr view "$pr" --repo "$repo" --json title --jq .title)
+    emit "**PR:** [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})${title:+ — $title}"
+
+    rc_count=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
+      --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\" and .state==\"CHANGES_REQUESTED\")] | length")
+    if [[ -n "$rc_count" && "$rc_count" -gt 0 ]]; then
+      emit "**Round:** re-review (after $rc_count changes-requested)"
+    else
+      emit "**Round:** initial review"
+    fi
+
+    last_state=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
+      --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\")] | last | .state // empty")
+    case "$last_state" in
+      APPROVED)          emit "**Outcome:** ✅ Approved" ;;
+      CHANGES_REQUESTED) emit "**Outcome:** 🔴 Changes requested" ;;
+      *)                 emit "**Outcome:** ⚠️ No verdict submitted — see the final message below." ;;
+    esac
+    ;;
+
+  Refinement)
+    title=$(gh_q issue view "$issue" --repo "$repo" --json title --jq .title)
+    emit "**Issue:** [#$issue](${GITHUB_SERVER_URL}/${repo}/issues/${issue})${title:+ — $title}"
+
+    labels=",$(gh_q issue view "$issue" --repo "$repo" --json labels --jq '[.labels[].name] | join(",")'),"
+    if [[ "$labels" == *",status:refined,"* ]]; then
+      emit "**Outcome:** Body refined"
+    elif [[ "$labels" == *",status:needs-attention,"* ]]; then
+      emit "**Outcome:** ⚠️ Stopped for clarification — see the final message below."
+    else
+      emit "**Outcome:** ⚠️ Ended without a terminal state — see the final message below."
+    fi
+    ;;
+
+  Estimation)
+    title=$(gh_q issue view "$issue" --repo "$repo" --json title --jq .title)
+    emit "**Issue:** [#$issue](${GITHUB_SERVER_URL}/${repo}/issues/${issue})${title:+ — $title}"
+
+    labels=",$(gh_q issue view "$issue" --repo "$repo" --json labels --jq '[.labels[].name] | join(",")'),"
+    size=$(sed -nE 's/.*,(size:[A-Z]+),.*/\1/p' <<<"$labels")
+    if [[ -n "$size" ]]; then
+      emit "**Outcome:** Estimate posted — \`$size\`"
+    elif [[ "$labels" == *",status:needs-attention,"* ]]; then
+      emit "**Outcome:** ⚠️ Stopped for clarification — see the final message below."
+    else
+      emit "**Outcome:** ⚠️ Ended without an estimate — see the final message below."
+    fi
+    ;;
+
+  *)
+    echo "run-summary: unknown phase $phase" >&2
+    exit 1
+    ;;
+esac
+
+cost_line="**Cost:** \$$(format_cost "$raw_cost")"
+[[ -n "$num_turns" ]] && cost_line+=" · ${num_turns} turns"
+emit "$cost_line"
+emit "[Full run log]($(run_url))"
+emit ""
+emit "### Agent's final message"
+emit ""
+emit_quote

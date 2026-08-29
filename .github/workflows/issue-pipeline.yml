@@ -130,6 +130,15 @@ jobs:
           "${{ steps.issue.outputs.number }}"
           status:refined status:needs-attention
 
+      - name: Write run summary
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          .github/scripts/pipeline/run-summary.sh Refinement
+          "${{ steps.claude.outputs.execution_file }}"
+          --issue "${{ steps.issue.outputs.number }}"
+
       - name: Flag failure
         if: failure()
         env:
@@ -221,6 +230,15 @@ jobs:
           .github/scripts/pipeline/verify-outcome.sh Estimation
           "${{ steps.issue.outputs.number }}"
           status:estimated status:ready status:needs-attention
+
+      - name: Write run summary
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          .github/scripts/pipeline/run-summary.sh Estimation
+          "${{ steps.claude.outputs.execution_file }}"
+          --issue "${{ steps.issue.outputs.number }}"
 
       - name: Flag failure
         if: failure()

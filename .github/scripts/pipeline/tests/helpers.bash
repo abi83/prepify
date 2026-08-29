@@ -13,13 +13,19 @@ setup_stubs() {
 #!/usr/bin/env bash
 printf '%s\n' "gh $*" >>"$STUB_LOG"
 case "$1 $2" in
-  "issue view") echo "${STUB_ISSUE_LABELS-}" ;;
+  "issue view")
+    case "$*" in
+      *--json\ title*) echo "${STUB_ISSUE_TITLE-}" ;;
+      *) echo "${STUB_ISSUE_LABELS-}" ;;
+    esac ;;
   "pr view")
     case "$*" in
       *headRefOid*) echo "${STUB_HEAD_SHA-}" ;;
+      *--json\ title*) echo "${STUB_PR_TITLE-}" ;;
       *) echo "${STUB_PR_LABELS-}" ;;
     esac ;;
   "pr checks") echo "${STUB_PR_CHECKS-[]}" ;;
+  "pr diff") echo "${STUB_PR_FILES-}" ;;
 esac
 case "$1" in
   api)
