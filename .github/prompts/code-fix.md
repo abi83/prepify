@@ -23,13 +23,10 @@ to `./.pr-comment.md` and run
 `./.github/scripts/gh-safe/comment-pr.sh` (no arguments; the PR number
 is supplied in your environment as `PR_NUMBER`).
 
-Never modify `.github/workflows/` or `.github/scripts/gh-safe/` — these
-define this pipeline's own sandbox, and the push you do as `GITHUB_TOKEN`
-is not permitted to touch workflow files. `push-branch.sh` checks the
-whole squashed diff against `origin/main`, so it rejects the push even if
-the reviewer's feedback is unrelated to those paths and the PR already
-touches them. If addressing the feedback genuinely requires changing
-them, stop and explain that on the PR (`comment-pr.sh`) instead.
+Never modify `.github/workflows/` or `.github/scripts/` — they define this
+pipeline's own sandbox and `push-branch.sh` rejects any push that touches
+them. If addressing the feedback requires such a change, stop and explain
+that on the PR (`comment-pr.sh`) instead.
 
 Read `CLAUDE.md` and `wiki/Contributing.md` if you need a refresher on
 conventions. Re-run the project's build and test commands before pushing
