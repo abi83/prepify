@@ -1,0 +1,53 @@
+# Test helpers: a PATH-shadowing `gh` (and `git`) stub that logs every
+# invocation to $STUB_LOG and returns canned output driven by STUB_* env vars.
+
+PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+setup_stubs() {
+  STUB_BIN="$BATS_TEST_TMPDIR/bin"
+  STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
+  mkdir -p "$STUB_BIN"
+  : >"$STUB_LOG"
+
+  cat >"$STUB_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "gh $*" >>"$STUB_LOG"
+case "$1 $2" in
+  "issue view") echo "${STUB_ISSUE_LABELS-}" ;;
+  "pr view")
+    case "$*" in
+      *headRefOid*) echo "${STUB_HEAD_SHA-}" ;;
+      *) echo "${STUB_PR_LABELS-}" ;;
+    esac ;;
+  "pr checks") echo "${STUB_PR_CHECKS-[]}" ;;
+esac
+case "$1" in
+  api)
+    case "$*" in
+      *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
+      *) echo "${STUB_LAST_STATE-}" ;;
+    esac ;;
+esac
+exit "${STUB_GH_EXIT-0}"
+EOF
+
+  cat >"$STUB_BIN/git" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "git $*" >>"$STUB_LOG"
+exit 0
+EOF
+
+  chmod +x "$STUB_BIN/gh" "$STUB_BIN/git"
+  PATH="$STUB_BIN:$PATH"
+
+  export STUB_LOG
+  export GITHUB_REPOSITORY="owner/repo"
+  export GITHUB_SERVER_URL="https://github.com"
+  export GITHUB_RUN_ID="42"
+  export GITHUB_EVENT_NAME="pull_request"
+  export GH_TOKEN="x"
+  export GITHUB_OUTPUT="$BATS_TEST_TMPDIR/output"
+  : >"$GITHUB_OUTPUT"
+}
+
+calls() { cat "$STUB_LOG"; }
