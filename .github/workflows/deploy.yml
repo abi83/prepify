@@ -50,10 +50,30 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # Same skip switch as `test`. Kept a separate check so a green/red build
+  # signal is distinct from tests — the coding pipeline gates the reviewer
+  # on both (#134).
+  build:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
   deploy-dev:
-    needs: test
+    needs: [test, build]
     if: |
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'workflow_dispatch' && inputs.tag == '')
@@ -97,9 +117,10 @@ jobs:
 
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
-    needs: test
+    needs: [test, build]
     if: |
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
         (github.event_name == 'workflow_dispatch' && inputs.tag != '')
