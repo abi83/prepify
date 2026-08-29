@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-PROTECTED_PATHS_RE='^\.github/(workflows|scripts/gh-safe)/'
+PROTECTED_PATHS_RE='^\.github/(workflows|scripts/(gh-safe|pipeline))/'
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

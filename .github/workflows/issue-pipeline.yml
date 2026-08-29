@@ -112,39 +112,31 @@ jobs:
             --model claude-haiku-4-5-20251001
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_EDIT_BODY }},${{ env.ALLOWED_EDIT_LABELS }},${{ env.ALLOWED_COMMENT }}"
 
-      - name: Report run
+      - name: Report run cost
         if: always() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
-          COST="unknown"
-          if [[ -n "$RAW_COST" ]]; then
-            COST=$(printf '%.4f' "$RAW_COST")
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Refinement [pipeline run]($RUN_URL) — cost: \$$COST"
+        run: >
+          .github/scripts/pipeline/report-run.sh Refinement
+          "${{ steps.claude.outputs.execution_file }}"
+          "${{ steps.issue.outputs.number }}"
 
       - name: Verify outcome
         if: success() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NUM="${{ steps.issue.outputs.number }}"
-          LABELS=$(gh issue view "$NUM" --repo ${{ github.repository }} --json labels --jq '[.labels[].name] | join(",")')
-          if [[ "$LABELS" != *"status:refined"* && "$LABELS" != *"status:needs-attention"* ]]; then
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention"
-            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Refinement run completed without leaving the issue in \`status:refined\` or \`status:needs-attention\` — likely stopped partway through. See the run: $RUN_URL"
-          fi
+        run: >
+          .github/scripts/pipeline/verify-outcome.sh Refinement
+          "${{ steps.issue.outputs.number }}"
+          status:refined status:needs-attention
 
       - name: Flag failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated refinement failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: >
+          .github/scripts/pipeline/flag-failure.sh --noun refinement
+          --issue "${{ steps.issue.outputs.number }}"
 
   estimate:
     if: >
@@ -212,36 +204,28 @@ jobs:
             --model claude-haiku-4-5-20251001
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_COMMENT }},${{ env.ALLOWED_EDIT_LABELS }}"
 
-      - name: Report run
+      - name: Report run cost
         if: always() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
-          COST="unknown"
-          if [[ -n "$RAW_COST" ]]; then
-            COST=$(printf '%.4f' "$RAW_COST")
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Estimation [pipeline run]($RUN_URL) — cost: \$$COST"
+        run: >
+          .github/scripts/pipeline/report-run.sh Estimation
+          "${{ steps.claude.outputs.execution_file }}"
+          "${{ steps.issue.outputs.number }}"
 
       - name: Verify outcome
         if: success() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NUM="${{ steps.issue.outputs.number }}"
-          LABELS=$(gh issue view "$NUM" --repo ${{ github.repository }} --json labels --jq '[.labels[].name] | join(",")')
-          if [[ "$LABELS" != *"status:estimated"* && "$LABELS" != *"status:needs-attention"* && "$LABELS" != *"status:ready"* ]]; then
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention"
-            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Estimation run completed without leaving the issue in \`status:estimated\`, \`status:ready\`, or \`status:needs-attention\` — likely stopped partway through. See the run: $RUN_URL"
-          fi
+        run: >
+          .github/scripts/pipeline/verify-outcome.sh Estimation
+          "${{ steps.issue.outputs.number }}"
+          status:estimated status:ready status:needs-attention
 
       - name: Flag failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated estimation failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: >
+          .github/scripts/pipeline/flag-failure.sh --noun estimation
+          --issue "${{ steps.issue.outputs.number }}"

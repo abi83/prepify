@@ -170,57 +170,16 @@ jobs:
           gh pr edit "${{ steps.pr.outputs.pr_number }}" --repo ${{ github.repository }} \
             --add-label "pr:coding" --remove-label "pr:in-review" || true
 
-      - name: Check out PR branch and gather feedback (fix round)
+      - name: Gather reviewer feedback (fix round)
         id: feedback
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          PR="${{ steps.pr.outputs.pr_number }}"
-          HEAD_REF="${{ steps.pr.outputs.head_ref }}"
-          REPO="${{ github.repository }}"
-          if [[ -z "$PR" ]]; then
-            echo "Error: fix round dispatched but no open PR references issue #${{ steps.issue.outputs.number }}" >&2
-            exit 1
-          fi
-
-          git fetch origin "$HEAD_REF"
-          git checkout "$HEAD_REF"
-
-          # Only the latest review round: the most recent CHANGES_REQUESTED
-          # review, its line-anchored comments, and any conversation posted
-          # after it. Earlier rounds are already addressed in prior commits;
-          # feeding them back in makes the coder re-litigate resolved points
-          # (contradicts code-fix.md).
-          LATEST_REVIEW=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
-            --jq '[.[] | select(.state=="CHANGES_REQUESTED")] | last')
-          if [[ -z "$LATEST_REVIEW" || "$LATEST_REVIEW" == "null" ]]; then
-            echo "Error: fix round for PR #$PR but no CHANGES_REQUESTED review found" >&2
-            exit 1
-          fi
-          REVIEW_ID=$(jq -r '.id' <<<"$LATEST_REVIEW")
-          REVIEW_TS=$(jq -r '.submitted_at' <<<"$LATEST_REVIEW")
-          export REVIEW_ID REVIEW_TS
-
-          {
-            echo 'text<<EOF_FEEDBACK'
-            echo "## Latest REQUEST_CHANGES review — $REVIEW_TS"
-            echo
-            jq -r '.body // "(no summary body)"' <<<"$LATEST_REVIEW"
-            echo
-            echo "## Inline comments on that review"
-            gh api "repos/$REPO/pulls/$PR/comments" --paginate \
-              --jq '[.[] | select((.pull_request_review_id | tostring) == env.REVIEW_ID)]
-                    | sort_by(.created_at)
-                    | .[] | "- \(.path):\(.line // .original_line // "?")\n  \(.body)"'
-            echo
-            echo "## PR conversation posted after that review"
-            gh api "repos/$REPO/issues/$PR/comments" --paginate \
-              --jq '[.[] | select(.created_at > env.REVIEW_TS)]
-                    | sort_by(.created_at)
-                    | .[] | "### \(.user.login) (\(.created_at))\n\(.body)"'
-            echo 'EOF_FEEDBACK'
-          } >> "$GITHUB_OUTPUT"
+        run: >
+          .github/scripts/pipeline/gather-fix-feedback.sh
+          "${{ steps.pr.outputs.pr_number }}"
+          "${{ steps.pr.outputs.head_ref }}"
+          "${{ steps.issue.outputs.number }}"
 
       - name: Run Claude coder (initial implementation)
         id: claude_initial
@@ -277,19 +236,14 @@ jobs:
             --model claude-sonnet-5
             --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
 
-      - name: Report run
+      - name: Report run cost
         if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          EXEC_FILE="${{ steps.claude_initial.outputs.execution_file }}${{ steps.claude_fix.outputs.execution_file }}"
-          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "$EXEC_FILE" 2>/dev/null)
-          COST="unknown"
-          if [[ -n "$RAW_COST" ]]; then
-            COST=$(printf '%.4f' "$RAW_COST")
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Coder [pipeline run]($RUN_URL) — cost: \$$COST"
+        run: >
+          .github/scripts/pipeline/report-run.sh Coder
+          "${{ steps.claude_initial.outputs.execution_file }}${{ steps.claude_fix.outputs.execution_file }}"
+          "${{ steps.issue.outputs.number }}"
 
       - name: Check PR now exists
         id: verify_pr
@@ -298,44 +252,26 @@ jobs:
         with:
           issue_number: ${{ steps.issue.outputs.number }}
 
-      - name: Verify outcome / hand off to review
+      - name: Hand off to reviewer
         if: steps.guard.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          NUM="${{ steps.issue.outputs.number }}"
-          PR="${{ steps.verify_pr.outputs.pr_number }}"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [[ -n "$PR" ]]; then
-            # Issue stays status:in-progress for the whole active run (#133).
-            # The PR label just says which agent is on it now: hand to the
-            # reviewer. A red check / rejection is read from native PR state,
-            # not a label.
-            gh pr edit "$PR" --repo ${{ github.repository }} \
-              --add-label "pr:in-review" --remove-label "pr:coding" || true
-          else
-            gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-progress"
-            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Coder run completed without leaving an open PR referencing this issue — likely stopped for clarification or partway through. See the run: $RUN_URL"
-          fi
+        run: >
+          .github/scripts/pipeline/handoff-to-review.sh
+          "${{ steps.issue.outputs.number }}" "${{ steps.verify_pr.outputs.pr_number }}"
 
       - name: Flag failure
         if: steps.guard.outputs.skip != 'true' && failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NUM="${{ steps.issue.outputs.number }}"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue edit "$NUM" --repo ${{ github.repository }} \
-            --add-label "status:needs-attention" --remove-label "status:in-progress"
           if [[ "${{ steps.mode.outputs.fix_round }}" == "true" ]]; then
-            PR="${{ steps.pr.outputs.pr_number }}"
-            if [[ -n "$PR" ]]; then
-              gh pr edit "$PR" --repo ${{ github.repository }} \
-                --remove-label "pr:coding" --remove-label "pr:in-review" || true
-            fi
-            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated fix round failed — issue set to \`status:needs-attention\`. Re-dispatch once the cause is addressed: \`gh workflow run code-pipeline.yml -f phase=coder -f issue_number=$NUM -f fix_round=true\`. Run: $RUN_URL"
+            .github/scripts/pipeline/flag-failure.sh --noun implementation \
+              --issue "${{ steps.issue.outputs.number }}" \
+              --pr "${{ steps.pr.outputs.pr_number }}" --fix-round
           else
-            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated implementation failed. See the run: $RUN_URL"
+            .github/scripts/pipeline/flag-failure.sh --noun implementation \
+              --issue "${{ steps.issue.outputs.number }}"
           fi
 
   reviewer:
@@ -387,58 +323,21 @@ jobs:
         with:
           pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
 
-      # The `test` and `build` checks (deploy.yml) are the single source of
-      # truth for "is it green" — the reviewer no longer runs npm test/build
-      # itself (#134). Wait for both to finish; proceed only if both pass.
-      # A red check routes to a human (no coder retry loop, #133). A manual
-      # workflow_dispatch review is an explicit override and skips the gate.
       - name: Wait for test + build checks
         id: checks
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "Manual dispatch — skipping the check gate."
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          PR="${{ github.event.pull_request.number }}"
-          REPO="${{ github.repository }}"
-          DEADLINE=$((SECONDS + 1200))
-          while [ "$SECONDS" -lt "$DEADLINE" ]; do
-            JSON=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket 2>/dev/null || echo '[]')
-            TEST=$(jq -r '[.[] | select(.name=="test")] | .[0].bucket // "missing"' <<<"$JSON")
-            BUILD=$(jq -r '[.[] | select(.name=="build")] | .[0].bucket // "missing"' <<<"$JSON")
-            echo "test=$TEST build=$BUILD"
-            if [[ "$TEST" == "fail" || "$TEST" == "cancel" || "$BUILD" == "fail" || "$BUILD" == "cancel" ]]; then
-              echo "ok=false" >> "$GITHUB_OUTPUT"
-              echo "reason=\`test\`=$TEST, \`build\`=$BUILD" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            if [[ ( "$TEST" == "pass" || "$TEST" == "skipping" ) && ( "$BUILD" == "pass" || "$BUILD" == "skipping" ) ]]; then
-              echo "ok=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "ok=false" >> "$GITHUB_OUTPUT"
-          echo "reason=timed out waiting for the \`test\` / \`build\` checks to complete" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/pipeline/wait-for-checks.sh "${{ github.event.pull_request.number }}"
 
       - name: Route red checks to a human
         if: steps.checks.outputs.ok == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          PR="${{ github.event.pull_request.number }}"
-          NUM="${{ steps.linked.outputs.issue_number }}"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh pr edit "$PR" --repo ${{ github.repository }} \
-            --remove-label "pr:in-review" --remove-label "pr:coding" || true
-          gh pr comment "$PR" --repo ${{ github.repository }} --body "Required checks are not green (${{ steps.checks.outputs.reason }}) — the reviewer won't run. The coder writes and runs tests before pushing, so this is being sent straight to a human rather than retried. Run: $RUN_URL"
-          if [[ -n "$NUM" ]]; then
-            gh issue edit "$NUM" --repo ${{ github.repository }} \
-              --add-label "status:needs-attention" --remove-label "status:in-progress"
-          fi
+        run: >
+          .github/scripts/pipeline/route-red-checks.sh
+          "${{ github.event.pull_request.number }}"
+          "${{ steps.linked.outputs.issue_number }}"
+          "${{ steps.checks.outputs.reason }}"
 
       # The reviewer runs under its own GitHub App identity, distinct from the
       # coder's claude[bot], so it can actually submit an APPROVE review —
@@ -504,97 +403,31 @@ jobs:
             --model claude-sonnet-5
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_ISSUE_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
 
-      - name: Report run
+      - name: Report run cost
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          RAW_COST=$(jq -r '[.[] | select(.type=="result")][0].total_cost_usd // empty' "${{ steps.claude.outputs.execution_file }}" 2>/dev/null)
-          COST="unknown"
-          if [[ -n "$RAW_COST" ]]; then
-            COST=$(printf '%.4f' "$RAW_COST")
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          ISSUE="${{ steps.linked.outputs.issue_number }}"
-          if [[ -n "$ISSUE" ]]; then
-            # Cost tracking lives on the ticket (refine/estimate/coder all post
-            # there too — see #105) so it's one place to aggregate from, not
-            # split across the issue and every PR it goes through.
-            gh issue comment "$ISSUE" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
-          else
-            gh pr comment "${{ github.event.pull_request.number || github.event.inputs.pr_number }}" --repo ${{ github.repository }} --body "Review [pipeline run]($RUN_URL) — cost: \$$COST"
-          fi
+        run: >
+          .github/scripts/pipeline/report-run.sh Review
+          "${{ steps.claude.outputs.execution_file }}"
+          "${{ steps.linked.outputs.issue_number }}"
+          "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
 
-      - name: Apply verdict — issue status + PR pipeline labels
+      - name: Apply reviewer verdict
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEWER_BOT: ${{ steps.ident.outputs.bot }}
-        run: |
-          PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
-          NUM="${{ steps.linked.outputs.issue_number }}"
-          REPO="${{ github.repository }}"
-          RUN_URL="${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
-          LAST_STATE=$(gh api "repos/$REPO/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .state // empty')
-
-          # Issue status:* is coarse: status:in-progress for the whole run,
-          # status:needs-attention when a human is needed, closed on merge.
-          # There is no "approved" issue state — an approved PR is found via
-          # its native review state (review:approved), and the pr:* label only
-          # marks which agent is currently working (none, once the reviewer is
-          # done). The fix-round decision is read from the review verdict, not
-          # a label (#133).
-          case "$LAST_STATE" in
-            APPROVED)
-              # Reviewer done; no agent active. Native review:approved is the
-              # merge signal — no label needed.
-              gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
-              if [[ -n "$NUM" ]]; then
-                gh issue comment "$NUM" --repo "$REPO" --body "Reviewer approved [PR #$PR](${{ github.server_url }}/$REPO/pull/$PR) — awaiting owner merge. Run: $RUN_URL"
-              fi
-              ;;
-            CHANGES_REQUESTED)
-              # Round cap: one automatic fix round. Counts this run's verdict.
-              RC_COUNT=$(gh api "repos/$REPO/pulls/$PR/reviews" \
-                --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
-              if [[ "$RC_COUNT" -ge 2 ]]; then
-                gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
-                if [[ -n "$NUM" ]]; then
-                  gh issue edit "$NUM" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress" || true
-                fi
-                gh pr comment "$PR" --repo "$REPO" --body "Second review still requests changes — the automatic fix round didn't converge. Escalating to a human. See the run: $RUN_URL"
-              else
-                if [[ -n "$NUM" ]]; then
-                  gh pr edit "$PR" --repo "$REPO" --add-label "pr:coding" --remove-label "pr:in-review" || true
-                  # GITHUB_TOKEN label edits don't fire workflow runs (anti-recursion),
-                  # so dispatch the coder explicitly as a fix round.
-                  gh workflow run code-pipeline.yml --repo "$REPO" \
-                    --field phase=coder --field issue_number="$NUM" --field fix_round=true
-                else
-                  gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
-                  gh pr comment "$PR" --repo "$REPO" --body "Changes requested but this PR has no linked issue — can't dispatch a coder fix round automatically. See the run: $RUN_URL"
-                fi
-              fi
-              ;;
-            *)
-              gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
-              if [[ -n "$NUM" ]]; then
-                gh issue edit "$NUM" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress" || true
-              fi
-              gh pr comment "$PR" --repo "$REPO" --body "Review run completed without submitting a recognized verdict — likely stopped partway through. See the run: $RUN_URL"
-              ;;
-          esac
+        run: >
+          .github/scripts/pipeline/apply-verdict.sh
+          "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          "${{ steps.linked.outputs.issue_number }}"
 
       - name: Flag failure
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
-          REPO="${{ github.repository }}"
-          gh pr comment "$PR" --repo "$REPO" --body "Automated review failed. See the run: ${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
-          gh pr edit "$PR" --repo "$REPO" --remove-label "pr:in-review" --remove-label "pr:coding" || true
-          ISSUE="${{ steps.linked.outputs.issue_number }}"
-          if [[ -n "$ISSUE" ]]; then
-            gh issue edit "$ISSUE" --repo "$REPO" --add-label "status:needs-attention" --remove-label "status:in-progress"
-          fi
+        run: >
+          .github/scripts/pipeline/flag-failure.sh --noun review
+          --pr "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          --issue "${{ steps.linked.outputs.issue_number }}"
