@@ -112,7 +112,7 @@ jobs:
           # that is *already* status:in-progress — the stale-trigger guard below
           # would wrongly skip it, so let it through.
           if [[ "$FIX_ROUND" != "true" ]] && \
-             [[ "$LABELS" == *"status:in-progress"* || "$LABELS" == *"status:approved"* || "$LABELS" == *"status:needs-attention"* ]]; then
+             [[ "$LABELS" == *"status:in-progress"* || "$LABELS" == *"status:needs-attention"* ]]; then
             echo "Issue #$NUM is already past status:ready ($LABELS) — stale or duplicate trigger, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           elif [[ "$LABELS" != *"type:coding-task"* && "$LABELS" != *"type:bug"* ]]; then
@@ -539,17 +539,19 @@ jobs:
           RUN_URL="${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
           LAST_STATE=$(gh api "repos/$REPO/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .state // empty')
 
-          # Issue status:* is coarse ("whose turn?") and only moves at phase
-          # boundaries; the PR pipeline:* label carries the fine-grained state
-          # and is authoritative (#133). CHANGES_REQUESTED keeps the issue at
-          # status:in-progress — the fix round happens under it.
-          # PR labels are set unconditionally; issue status only when a linked
+          # Issue status:* is coarse ("whose turn?"). It has exactly two active
+          # values — status:in-progress for the whole run, status:needs-attention
+          # when a human is needed — plus closure on merge. There is no
+          # "approved" issue state: an approved PR carries pipeline:approved and
+          # the issue stays status:in-progress until the owner merges (which
+          # closes it via "Closes #N"). Fine-grained state is the PR label (#133).
+          # PR labels are set unconditionally; issue edits only when a linked
           # issue exists (a PR without one still gets a pipeline verdict).
           case "$LAST_STATE" in
             APPROVED)
               gh pr edit "$PR" --repo "$REPO" --add-label "pipeline:approved" --remove-label "pipeline:in-review" || true
               if [[ -n "$NUM" ]]; then
-                gh issue edit "$NUM" --repo "$REPO" --add-label "status:approved" --remove-label "status:in-progress" || true
+                gh issue comment "$NUM" --repo "$REPO" --body "Reviewer approved [PR #$PR](${{ github.server_url }}/$REPO/pull/$PR) — awaiting owner merge. Run: $RUN_URL"
               fi
               ;;
             CHANGES_REQUESTED)
