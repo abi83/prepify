@@ -369,7 +369,7 @@ jobs:
       # GitHub forbids approving a PR authored by the same identity (#119).
       - name: Generate reviewer app token
         id: reviewer_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.REVIEWER_APP_ID }}
           private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
