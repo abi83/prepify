@@ -29,8 +29,12 @@ define this pipeline's own sandbox, and the push you do as `GITHUB_TOKEN`
 is not permitted to touch workflow files. If the issue seems to require
 changing them, stop and comment on the issue instead of opening a PR.
 
-Before opening the PR: run the project's build and test commands and
-make sure they pass. Fix any failures your change caused.
+Tests are your responsibility. Add or update tests for the behaviour you
+change, then run the project's build and test commands and make sure they
+pass. The reviewer does not run tests — the `test` and `build` CI checks
+are the gate, and a red check sends the issue straight to a human instead
+of back to you. Do not open the PR with a failing build or failing tests:
+if you can't get them green, stop and comment on the issue instead.
 
 ## Branch and commit
 

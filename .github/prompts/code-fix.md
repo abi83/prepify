@@ -32,9 +32,10 @@ touches them. If addressing the feedback genuinely requires changing
 them, stop and explain that on the PR (`comment-pr.sh`) instead.
 
 Read `CLAUDE.md` and `wiki/Contributing.md` if you need a refresher on
-conventions, and re-run the project's build and test commands before
-pushing — the same bar applies to a fix commit as to the original
-implementation.
+conventions. Re-run the project's build and test commands before pushing
+and keep them green — the same bar applies to a fix commit as to the
+original implementation, and a red `test` or `build` check sends the
+issue to a human rather than back to you for another round.
 
 ## Commit and push
 

@@ -21,12 +21,16 @@ those too rather than reviewing off the one issue in isolation.
 - **Scope** — does it stay within what the issue actually asked for, or
   does it drag in unrelated refactors, speculative abstraction, or
   unrequested changes?
-- **Tests** — is the change verified, not just asserted? Run the
-  project's build and test commands yourself rather than trusting the
-  PR description.
+- **Tests** — is the change verified, not just asserted? Does it add or
+  update tests for the behaviour it changes, and are they meaningful
+  (not just present)? You do **not** run `npm test` / `npm run build`
+  yourself — the `test` and `build` CI checks already passed before this
+  review started (that's a hard gate; a red check never reaches you), so
+  treat "is it green" as settled and judge whether the tests that exist
+  actually cover the change.
 
-Read the actual code and run build/test yourself — don't rubber-stamp
-based on the PR description alone.
+Read the actual code — don't rubber-stamp based on the PR description
+alone.
 
 ## Changes you can't build/test locally
 
