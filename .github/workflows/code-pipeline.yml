@@ -116,17 +116,22 @@ jobs:
             # Fix-round cap. The reviewer's own cap counts *submitted*
             # CHANGES_REQUESTED reviews, so a fix round that fails before any
             # re-review never advances it — a stuck loop could retry forever.
-            # Count coder rounds directly from the issue timeline instead (each
-            # run adds status:in-progress once); allow the two normal fix rounds
-            # plus one retry to absorb a transient failure, then escalate.
-            ROUNDS=$(gh api "repos/${{ github.repository }}/issues/$NUM/timeline" --paginate \
+            # Count coder rounds directly from the issue timeline instead: every
+            # run adds status:in-progress once, so (total - 1) is the number of
+            # fix rounds already attempted (the -1 drops the initial
+            # implementation). This check runs before *this* run's own
+            # "Set in-progress", so the count is of strictly prior rounds. Cap at
+            # 3 attempts — the two normal fix rounds plus one retry to absorb a
+            # transient failure — then escalate.
+            IN_PROGRESS=$(gh api "repos/${{ github.repository }}/issues/$NUM/timeline" --paginate \
               --jq '[.[] | select(.event=="labeled" and .label.name=="status:in-progress")] | length' \
               | awk '{s+=$1} END {print s+0}')
-            if [[ "$ROUNDS" -ge 3 ]]; then
-              echo "Fix-round cap: $ROUNDS coder rounds already on #$NUM without converging — escalating."
+            FIX_ROUNDS=$((IN_PROGRESS - 1))
+            if [[ "$FIX_ROUNDS" -ge 3 ]]; then
+              echo "Fix-round cap: $FIX_ROUNDS fix rounds already attempted on #$NUM without converging — escalating."
               gh issue edit "$NUM" --repo ${{ github.repository }} \
                 --add-label "status:needs-attention" --remove-label "status:changes-requested"
-              gh issue comment "$NUM" --repo ${{ github.repository }} --body "Fix-round cap reached ($ROUNDS coder rounds without converging) — needs a human look. Resolve the cause, then re-dispatch the coder or push a manual fix."
+              gh issue comment "$NUM" --repo ${{ github.repository }} --body "Fix-round cap reached ($FIX_ROUNDS fix rounds without converging) — needs a human look. Resolve the cause, then re-dispatch the coder or push a manual fix."
               echo "skip=true" >> "$GITHUB_OUTPUT"
             else
               echo "skip=false" >> "$GITHUB_OUTPUT"
