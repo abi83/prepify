@@ -170,7 +170,7 @@ jobs:
           gh pr edit "${{ steps.pr.outputs.pr_number }}" --repo ${{ github.repository }} \
             --add-label "pr:coding" --remove-label "pr:in-review" || true
 
-      - name: Check out PR branch and gather feedback (fix round)
+      - name: Gather reviewer feedback (fix round)
         id: feedback
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
         env:
@@ -236,7 +236,7 @@ jobs:
             --model claude-sonnet-5
             --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
 
-      - name: Report run
+      - name: Report run cost
         if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
         env:
           GH_TOKEN: ${{ github.token }}
@@ -252,7 +252,7 @@ jobs:
         with:
           issue_number: ${{ steps.issue.outputs.number }}
 
-      - name: Verify outcome / hand off to review
+      - name: Hand off to reviewer
         if: steps.guard.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -403,7 +403,7 @@ jobs:
             --model claude-sonnet-5
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_ISSUE_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
 
-      - name: Report run
+      - name: Report run cost
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -413,7 +413,7 @@ jobs:
           "${{ steps.linked.outputs.issue_number }}"
           "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
 
-      - name: Apply verdict — issue status + PR pipeline labels
+      - name: Apply reviewer verdict
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
