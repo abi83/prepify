@@ -105,10 +105,6 @@ case "$phase" in
     fi
 
     if [[ -n "$pr" ]]; then
-      checks=$(gh_q pr checks "$pr" --repo "$repo" --json name,state \
-        | jq -r '.[] | select(.name=="test" or .name=="build") | "\(.name): \(.state)"' 2>/dev/null || true)
-      [[ -n "$checks" ]] && emit "**Checks:** $(echo "$checks" | awk 'NR>1{printf ", "}{printf "%s",$0}END{if(NR)print ""}')"
-
       files=$(gh_q pr diff "$pr" --repo "$repo" --name-only | grep -c . || true)
       [[ -n "$files" ]] && emit "**Files changed:** $files"
     fi

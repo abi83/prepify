@@ -8,10 +8,9 @@ setup() {
 
 summary() { cat "$GITHUB_STEP_SUMMARY"; }
 
-@test "coder: issue, round, PR outcome, checks, files, cost, final message" {
+@test "coder: issue, round, PR outcome, files, cost, final message" {
   echo '[{"type":"result","total_cost_usd":0.5,"num_turns":7,"result":"All steps done, opening the PR."}]' >"$EXEC"
   export STUB_ISSUE_TITLE="Add a widget"
-  export STUB_PR_CHECKS='[{"name":"test","state":"SUCCESS"},{"name":"build","state":"SUCCESS"},{"name":"lint","state":"FAILURE"}]'
   export STUB_PR_FILES=$'src/a.ts\nsrc/b.ts\nsrc/c.ts'
   run "$PIPELINE_DIR/run-summary.sh" Coder "$EXEC" --issue 42 --pr 99 --round initial
   [ "$status" -eq 0 ]
@@ -19,10 +18,10 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   summary | grep -qF '**Issue:** [#42](https://github.com/owner/repo/issues/42) — Add a widget'
   summary | grep -qF '**Round:** Initial implementation'
   summary | grep -qF '**Outcome:** PR opened — [#99](https://github.com/owner/repo/pull/99)'
-  summary | grep -qF '**Checks:** test: SUCCESS, build: SUCCESS'
   summary | grep -qF '**Files changed:** 3'
   summary | grep -qF '**Cost:** $0.5000 · 7 turns'
   summary | grep -qF '> All steps done, opening the PR.'
+  ! summary | grep -qi 'checks'
 }
 
 @test "coder: no PR opened surfaces a blocked outcome without the log" {
