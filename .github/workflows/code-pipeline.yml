@@ -4,7 +4,7 @@ on:
   issues:
     types: [labeled]
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -73,14 +73,14 @@ jobs:
       group: coder-issue-${{ github.event.issue.number || github.event.inputs.issue_number }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       # vars.WIKI_REPO is a repo-level Actions variable (Settings → Secrets
       # and variables → Actions → Variables), set to abi83/prepify.wiki.
       - name: Checkout wiki
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ vars.WIKI_REPO }}
           path: wiki
@@ -156,6 +156,7 @@ jobs:
         run: |
           PR="${{ steps.pr.outputs.pr_number }}"
           HEAD_REF="${{ steps.pr.outputs.head_ref }}"
+          REPO="${{ github.repository }}"
           if [[ -z "$PR" ]]; then
             echo "Error: status:changes-requested but no open PR references issue #${{ steps.issue.outputs.number }}" >&2
             exit 1
@@ -164,10 +165,38 @@ jobs:
           git fetch origin "$HEAD_REF"
           git checkout "$HEAD_REF"
 
+          # Only the latest review round: the most recent CHANGES_REQUESTED
+          # review, its line-anchored comments, and any conversation posted
+          # after it. Earlier rounds are already addressed in prior commits;
+          # feeding them back in makes the coder re-litigate resolved points
+          # (contradicts code-fix.md).
+          LATEST_REVIEW=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+            --jq '[.[] | select(.state=="CHANGES_REQUESTED")] | last')
+          if [[ -z "$LATEST_REVIEW" || "$LATEST_REVIEW" == "null" ]]; then
+            echo "Error: fix round for PR #$PR but no CHANGES_REQUESTED review found" >&2
+            exit 1
+          fi
+          REVIEW_ID=$(jq -r '.id' <<<"$LATEST_REVIEW")
+          REVIEW_TS=$(jq -r '.submitted_at' <<<"$LATEST_REVIEW")
+          export REVIEW_ID REVIEW_TS
+
           {
             echo 'text<<EOF_FEEDBACK'
-            gh pr view "$PR" --repo ${{ github.repository }} --json reviews,comments \
-              --jq '(.reviews // []) + (.comments // []) | map("### " + (.author.login // "unknown") + " (" + .createdAt + ")\n" + .body) | join("\n\n---\n\n")'
+            echo "## Latest REQUEST_CHANGES review — $REVIEW_TS"
+            echo
+            jq -r '.body // "(no summary body)"' <<<"$LATEST_REVIEW"
+            echo
+            echo "## Inline comments on that review"
+            gh api "repos/$REPO/pulls/$PR/comments" --paginate \
+              --jq '[.[] | select((.pull_request_review_id | tostring) == env.REVIEW_ID)]
+                    | sort_by(.created_at)
+                    | .[] | "- \(.path):\(.line // .original_line // "?")\n  \(.body)"'
+            echo
+            echo "## PR conversation posted after that review"
+            gh api "repos/$REPO/issues/$PR/comments" --paginate \
+              --jq '[.[] | select(.created_at > env.REVIEW_TS)]
+                    | sort_by(.created_at)
+                    | .[] | "### \(.user.login) (\(.created_at))\n\(.body)"'
             echo 'EOF_FEEDBACK'
           } >> "$GITHUB_OUTPUT"
 
@@ -204,7 +233,12 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
-          allowed_bots: "claude[bot]"
+          # The fix round is dispatched by the reviewer job via `gh workflow run`
+          # with the default token, so the triggering actor is github-actions[bot],
+          # not a human label event — claude-code-action refuses it unless the bot
+          # is allowlisted here. The initial-implementation step doesn't need this:
+          # it's triggered by a real `status:ready` label event on the issue.
+          allowed_bots: "claude[bot],github-actions[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             ISSUE NUMBER: ${{ steps.issue.outputs.number }}
@@ -261,12 +295,40 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue edit "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --add-label "status:needs-attention"
-          gh issue comment "${{ steps.issue.outputs.number }}" --repo ${{ github.repository }} --body "Automated implementation failed. See the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          NUM="${{ steps.issue.outputs.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [[ "${{ steps.mode.outputs.fix_round }}" == "true" ]]; then
+            # Reset to a resumable state instead of a dead end: status:changes-
+            # requested was consumed by "Set in-progress", and the guard step
+            # skips on status:needs-attention, so leaving both would need manual
+            # label surgery to recover (see #132 defect 2). Drop in-progress,
+            # restore changes-requested — a human re-dispatches the coder once
+            # the cause is fixed. This is a crash, not a review round, so it
+            # doesn't count against the one-fix-round cap.
+            gh issue edit "$NUM" --repo ${{ github.repository }} \
+              --add-label "status:changes-requested" \
+              --remove-label "status:in-progress" --remove-label "status:needs-attention"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated fix round failed — issue reset to \`status:changes-requested\`. Re-dispatch the coder once the cause is addressed: \`gh workflow run code-pipeline.yml -f phase=coder -f issue_number=$NUM\`. Run: $RUN_URL"
+          else
+            gh issue edit "$NUM" --repo ${{ github.repository }} \
+              --add-label "status:needs-attention" --remove-label "status:in-progress"
+            gh issue comment "$NUM" --repo ${{ github.repository }} --body "Automated implementation failed. See the run: $RUN_URL"
+          fi
 
   reviewer:
+    # Skip PRs the reviewer can't meaningfully handle instead of failing on them
+    # (see #132 defect 8):
+    #  - fork PRs have no access to secrets, so CLAUDE_CODE_OAUTH_TOKEN /
+    #    REVIEWER_APP_PRIVATE_KEY are empty and the run just errors out;
+    #  - bot PRs other than the coder's claude[bot] (Dependabot, etc.) aren't in
+    #    allowed_bots and produce an "Automated review failed" comment.
+    # A skipped job posts nothing. workflow_dispatch stays an unconditional
+    # manual override.
     if: >
-      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.fork == false &&
+        (github.event.pull_request.user.type != 'Bot' ||
+         github.event.pull_request.user.login == 'claude[bot]')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.phase == 'reviewer')
     runs-on: ubuntu-latest
     # GITHUB_TOKEN-authored label edits don't fire new workflow runs (GitHub's
@@ -286,12 +348,12 @@ jobs:
       group: reviewer-pr-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Checkout wiki
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ vars.WIKI_REPO }}
           path: wiki
@@ -307,42 +369,40 @@ jobs:
       # GitHub forbids approving a PR authored by the same identity (#119).
       - name: Generate reviewer app token
         id: reviewer_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.REVIEWER_APP_ID }}
           private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
 
-      - name: Dedup and round-cap check
+      # One source of truth for the reviewer's bot login, derived from the app
+      # token (which is derived from vars.REVIEWER_APP_ID). Every step that
+      # matches reviews by author reads this output — renaming the app only
+      # touches the variable, never a hardcoded slug (see #132 defect 3).
+      - name: Resolve reviewer identity
+        id: ident
+        run: echo "bot=${{ steps.reviewer_token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
+
+      # Dedup only. The round cap lives in "Set changes-requested / approved":
+      # the reviewer always runs and submits a verdict (so a second review can
+      # still land on APPROVE), and the escalate-vs-dispatch-coder decision is
+      # made from that verdict — see #132 defect 6.
+      - name: Dedup check
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEWER_BOT: ${{ steps.reviewer_token.outputs.app-slug }}[bot]
+          REVIEWER_BOT: ${{ steps.ident.outputs.bot }}
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           HEAD_SHA=$(gh pr view "$PR" --repo ${{ github.repository }} --json headRefOid --jq .headRefOid)
-          LAST_REVIEW=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last')
-          LAST_SHA=$(echo "$LAST_REVIEW" | jq -r '.commit_id // empty')
+          LAST_SHA=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
+            --jq '[.[] | select(.user.login==env.REVIEWER_BOT)] | last | .commit_id // empty')
 
           if [[ -n "$LAST_SHA" && "$LAST_SHA" == "$HEAD_SHA" ]]; then
             echo "Head commit $HEAD_SHA already reviewed — duplicate event, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-
-          REQUEST_CHANGES_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
-            --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
-          if [[ "$REQUEST_CHANGES_COUNT" -ge 2 ]]; then
-            echo "Round cap (2) reached for PR #$PR — skipping reviewer, escalating."
-            gh pr comment "$PR" --repo ${{ github.repository }} --body "Review round cap (2 requested-changes rounds) reached — needs a human look."
-            ISSUE="${{ steps.linked.outputs.issue_number }}"
-            if [[ -n "$ISSUE" ]]; then
-              gh issue edit "$ISSUE" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
-            fi
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude reviewer
         id: claude
@@ -392,7 +452,7 @@ jobs:
         if: steps.check.outputs.skip != 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEWER_BOT: ${{ steps.reviewer_token.outputs.app-slug }}[bot]
+          REVIEWER_BOT: ${{ steps.ident.outputs.bot }}
         run: |
           PR="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           NUM="${{ steps.linked.outputs.issue_number }}"
@@ -409,16 +469,27 @@ jobs:
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:approved" --remove-label "status:in-review"
               ;;
             CHANGES_REQUESTED)
-              gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
-              # Label edits made with the default GITHUB_TOKEN don't fire new
-              # workflow runs (GitHub's anti-recursion rule), so the coder
-              # job's issues.labeled trigger would never see this. Dispatch
-              # it explicitly instead — an intentional workflow_dispatch
-              # call is exempt from that restriction. The dispatched run
-              # detects it's a fix round from the issue's actual labels
-              # (just set above), the same way a real label event would.
-              gh workflow run code-pipeline.yml --repo ${{ github.repository }} \
-                --field phase=coder --field issue_number="$NUM"
+              # Round cap: one automatic fix round. The first CHANGES_REQUESTED
+              # dispatches the coder; a second one means the fix didn't converge,
+              # so escalate to a human instead of looping again. Counts this
+              # run's just-submitted verdict.
+              RC_COUNT=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" \
+                --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
+              if [[ "$RC_COUNT" -ge 2 ]]; then
+                gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"
+                gh pr comment "$PR" --repo ${{ github.repository }} --body "Second review still requests changes — the automatic fix round didn't converge. Escalating to a human. See the run: $RUN_URL"
+              else
+                gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:changes-requested" --remove-label "status:in-review"
+                # Label edits made with the default GITHUB_TOKEN don't fire new
+                # workflow runs (GitHub's anti-recursion rule), so the coder
+                # job's issues.labeled trigger would never see this. Dispatch
+                # it explicitly instead — an intentional workflow_dispatch
+                # call is exempt from that restriction. The dispatched run
+                # detects it's a fix round from the issue's actual labels
+                # (just set above), the same way a real label event would.
+                gh workflow run code-pipeline.yml --repo ${{ github.repository }} \
+                  --field phase=coder --field issue_number="$NUM"
+              fi
               ;;
             *)
               gh issue edit "$NUM" --repo ${{ github.repository }} --add-label "status:needs-attention" --remove-label "status:in-review"

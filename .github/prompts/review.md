@@ -53,9 +53,16 @@ the review body but still approve. Request changes only for things that
 actually need to change before merge: bugs, security issues, missed
 Acceptance Criteria, or a real convention violation.
 
-Inline comments should point at the exact `path`/`line` they concern and
-say specifically what's wrong and (where it's not obvious) what would
-fix it — not vague "consider improving this."
+On a `REQUEST_CHANGES` verdict, every concrete change you want made gets
+its own inline comment anchored to the exact `path`/`line` it concerns,
+saying specifically what's wrong and (where it's not obvious) what would
+fix it — not vague "consider improving this." The summary `body` stays
+short: a sentence or two on the overall state and why you're blocking,
+not a re-listing of the individual changes. A requested change with no
+inline anchor is one the coder has to hunt for — don't make it do that.
+
+`APPROVE` needs no inline comments; add one only for a genuine
+nice-to-have you're explicitly not blocking on.
 
 ## If you can't verify something
 
@@ -83,7 +90,8 @@ Write your review to `./.pr-review.json`:
 }
 ```
 
-`comments` may be an empty array if nothing warrants an inline note. Then
+`comments` is empty only for a clean `APPROVE`; a `REQUEST_CHANGES`
+verdict carries one entry per change you're asking for. Then
 run `./.github/scripts/gh-safe/submit-pr-review.sh` (no arguments) — this
 is the only way to submit the review; do not call `gh pr review` or the
 GitHub API directly.
