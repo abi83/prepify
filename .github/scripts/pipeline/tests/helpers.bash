@@ -29,11 +29,18 @@ case "$1 $2" in
 esac
 case "$1" in
   api)
-    case "$*" in
-      *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
-      *commit_id*) echo "${STUB_LAST_SHA-}" ;;
-      *) echo "${STUB_LAST_STATE-}" ;;
-    esac ;;
+    if [[ "$*" == *"/reviews"* && -n "${STUB_REVIEWS-}" ]]; then
+      # Faithful path: run the real --jq expression against a reviews fixture.
+      jqexpr=; shift
+      while [[ $# -gt 0 ]]; do [[ "$1" == "--jq" ]] && { jqexpr="$2"; break; }; shift; done
+      jq -r "$jqexpr" <<<"$STUB_REVIEWS"
+    else
+      case "$*" in
+        *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
+        *commit_id*) echo "${STUB_LAST_SHA-}" ;;
+        *) echo "${STUB_LAST_STATE-}" ;;
+      esac
+    fi ;;
 esac
 exit "${STUB_GH_EXIT-0}"
 EOF

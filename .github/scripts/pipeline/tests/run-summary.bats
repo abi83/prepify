@@ -83,6 +83,28 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   summary | grep -qF '**Outcome:** ⚠️ No verdict submitted — see the final message below.'
 }
 
+@test "review: a PR's first-ever review requesting changes is 'initial', not 're-review'" {
+  echo '[{"type":"result","result":"Requesting changes."}]' >"$EXEC"
+  export REVIEWER_BOT="prepify-reviewer[bot]"
+  export STUB_HEAD_SHA="head1"
+  export STUB_REVIEWS='[{"user":{"login":"prepify-reviewer[bot]"},"state":"CHANGES_REQUESTED","commit_id":"head1"}]'
+  run "$PIPELINE_DIR/run-summary.sh" Review "$EXEC" --pr 99
+  [ "$status" -eq 0 ]
+  summary | grep -qF '**Round:** initial review'
+  summary | grep -qF '**Outcome:** 🔴 Changes requested'
+}
+
+@test "review: a genuine re-review counts only prior-commit changes-requested" {
+  echo '[{"type":"result","result":"Still not there."}]' >"$EXEC"
+  export REVIEWER_BOT="prepify-reviewer[bot]"
+  export STUB_HEAD_SHA="head2"
+  export STUB_REVIEWS='[{"user":{"login":"prepify-reviewer[bot]"},"state":"CHANGES_REQUESTED","commit_id":"head1"},{"user":{"login":"prepify-reviewer[bot]"},"state":"CHANGES_REQUESTED","commit_id":"head2"}]'
+  run "$PIPELINE_DIR/run-summary.sh" Review "$EXEC" --pr 99
+  [ "$status" -eq 0 ]
+  summary | grep -qF '**Round:** re-review (after 1 changes-requested)'
+  summary | grep -qF '**Outcome:** 🔴 Changes requested'
+}
+
 @test "review: a stale verdict against an old commit is not counted as this run's" {
   echo '[{"type":"result","result":"Stopped early."}]' >"$EXEC"
   export STUB_LAST_STATE="CHANGES_REQUESTED"

@@ -114,8 +114,12 @@ case "$phase" in
     title=$(gh_q pr view "$pr" --repo "$repo" --json title --jq .title)
     emit "**PR:** [#$pr](${GITHUB_SERVER_URL}/${repo}/pull/${pr})${title:+ — $title}"
 
+    # This run's own verdict is already POSTed by the time we get here, so
+    # count only CHANGES_REQUESTED reviews against *earlier* commits — a
+    # review against the current head is this run's and isn't a prior round.
+    head_sha=$(gh_q pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)
     rc_count=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
-      --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\" and .state==\"CHANGES_REQUESTED\")] | length")
+      --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\" and .state==\"CHANGES_REQUESTED\" and .commit_id != \"${head_sha}\")] | length")
     if [[ -n "$rc_count" && "$rc_count" -gt 0 ]]; then
       emit "**Round:** re-review (after $rc_count changes-requested)"
     else
@@ -125,7 +129,6 @@ case "$phase" in
     # A verdict is this run's outcome only if it was submitted against the PR's
     # current head — otherwise it's a stale review from an earlier round and
     # this run submitted nothing (same headRefOid check as the Dedup step).
-    head_sha=$(gh_q pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid)
     last_state=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
       --jq "[.[] | select(.user.login==\"${REVIEWER_BOT:-}\")] | last | .state // empty")
     last_sha=$(gh_q api "repos/$repo/pulls/$pr/reviews" \
