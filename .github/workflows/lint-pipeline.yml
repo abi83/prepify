@@ -24,6 +24,12 @@ jobs:
       - name: Lint standalone shell scripts
         run: find .github/scripts -name '*.sh' -print0 | xargs -0 -r shellcheck -x
 
+      - name: Validate agent-pipeline.yml against its schema
+        run: >
+          pipx run check-jsonschema
+          --schemafile .github/agent-pipeline.schema.json
+          .github/agent-pipeline.yml
+
   test-scripts:
     runs-on: ubuntu-latest
     steps:

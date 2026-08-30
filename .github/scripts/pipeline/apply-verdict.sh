@@ -9,8 +9,11 @@
 # the reviewer is done). The fix-round decision is read from the verdict, not a
 # label (#133).
 #
-# Round cap: one automatic fix round, counting this run's verdict. A second
-# CHANGES_REQUESTED escalates to a human.
+# max_fix_rounds: how many automatic coder fix rounds a PR gets before the loop
+# escalates to a human. Counts CHANGES_REQUESTED reviews (this run's verdict
+# included). Distinct from agent-pipeline.yml's max_turns (turns inside one
+# agent run) — this counts whole agent invocations across a PR, so it stays a
+# workflow-behaviour constant here, not an execution limit in the config file.
 #
 # Usage: apply-verdict.sh <pr> <issue-or-empty>
 #   Env: REVIEWER_BOT (login whose reviews count), GH_TOKEN
@@ -18,6 +21,8 @@
 set -euo pipefail
 # shellcheck source=.github/scripts/pipeline/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+max_fix_rounds=1
 
 pr="$1"
 issue="${2:-}"
@@ -38,7 +43,7 @@ case "$last_state" in
   CHANGES_REQUESTED)
     rc_count=$(gh api "repos/$repo/pulls/$pr/reviews" \
       --jq '[.[] | select(.user.login==env.REVIEWER_BOT and .state=="CHANGES_REQUESTED")] | length')
-    if [[ "$rc_count" -ge 2 ]]; then
+    if [[ "$rc_count" -gt "$max_fix_rounds" ]]; then
       set_pr_pipeline_label "$pr"
       [[ -n "$issue" ]] && set_issue_status "$issue" status:needs-attention
       gh pr comment "$pr" --repo "$repo" --body \

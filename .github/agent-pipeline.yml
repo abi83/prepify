@@ -1,0 +1,22 @@
+# Pipeline tuning for the agent jobs — one place to see and adjust every
+# execution limit. Schema: .github/agent-pipeline.schema.json
+#
+# Effective value for an agent = agents.<name>.<key> if set, else
+# defaults.<key>. Flat one-level merge, no deep nesting. A repo consuming the
+# pipeline as an App overrides this file; unset keys fall back to the App
+# default (and, between the two, an org/repo Actions var PIPELINE_<KEY>).
+
+defaults:
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_minutes: 30
+  # Safety ceiling, NOT a cost lever. Lowering this truncates file edits and
+  # review bodies mid-write and makes the agent fail the task.
+  max_output_tokens: 32000
+  cost_warn_usd: 1.50
+
+agents:
+  refiner:   { model: claude-haiku-4-5-20251001, max_turns: 15, timeout_minutes: 10, cost_warn_usd: 0.30 }
+  estimator: { model: claude-haiku-4-5-20251001, max_turns: 10, timeout_minutes: 10, cost_warn_usd: 0.20 }
+  coder:     { max_turns: 60, timeout_minutes: 45, cost_warn_usd: 2.00 }
+  reviewer:  { max_turns: 30, timeout_minutes: 20 }

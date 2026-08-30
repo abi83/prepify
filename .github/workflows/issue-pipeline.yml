@@ -58,6 +58,10 @@ jobs:
         with:
           issue_number: ${{ github.event.issue.number || github.event.inputs.issue_number }}
 
+      - name: Resolve agent config
+        id: cfg
+        run: .github/scripts/pipeline/agent-config.sh refiner
+
       - name: Preserve original body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +73,10 @@ jobs:
 
       - name: Run Claude refinement
         id: claude
+        timeout-minutes: ${{ fromJSON(steps.cfg.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: ${{ steps.cfg.outputs.max_output_tokens }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -109,7 +116,8 @@ jobs:
 
             Do nothing else — no other comments, no other edits.
           claude_args: |
-            --model claude-haiku-4-5-20251001
+            --model ${{ steps.cfg.outputs.model }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_EDIT_BODY }},${{ env.ALLOWED_EDIT_LABELS }},${{ env.ALLOWED_COMMENT }}"
 
       - name: Report run cost
@@ -131,13 +139,14 @@ jobs:
           status:refined status:needs-attention
 
       - name: Write run summary
-        if: always() && steps.claude.outputs.execution_file != ''
+        if: always() && steps.claude.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
           .github/scripts/pipeline/run-summary.sh Refinement
           "${{ steps.claude.outputs.execution_file }}"
           --issue "${{ steps.issue.outputs.number }}"
+          --cost-warn "${{ steps.cfg.outputs.cost_warn_usd }}"
 
       - name: Flag failure
         if: failure()
@@ -168,9 +177,16 @@ jobs:
         with:
           issue_number: ${{ github.event.issue.number || github.event.inputs.issue_number }}
 
+      - name: Resolve agent config
+        id: cfg
+        run: .github/scripts/pipeline/agent-config.sh estimator
+
       - name: Run Claude estimation
         id: claude
+        timeout-minutes: ${{ fromJSON(steps.cfg.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: ${{ steps.cfg.outputs.max_output_tokens }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -210,7 +226,8 @@ jobs:
 
             Do nothing else.
           claude_args: |
-            --model claude-haiku-4-5-20251001
+            --model ${{ steps.cfg.outputs.model }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_COMMENT }},${{ env.ALLOWED_EDIT_LABELS }}"
 
       - name: Report run cost
@@ -232,13 +249,14 @@ jobs:
           status:estimated status:ready status:needs-attention
 
       - name: Write run summary
-        if: always() && steps.claude.outputs.execution_file != ''
+        if: always() && steps.claude.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
           .github/scripts/pipeline/run-summary.sh Estimation
           "${{ steps.claude.outputs.execution_file }}"
           --issue "${{ steps.issue.outputs.number }}"
+          --cost-warn "${{ steps.cfg.outputs.cost_warn_usd }}"
 
       - name: Flag failure
         if: failure()

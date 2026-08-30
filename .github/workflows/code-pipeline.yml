@@ -135,6 +135,11 @@ jobs:
             --add-label "status:in-progress" \
             --remove-label "status:ready" --remove-label "status:needs-attention" || true
 
+      - name: Resolve agent config
+        id: cfg
+        if: steps.guard.outputs.skip != 'true'
+        run: .github/scripts/pipeline/agent-config.sh coder
+
       - name: Resolve existing PR (fix round)
         id: pr
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
@@ -164,7 +169,10 @@ jobs:
       - name: Run Claude coder (initial implementation)
         id: claude_initial
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round != 'true'
+        timeout-minutes: ${{ fromJSON(steps.cfg.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: ${{ steps.cfg.outputs.max_output_tokens }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -182,15 +190,18 @@ jobs:
             Read .github/prompts/code.md for the exact implementation and
             PR-opening rules and apply them to the issue above.
           claude_args: |
-            --model claude-sonnet-5
+            --model ${{ steps.cfg.outputs.model }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
             --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_OPEN_PR }},${{ env.ALLOWED_COMMENT_ISSUE }}"
 
       - name: Run Claude coder (fix round)
         id: claude_fix
         if: steps.guard.outputs.skip != 'true' && steps.mode.outputs.fix_round == 'true'
+        timeout-minutes: ${{ fromJSON(steps.cfg.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
         env:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: ${{ steps.cfg.outputs.max_output_tokens }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' }}
@@ -213,7 +224,8 @@ jobs:
             Read .github/prompts/code-fix.md for the exact rules and
             apply them to the feedback above.
           claude_args: |
-            --model claude-sonnet-5
+            --model ${{ steps.cfg.outputs.model }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
             --allowedTools "Read,Grep,Glob,Write,Edit,${{ env.ALLOWED_GIT_WRITE }},${{ env.ALLOWED_PUSH_BRANCH }},${{ env.ALLOWED_BUILD_TEST }},${{ env.ALLOWED_COMMENT_PR }}"
 
       - name: Report run cost
@@ -241,7 +253,7 @@ jobs:
           "${{ steps.issue.outputs.number }}" "${{ steps.verify_pr.outputs.pr_number }}"
 
       - name: Write run summary
-        if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
+        if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outcome != 'skipped' || steps.claude_fix.outcome != 'skipped')
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
@@ -250,6 +262,7 @@ jobs:
           --issue "${{ steps.issue.outputs.number }}"
           --pr "${{ steps.verify_pr.outputs.pr_number || steps.pr.outputs.pr_number }}"
           --round ${{ steps.mode.outputs.fix_round == 'true' && 'fix' || 'initial' }}
+          --cost-warn "${{ steps.cfg.outputs.cost_warn_usd }}"
 
       - name: Flag failure
         if: steps.guard.outputs.skip != 'true' && failure()
@@ -314,6 +327,10 @@ jobs:
         with:
           pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
 
+      - name: Resolve agent config
+        id: cfg
+        run: .github/scripts/pipeline/agent-config.sh reviewer
+
       - name: Wait for test + build checks
         id: checks
         env:
@@ -374,9 +391,11 @@ jobs:
       - name: Run Claude reviewer
         id: claude
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true'
+        timeout-minutes: ${{ fromJSON(steps.cfg.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: ${{ steps.cfg.outputs.max_output_tokens }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.reviewer_token.outputs.token }}
@@ -391,7 +410,8 @@ jobs:
             and the mechanic for submitting your verdict, and review this
             PR's diff against the linked issue's Acceptance Criteria.
           claude_args: |
-            --model claude-sonnet-5
+            --model ${{ steps.cfg.outputs.model }}
+            --max-turns ${{ steps.cfg.outputs.max_turns }}
             --allowedTools "Read,Grep,Glob,Write,${{ env.ALLOWED_GIT_READ }},${{ env.ALLOWED_CI_READ }},${{ env.ALLOWED_ISSUE_READ }},${{ env.ALLOWED_SUBMIT_REVIEW }},${{ env.ALLOWED_COMMENT_PR }}"
 
       - name: Report run cost
@@ -415,7 +435,7 @@ jobs:
           "${{ steps.linked.outputs.issue_number }}"
 
       - name: Write run summary
-        if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
+        if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && always() && steps.claude.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEWER_BOT: ${{ steps.ident.outputs.bot }}
@@ -424,6 +444,7 @@ jobs:
           "${{ steps.claude.outputs.execution_file }}"
           --pr "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           --issue "${{ steps.linked.outputs.issue_number }}"
+          --cost-warn "${{ steps.cfg.outputs.cost_warn_usd }}"
 
       - name: Flag failure
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && failure()
