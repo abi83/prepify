@@ -24,6 +24,14 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   ! summary | grep -qi 'checks'
 }
 
+@test "coder: a failed diff lookup reads 'unknown', not '0'" {
+  echo '[{"type":"result","result":"done"}]' >"$EXEC"
+  export STUB_GH_EXIT=1
+  run "$PIPELINE_DIR/run-summary.sh" Coder "$EXEC" --issue 42 --pr 99 --round initial
+  [ "$status" -eq 0 ]
+  summary | grep -qF '**Files changed:** unknown'
+}
+
 @test "coder: no PR opened surfaces a blocked outcome without the log" {
   echo '[{"type":"result","result":"Could not push the branch: missing workflows permission."}]' >"$EXEC"
   run "$PIPELINE_DIR/run-summary.sh" Coder "$EXEC" --issue 42 --round initial

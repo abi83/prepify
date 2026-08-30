@@ -105,8 +105,11 @@ case "$phase" in
     fi
 
     if [[ -n "$pr" ]]; then
-      files=$(gh_q pr diff "$pr" --repo "$repo" --name-only | grep -c . || true)
-      [[ -n "$files" ]] && emit "**Files changed:** $files"
+      if names=$(gh pr diff "$pr" --repo "$repo" --name-only 2>/dev/null); then
+        emit "**Files changed:** $(printf '%s\n' "$names" | grep -c . || true)"
+      else
+        emit "**Files changed:** unknown"
+      fi
     fi
     ;;
 
