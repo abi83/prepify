@@ -38,36 +38,17 @@ permissions:
   id-token: write
 
 env:
-  # Bash permission matching is a literal prefix match on the command string
-  # (not a resolved path), so each gh-safe script needs an entry for every
-  # form the agent might type it in: relative with ./, relative without it,
-  # and workspace-absolute. See #104.
+  # Bash perms are literal-prefix matched, so each gh-safe script is listed in every path form the agent might type (#104).
   ALLOWED_COMMENT_ISSUE: "Bash(./.github/scripts/gh-safe/comment-issue.sh:*),Bash(.github/scripts/gh-safe/comment-issue.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-issue.sh:*)"
   ALLOWED_COMMENT_PR: "Bash(./.github/scripts/gh-safe/comment-pr.sh:*),Bash(.github/scripts/gh-safe/comment-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/comment-pr.sh:*)"
   ALLOWED_OPEN_PR: "Bash(./.github/scripts/gh-safe/open-pr.sh:*),Bash(.github/scripts/gh-safe/open-pr.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/open-pr.sh:*)"
   ALLOWED_SUBMIT_REVIEW: "Bash(./.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(.github/scripts/gh-safe/submit-pr-review.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/submit-pr-review.sh:*)"
   ALLOWED_PUSH_BRANCH: "Bash(./.github/scripts/gh-safe/push-branch.sh:*),Bash(.github/scripts/gh-safe/push-branch.sh:*),Bash(${{ github.workspace }}/.github/scripts/gh-safe/push-branch.sh:*)"
-  # git/npm commands the agents run directly — not gh-safe scripts, so no
-  # path-form variation, but each subcommand still needs its own entry
-  # since Bash access isn't otherwise open. git push is NOT in this list —
-  # it's the one operation here that leaves the sandbox and reaches a
-  # shared remote, so it's routed through push-branch.sh (ALLOWED_PUSH_BRANCH)
-  # instead of being grantable with arbitrary flags/targets.
-  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*)"
+  # In-sandbox git only. git push is deliberately absent — reaching the shared remote goes through push-branch.sh.
+  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git rm:*)"
   ALLOWED_GIT_READ: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
-  # Coder only. The reviewer no longer runs tests/build — the `test` and
-  # `build` checks (deploy.yml) are the source of truth and gate the
-  # reviewer job before it starts (#134).
   ALLOWED_BUILD_TEST: "Bash(npm install:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run build:*)"
-  # Read-only, no model-authored text involved, so no gh-safe wrapper needed —
-  # lets the reviewer inspect a CI check it can't reproduce locally (e.g. the
-  # actual terraform plan diff behind a passing/failing plan-shared check).
   ALLOWED_CI_READ: "Bash(gh pr checks:*),Bash(gh run view:*)"
-  # Also read-only. resolve-linked-issue only resolves the linked issue's
-  # *number*, never its content, and issues reference each other in ways a
-  # single fixed number can't cover — a parent epic, a sub-issue, another
-  # ticket mentioned in the body. Any-issue read access lets the reviewer
-  # follow those references itself instead of reviewing blind.
   ALLOWED_ISSUE_READ: "Bash(gh issue view:*)"
 
 jobs:
@@ -84,8 +65,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # vars.WIKI_REPO is a repo-level Actions variable (Settings → Secrets
-      # and variables → Actions → Variables), set to abi83/prepify.wiki.
+      # vars.WIKI_REPO — repo-level Actions variable, set to abi83/prepify.wiki.
       - name: Checkout wiki
         uses: actions/checkout@v5
         with:

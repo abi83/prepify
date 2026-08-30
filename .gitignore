@@ -8,6 +8,9 @@ coverage
 .env.local
 .DS_Store
 
+# CI (code-pipeline.yml) checks the wiki out here; it's a separate repo, not content of this one
+/wiki/
+
 # Terraform
 .terraform/
 *.tfstate
