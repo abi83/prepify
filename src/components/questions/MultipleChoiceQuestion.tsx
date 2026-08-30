@@ -1,5 +1,5 @@
 import type { MultipleChoiceContent } from '../../types/questions'
-import styles from './ChoiceQuestion.module.css'
+import { badgeClassName, explanationClassName, optionClassName } from './optionStyles'
 
 interface Props {
   content: MultipleChoiceContent
@@ -23,33 +23,27 @@ export default function MultipleChoiceQuestion({ content, selected, isReview, on
   }
 
   return (
-    <div className={styles.root}>
-      <span className={styles.hint}>Select {correctCount} answers</span>
+    <div className="flex flex-col gap-2.5">
+      <span className="px-0 py-1 text-xs text-muted-foreground">Select {correctCount} answers</span>
       {content.answers.map((answer, i) => {
         const isSelected = selected.includes(answer.id)
         const isCorrect = isReview && answer.is_correct
         const isWrong = isReview && isSelected && !answer.is_correct
 
-        let cls = styles.option
-        if (isCorrect) cls += ` ${styles.correct}`
-        else if (isWrong) cls += ` ${styles.incorrect}`
-        else if (isSelected) cls += ` ${styles.selected}`
-        if (isReview) cls += ` ${styles.disabled}`
-
         return (
           <button
             key={answer.id}
-            className={cls}
+            className={optionClassName({ selected: isSelected, correct: isCorrect, incorrect: isWrong, disabled: isReview })}
             onClick={() => toggle(answer.id)}
             disabled={isReview}
           >
-            <span className={styles.badge}>{LABELS[i]}</span>
-            <span className={styles.optionBody}>
-              <span className={styles.optionText}>{answer.text}</span>
+            <span className={badgeClassName({ selected: isSelected, correct: isCorrect, incorrect: isWrong })}>
+              {LABELS[i]}
+            </span>
+            <span className="flex flex-1 flex-col gap-1.5">
+              <span className="text-sm leading-relaxed">{answer.text}</span>
               {isReview && (isCorrect || isWrong) && (
-                <span className={`${styles.explanation} ${isCorrect ? styles.correct : styles.incorrect}`}>
-                  {answer.explanation}
-                </span>
+                <span className={explanationClassName(isCorrect)}>{answer.explanation}</span>
               )}
             </span>
           </button>

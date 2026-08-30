@@ -75,22 +75,22 @@ describe('StudyPage — loaded with questions', () => {
 
   it('renders the Cards, Quiz, and Test tabs', () => {
     render(<StudyPage prep={prep()} questions={questions} />)
-    expect(screen.getByRole('button', { name: 'Cards' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Quiz' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Test' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Cards' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Quiz' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Test' })).toBeInTheDocument()
   })
 
   it('shows quiz start button when Quiz tab is selected', async () => {
     const user = userEvent.setup()
     render(<StudyPage prep={prep()} questions={questions} />)
-    await user.click(screen.getByRole('button', { name: 'Quiz' }))
+    await user.click(screen.getByRole('tab', { name: 'Quiz' }))
     expect(screen.getByRole('button', { name: /start quiz/i })).toBeInTheDocument()
   })
 
   it('shows test start button when Test tab is selected', async () => {
     const user = userEvent.setup()
     render(<StudyPage prep={prep()} questions={questions} />)
-    await user.click(screen.getByRole('button', { name: 'Test' }))
+    await user.click(screen.getByRole('tab', { name: 'Test' }))
     expect(screen.getByRole('button', { name: /start test/i })).toBeInTheDocument()
   })
 })

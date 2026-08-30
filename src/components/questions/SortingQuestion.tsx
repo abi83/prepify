@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { SortingContent } from '../../types/questions'
-import styles from './SortingQuestion.module.css'
+import { cn } from '@/lib/utils'
 
 interface Props {
   content: SortingContent
@@ -47,28 +47,30 @@ function SortableItem({ id, text, index, isInteractive, isCorrect, isIncorrect, 
 
   const style = { transform: CSS.Transform.toString(transform), transition }
 
-  let cls = styles.item
-  if (isInteractive) cls += ` ${styles.draggable}`
-  if (isDragging) cls += ` ${styles.dragging}`
-  if (isCorrect) cls += ` ${styles.correct}`
-  if (isIncorrect) cls += ` ${styles.incorrect}`
-
   return (
     <div ref={setNodeRef} style={style}>
-      <div className={cls} {...attributes} {...listeners}>
-        {isInteractive && (
-          <span className={styles.grip}>⠿</span>
+      <div
+        className={cn(
+          'flex items-start gap-3 rounded-md border-2 border-border bg-background px-4 py-3 transition-colors',
+          isInteractive && 'cursor-grab touch-none hover:border-primary hover:bg-muted',
+          isDragging && 'cursor-grabbing opacity-50',
+          isCorrect && 'border-success bg-success/10',
+          isIncorrect && 'border-error bg-error/10',
         )}
-        <span className={styles.index}>{index + 1}.</span>
-        <span className={styles.itemBody}>
-          <span className={styles.text}>{text}</span>
+        {...attributes}
+        {...listeners}
+      >
+        {isInteractive && <span className="mt-0.5 shrink-0 text-muted-foreground">⠿</span>}
+        <span className="mt-0.5 w-5 shrink-0 text-xs font-bold text-muted-foreground">{index + 1}.</span>
+        <span className="flex flex-1 flex-col gap-1.5">
+          <span className="text-sm leading-relaxed">{text}</span>
           {(isCorrect || isIncorrect) && correctIndex !== undefined && (
-            <span className={isCorrect ? styles.correctPos : styles.incorrectPos}>
+            <span className={cn('text-xs font-semibold', isCorrect ? 'text-success' : 'text-error')}>
               {isCorrect ? '✓ Correct position' : `Correct position: ${correctIndex}`}
             </span>
           )}
           {explanation && (isCorrect || isIncorrect) && (
-            <span className={styles.explanation}>{explanation}</span>
+            <span className="text-sm leading-snug text-muted-foreground">{explanation}</span>
           )}
         </span>
       </div>
@@ -99,8 +101,8 @@ export default function SortingQuestion({ content, selected, isReview, onChange 
   const answersMap = new Map(content.answers.map(a => [a.id, a]))
 
   return (
-    <div className={styles.root}>
-      {!isReview && <span className={styles.hint}>Drag items into the correct order (top = first)</span>}
+    <div className="flex flex-col gap-3">
+      {!isReview && <span className="text-xs text-muted-foreground">Drag items into the correct order (top = first)</span>}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -108,7 +110,7 @@ export default function SortingQuestion({ content, selected, isReview, onChange 
         modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
       >
         <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <div className={styles.list}>
+          <div className="flex flex-col gap-2">
             {order.map((id, i) => {
               const answer = answersMap.get(id)
               if (!answer) return null

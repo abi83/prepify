@@ -10,22 +10,6 @@
 }
 
 :root {
-  /* Legacy CSS Modules tokens — consumed by *.module.css. Not renamed or
-     re-themed here; that's #118's job when those files migrate. */
-  --bg: #0f0f13;
-  --surface: #1a1a24;
-  --surface-2: #22222f;
-  --border: #2e2e3e;
-  --text: #e8e8f0;
-  --text-muted: #7a7a99;
-  --accent: #6c63ff;
-  --accent-hover: #7d75ff;
-  --accent-dim: #6c63ff22;
-  --danger: #ff6b6b;
-  --success: #63d68d;
-  --radius: 12px;
-  --radius-sm: 8px;
-
   /* Tailwind / shadcn design tokens — light theme (default) */
   --ui-background: oklch(1 0 0);
   --ui-foreground: oklch(0.17 0.02 285);
@@ -128,8 +112,8 @@
 
 html, body {
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--ui-background);
+  color: var(--ui-foreground);
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.6;
@@ -163,4 +147,4 @@ input, textarea {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 3px; }
