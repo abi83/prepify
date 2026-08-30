@@ -53,7 +53,11 @@ env:
   # it's the one operation here that leaves the sandbox and reaches a
   # shared remote, so it's routed through push-branch.sh (ALLOWED_PUSH_BRANCH)
   # instead of being grantable with arbitrary flags/targets.
-  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*)"
+  # git rm is in-sandbox only (like add/commit) — it stages a deletion, it
+  # doesn't reach the remote. Needed for refactors whose acceptance criteria
+  # require removing tracked files (e.g. #118). Direct push to main stays
+  # blocked by branch protection, so a bad deletion can't escape review.
+  ALLOWED_GIT_WRITE: "Bash(git checkout:*),Bash(git switch:*),Bash(git add:*),Bash(git commit:*),Bash(git rm:*)"
   ALLOWED_GIT_READ: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
   # Coder only. The reviewer no longer runs tests/build — the `test` and
   # `build` checks (deploy.yml) are the source of truth and gate the
