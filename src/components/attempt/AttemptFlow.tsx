@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { Question, Asset } from '@prisma/client'
 import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from '../../types/questions'
+import { cn } from '@/lib/utils'
 import QuestionBody, { AnswerState, emptyAnswer } from '../questions/QuestionBody'
 import ScoreScreen from './ScoreScreen'
 import { insertAttempt } from '../../actions/attempts'
 import { isAnswerCorrect } from '../../lib/scoring'
-import styles from './AttemptFlow.module.css'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 
 function shuffleArray<T>(arr: T[]): T[] {
   const result = [...arr]
@@ -138,21 +140,21 @@ export default function AttemptFlow({ questions, assets, mode, prepId, userId, o
   }
 
   return (
-    <div className={styles.root}>
-      <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${((index) / total) * 100}%` }} />
+    <div className="flex min-h-full flex-col">
+      <div className="mb-6 h-1 overflow-hidden rounded-full bg-border">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out" style={{ width: `${((index) / total) * 100}%` }} />
       </div>
 
-      <div className={styles.header}>
-        <span className={styles.counter}>Question {index + 1} of {total}</span>
-        <span className={styles.modeBadge}>{mode}</span>
+      <div className="mb-5 flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">Question {index + 1} of {total}</span>
+        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{mode}</span>
       </div>
 
-      <p className={styles.questionText}>{
+      <p className="mb-5 text-lg font-medium leading-relaxed">{
         (current.content as unknown as { question?: string }).question ?? ''
       }</p>
 
-      <div className={styles.body}>
+      <div className="flex-1">
         <QuestionBody
           question={current}
           answer={currentAnswer}
@@ -163,82 +165,86 @@ export default function AttemptFlow({ questions, assets, mode, prepId, userId, o
       </div>
 
       {feedbackShown && (
-        <div className={`${styles.feedback} ${wasCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect}`}>
+        <div
+          className={cn(
+            'mt-4 rounded-sm px-4 py-3 text-sm font-semibold',
+            wasCorrect ? 'border border-success bg-success/10 text-success' : 'border border-error bg-error/10 text-error',
+          )}
+        >
           {wasCorrect ? '✓ Correct!' : '✗ Incorrect'}
         </div>
       )}
 
-      <div className={styles.controls}>
-        <button className={styles.prevBtn} onClick={handlePrev} disabled={index === 0}>
+      <div className="mt-7 flex gap-2.5 border-t border-border pt-5">
+        <Button variant="outline" onClick={handlePrev} disabled={index === 0}>
           ← Back
-        </button>
+        </Button>
 
         {/* Quiz mode: show Submit answer → then Next */}
         {mode === 'quiz' && !submitted[index] && (
-          <button
-            className={styles.nextBtn}
+          <Button
+            className="flex-1"
             onClick={handleQuizSubmit}
             disabled={!isAnswerValid(current, currentAnswer)}
           >
             Submit answer
-          </button>
+          </Button>
         )}
 
         {mode === 'quiz' && submitted[index] && !isLastQuestion && (
-          <button className={styles.nextBtn} onClick={handleNext}>
+          <Button className="flex-1" onClick={handleNext}>
             Next →
-          </button>
+          </Button>
         )}
 
         {mode === 'quiz' && submitted[index] && isLastQuestion && (
-          <button className={styles.submitBtn} onClick={() => setShowConfirm(true)} disabled={saving}>
+          <Button className="flex-1 bg-success text-success-foreground hover:bg-success/90" onClick={() => setShowConfirm(true)} disabled={saving}>
             {saving ? 'Saving…' : 'Finish'}
-          </button>
+          </Button>
         )}
 
         {/* Test mode: next / finish at end */}
         {mode === 'test' && !isLastQuestion && (
-          <button
-            className={styles.nextBtn}
+          <Button
+            className="flex-1"
             onClick={handleNext}
             disabled={!isAnswerValid(current, currentAnswer)}
           >
             Next →
-          </button>
+          </Button>
         )}
 
         {mode === 'test' && isLastQuestion && (
-          <button
-            className={styles.submitBtn}
+          <Button
+            className="flex-1 bg-success text-success-foreground hover:bg-success/90"
             onClick={() => setShowConfirm(true)}
             disabled={!isAnswerValid(current, currentAnswer) || saving}
           >
             {saving ? 'Saving…' : 'Submit test'}
-          </button>
+          </Button>
         )}
       </div>
 
-      {showConfirm && (
-        <div className={styles.overlay}>
-          <div className={styles.dialog}>
-            <h3>Submit {mode}?</h3>
-            <p>
+      <Dialog open={showConfirm} onOpenChange={open => !open && setShowConfirm(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit {mode}?</DialogTitle>
+            <DialogDescription>
               {mode === 'quiz'
                 ? userId
                   ? 'Your results will be saved to your history.'
                   : 'Sign in to save results to your history.'
                 : `You've answered all ${total} questions. Submit for your final score?`}
-            </p>
-            <div className={styles.dialogBtns}>
-              <button className={styles.cancelBtn} onClick={() => setShowConfirm(false)}>Cancel</button>
-              <button className={styles.confirmBtn} onClick={finalize} disabled={saving}>
-                {saving ? 'Saving…' : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
+            <Button className="bg-success text-success-foreground hover:bg-success/90" onClick={finalize} disabled={saving}>
+              {saving ? 'Saving…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

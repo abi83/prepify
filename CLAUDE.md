@@ -10,7 +10,7 @@ API keys are BYOK — users supply their own OpenAI key stored in localStorage; 
 - Next.js (App Router, TypeScript)
 - Supabase (auth only)
 - Neon Postgres + Prisma (data layer)
-- CSS Modules
+- Tailwind CSS + shadcn/ui
 - OpenAI API (LLM pipeline)
 
 ## Style

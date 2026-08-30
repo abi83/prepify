@@ -32,6 +32,11 @@ function renderCatalog(entries: CatalogEntry[] = []) {
   return render(<CatalogPage entries={entries} />)
 }
 
+async function selectOption(user: ReturnType<typeof userEvent.setup>, triggerName: RegExp, optionName: string) {
+  await user.click(screen.getByRole('combobox', { name: triggerName }))
+  await user.click(await screen.findByRole('option', { name: optionName }))
+}
+
 beforeEach(() => {
   mockPush.mockClear()
 })
@@ -109,8 +114,7 @@ describe('CatalogPage — filtering', () => {
     const user = userEvent.setup()
     renderCatalog(entries)
 
-    const disciplineSelect = screen.getByRole('combobox', { name: /filter by subject/i })
-    await user.selectOptions(disciplineSelect, 'Biology')
+    await selectOption(user, /filter by subject/i, 'Biology')
 
     expect(screen.getByText('Cell Biology')).toBeInTheDocument()
     expect(screen.getByText('Genetics')).toBeInTheDocument()
@@ -121,8 +125,7 @@ describe('CatalogPage — filtering', () => {
     const user = userEvent.setup()
     renderCatalog(entries)
 
-    const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
-    await user.selectOptions(gradeSelect, 'Grade 9')
+    await selectOption(user, /filter by grade/i, 'Grade 9')
 
     expect(screen.getByText('World War II')).toBeInTheDocument()
     expect(screen.queryByText('Cell Biology')).not.toBeInTheDocument()
@@ -133,8 +136,7 @@ describe('CatalogPage — filtering', () => {
     const user = userEvent.setup()
     renderCatalog(entries)
 
-    const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
-    await user.selectOptions(gradeSelect, 'Grade 13')
+    await selectOption(user, /filter by grade/i, 'Grade 13')
 
     expect(screen.getByText(/no preps match/i)).toBeInTheDocument()
   })
@@ -143,11 +145,10 @@ describe('CatalogPage — filtering', () => {
     const user = userEvent.setup()
     renderCatalog(entries)
 
-    const gradeSelect = screen.getByRole('combobox', { name: /filter by grade/i })
-    await user.selectOptions(gradeSelect, 'Grade 9')
+    await selectOption(user, /filter by grade/i, 'Grade 9')
     expect(screen.queryByText('Cell Biology')).not.toBeInTheDocument()
 
-    await user.selectOptions(gradeSelect, 'All grades')
+    await selectOption(user, /filter by grade/i, 'All grades')
     expect(screen.getByText('Cell Biology')).toBeInTheDocument()
   })
 
@@ -155,8 +156,8 @@ describe('CatalogPage — filtering', () => {
     const user = userEvent.setup()
     renderCatalog(entries)
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /filter by subject/i }), 'Biology')
-    await user.selectOptions(screen.getByRole('combobox', { name: /filter by grade/i }), 'Grade 10')
+    await selectOption(user, /filter by subject/i, 'Biology')
+    await selectOption(user, /filter by grade/i, 'Grade 10')
 
     expect(screen.getByText('Cell Biology')).toBeInTheDocument()
     expect(screen.queryByText('Genetics')).not.toBeInTheDocument()

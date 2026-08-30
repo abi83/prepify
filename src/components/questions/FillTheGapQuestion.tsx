@@ -1,5 +1,6 @@
 import type { FillTheGapContent } from '../../types/questions'
-import styles from './FillTheGapQuestion.module.css'
+import { cn } from '@/lib/utils'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 interface Props {
   content: FillTheGapContent
@@ -37,14 +38,11 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
     const gapNumber = parseInt(match[1])
     const gapIndex = gapNumber - 1
     const gap = gaps.find(g => g.index === gapNumber)
-    const currentValue = isReview
-      ? (selected[gapIndex] || '')
-      : (selected[gapIndex] || '')
+    const currentValue = selected[gapIndex] || ''
 
-    let cls = styles.gapSelect
+    let isCorrect = false
     if (isReview && gap) {
-      const isCorrect = currentValue === gap.correct_answer_id
-      cls += isCorrect ? ` ${styles.correct}` : ` ${styles.incorrect}`
+      isCorrect = currentValue === gap.correct_answer_id
 
       if (gap.explanation) {
         const correctLabel = content.answers.find(a => a.id === gap.correct_answer_id)?.label ?? ''
@@ -53,34 +51,49 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
     }
 
     return (
-      <select
+      <Select
         key={i}
-        className={cls}
         value={currentValue}
-        onChange={e => handleChange(gapIndex, e.target.value)}
+        onValueChange={v => handleChange(gapIndex, v)}
         disabled={isReview}
       >
-        <option value="" disabled>___</option>
-        {content.answers.map(opt => {
-          const disabledByUsage = !isReview && !opt.multiple_usage && usedOnce.has(opt.id) && selected[gapIndex] !== opt.id
-          return (
-            <option key={opt.id} value={opt.id} disabled={disabledByUsage}>
-              {opt.label}
-            </option>
-          )
-        })}
-      </select>
+        <SelectTrigger
+          size="sm"
+          className={cn(
+            'mx-1 inline-flex min-w-[130px] align-middle',
+            isReview && (isCorrect ? 'border-success bg-success/10' : 'border-error bg-error/10'),
+          )}
+        >
+          <SelectValue placeholder="___" />
+        </SelectTrigger>
+        <SelectContent>
+          {content.answers.map(opt => {
+            const disabledByUsage = !isReview && !opt.multiple_usage && usedOnce.has(opt.id) && selected[gapIndex] !== opt.id
+            return (
+              <SelectItem key={opt.id} value={opt.id} disabled={disabledByUsage}>
+                {opt.label}
+              </SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select>
     )
   })
 
   return (
-    <div className={styles.root}>
-      <span className={styles.hint}>
+    <div className="flex flex-col gap-3">
+      <span className="text-xs text-muted-foreground">
         Fill {gaps.length} gap{gaps.length !== 1 ? 's' : ''} — select from the dropdowns
       </span>
-      <p className={styles.sentence}>{rendered}</p>
+      <p className="text-base leading-[2.6]">{rendered}</p>
       {isReview && reviewExplanations.map(({ gapIndex, correct, explanation, correctLabel }) => (
-        <div key={gapIndex} className={`${styles.explanation} ${correct ? styles.explanationCorrect : styles.explanationIncorrect}`}>
+        <div
+          key={gapIndex}
+          className={cn(
+            'rounded-sm border-l-[3px] bg-muted px-3 py-2 text-sm text-muted-foreground',
+            correct ? 'border-l-success text-success' : 'border-l-error',
+          )}
+        >
           {!correct && correctLabel && <strong>Correct: {correctLabel}. </strong>}
           {explanation}
         </div>

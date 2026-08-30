@@ -5,7 +5,9 @@ import type { VisualElement, Page } from '../types/prep'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import { listMyPreps, createPrep } from '../actions/preps'
-import styles from './UploadModal.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 
 const MAX_IMAGES = 10
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -206,68 +208,70 @@ export default function UploadModal({ onClose, onDone }: Props) {
   const canAddMore = files.length < MAX_IMAGES
 
   return (
-    <div className={styles.overlay} onClick={isWorking ? undefined : onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.header}>
-          <h2>New Prep</h2>
-          {!isWorking && (
-            <button className={styles.close} onClick={onClose} aria-label="Close">✕</button>
-          )}
-        </div>
+    <Dialog open onOpenChange={open => { if (!open && !isWorking) onClose() }}>
+      <DialogContent
+        showCloseButton={!isWorking}
+        onEscapeKeyDown={e => isWorking && e.preventDefault()}
+        onPointerDownOutside={e => isWorking && e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>New Prep</DialogTitle>
+          <DialogDescription className="sr-only">Upload photos of textbook pages to create a new prep.</DialogDescription>
+        </DialogHeader>
 
         {phase === 'collect' && (
           <>
             {files.length === 0 ? (
               <div
-                className={styles.dropzone}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border p-12 transition-colors hover:border-primary hover:bg-primary/10"
                 onClick={() => fileInputRef.current?.click()}
                 onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
                 onDragOver={e => e.preventDefault()}
               >
-                <span className={styles.dropIcon}>📄</span>
-                <p className={styles.dropMain}>Upload photos of textbook pages</p>
-                <p className={styles.dropSub}>Tap to select · or drag & drop</p>
+                <span className="text-4xl">📄</span>
+                <p className="text-sm font-medium">Upload photos of textbook pages</p>
+                <p className="text-xs text-muted-foreground">Tap to select · or drag & drop</p>
               </div>
             ) : (
               <>
-                <div className={styles.thumbGrid}>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2.5">
                   {files.map((_, i) => (
-                    <div key={i} className={styles.thumb}>
-                      <img src={previews[i]} alt={`Page ${i + 1}`} className={styles.thumbImg} />
+                    <div key={i} className="relative overflow-hidden rounded-sm border border-border bg-muted" style={{ aspectRatio: '3 / 4' }}>
+                      <img src={previews[i]} alt={`Page ${i + 1}`} className="block h-full w-full object-cover" />
                       <button
-                        className={styles.thumbRemove}
+                        className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/55 p-0 text-[0.65rem] text-white hover:bg-black/80"
                         onClick={() => removeFile(i)}
                         aria-label={`Remove page ${i + 1}`}
                       >✕</button>
-                      <span className={styles.thumbLabel}>{i + 1}</span>
+                      <span className="absolute bottom-1 left-[5px] text-[0.65rem] font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.7)]">{i + 1}</span>
                     </div>
                   ))}
                 </div>
 
                 {canAddMore && (
-                  <div className={styles.addMoreRow}>
-                    <button className={styles.addBtn} onClick={() => fileInputRef.current?.click()}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
                       + Add files
-                    </button>
-                    <button className={styles.addBtn} onClick={() => cameraInputRef.current?.click()}>
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => cameraInputRef.current?.click()}>
                       + Take photo
-                    </button>
-                    <span className={styles.addHint}>{files.length} / {MAX_IMAGES} pages</span>
+                    </Button>
+                    <span className="ml-auto text-xs text-muted-foreground">{files.length} / {MAX_IMAGES} pages</span>
                   </div>
                 )}
               </>
             )}
 
-            <div className={styles.mobileButtons}>
+            <div className="flex flex-col gap-2.5">
               {files.length === 0 && (
-                <button className={styles.cameraBtn} onClick={() => cameraInputRef.current?.click()}>
+                <Button variant="secondary" className="w-full" onClick={() => cameraInputRef.current?.click()}>
                   Take photo
-                </button>
+                </Button>
               )}
               {files.length > 0 && (
-                <button className={styles.recogniseBtn} onClick={handleRecognise}>
+                <Button className="w-full" onClick={handleRecognise}>
                   Recognise & Create
-                </button>
+                </Button>
               )}
             </div>
 
@@ -290,38 +294,35 @@ export default function UploadModal({ onClose, onDone }: Props) {
           </>
         )}
 
-        {phase === 'ocr' && (
-          <div className={styles.progress}>
-            <div className={styles.progressLabel}>
-              Recognising image {ocrProgress.done + 1} of {ocrProgress.total}…
+        {(phase === 'ocr' || phase === 'saving') && (
+          <div className="flex flex-col gap-3 py-4">
+            <div className="text-sm text-muted-foreground">
+              {phase === 'ocr'
+                ? `Recognising image ${ocrProgress.done + 1} of ${ocrProgress.total}…`
+                : 'Saving your prep…'}
             </div>
-            <div className={styles.bar}>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className={styles.fill}
-                style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.done / ocrProgress.total) * 100 : 0}%` }}
+                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{
+                  width: phase === 'saving'
+                    ? '100%'
+                    : `${ocrProgress.total > 0 ? (ocrProgress.done / ocrProgress.total) * 100 : 0}%`,
+                }}
               />
             </div>
           </div>
         )}
 
-        {phase === 'saving' && (
-          <div className={styles.progress}>
-            <div className={styles.progressLabel}>Saving your prep…</div>
-            <div className={styles.bar}>
-              <div className={styles.fill} style={{ width: '100%' }} />
-            </div>
-          </div>
-        )}
-
         {phase === 'error' && (
-          <div className={styles.error}>
+          <div className={cn('flex flex-col items-center gap-4 py-4 text-center text-error')}>
             <p>{errorMsg}</p>
-            <button className={styles.retry} onClick={() => { setPhase('collect'); setErrorMsg('') }}>
+            <Button variant="secondary" onClick={() => { setPhase('collect'); setErrorMsg('') }}>
               Try again
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -13,7 +13,12 @@ import {
 import type { GenerationConfig } from '../lib/generationConfig'
 import type { QuestionType } from '../types/questions'
 import { getTotalTokens } from '../actions/preps'
-import styles from './SettingsPage.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '../components/ui/button'
+import { Checkbox } from '../components/ui/checkbox'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
 type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
 
@@ -97,33 +102,32 @@ export default function SettingsPage() {
   const hasKey = !!getApiKey()
 
   return (
-    <div className={styles.root}>
-      <header className={styles.header}>
-        <button className={styles.back} onClick={() => router.push(returnTo)}>← Back</button>
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-border px-6 py-4">
+        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push(returnTo)}>← Back</Button>
       </header>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>Settings</h1>
+      <main className="mx-auto flex w-full max-w-[520px] flex-1 flex-col gap-10 px-6 py-10">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>OpenAI API Key</h2>
-          <p className={styles.hint}>
+        <section className="flex flex-col gap-4">
+          <h2 className="text-base font-bold tracking-tight">OpenAI API Key</h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             Your key is stored only in this browser and never sent to our servers.{' '}
             <a
               href="https://platform.openai.com/api-keys"
               target="_blank"
               rel="noreferrer"
-              className={styles.link}
+              className="text-primary hover:underline"
             >
               Get a key →
             </a>
           </p>
 
-          <div className={styles.field}>
-            <label className={styles.label}>API Key</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">API Key</Label>
+            <Input
               type="password"
-              className={styles.input}
               placeholder="sk-..."
               value={keyValue}
               onChange={e => { setKeyValue(e.target.value); setSaved(false); setTestState('idle') }}
@@ -132,63 +136,59 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Model</label>
-            <select
-              className={styles.select}
-              value={model}
-              onChange={e => { setModel(e.target.value as ModelId); setSaved(false) }}
-            >
-              {AVAILABLE_MODELS.map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Model</Label>
+            <Select value={model} onValueChange={v => { setModel(v as ModelId); setSaved(false) }}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_MODELS.map(m => (
+                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className={styles.actions}>
-            <button
-              className={styles.saveBtn}
-              onClick={handleSave}
-              disabled={!keyValue.trim()}
-            >
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button onClick={handleSave} disabled={!keyValue.trim()}>
               {saved ? '✓ Saved' : 'Save'}
-            </button>
-            <button
-              className={styles.testBtn}
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleTestConnection}
               disabled={!keyValue.trim() || testState === 'testing'}
             >
               {testState === 'testing' ? 'Testing…' : 'Test connection'}
-            </button>
+            </Button>
             {hasKey && (
-              <button className={styles.clearBtn} onClick={handleClear}>
+              <Button variant="link" className="ml-auto h-auto p-0 text-error" onClick={handleClear}>
                 Remove key
-              </button>
+              </Button>
             )}
           </div>
 
           {testState === 'ok' && (
-            <p className={styles.testSuccess}>✓ Connection successful</p>
+            <p className="text-sm font-medium text-success">✓ Connection successful</p>
           )}
           {testState === 'invalid_key' && (
-            <p className={styles.testError}>Invalid API key — check your key and try again.</p>
+            <p className="text-sm text-error">Invalid API key — check your key and try again.</p>
           )}
           {testState === 'error' && (
-            <p className={styles.testError}>Connection failed — check your internet connection.</p>
+            <p className="text-sm text-error">Connection failed — check your internet connection.</p>
           )}
         </section>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Generation defaults</h2>
-          <p className={styles.hint}>
+        <section className="flex flex-col gap-4">
+          <h2 className="text-base font-bold tracking-tight">Generation defaults</h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             These apply to all new generations. You can override them per prep before hitting Generate.
           </p>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Questions per prep</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Questions per prep</Label>
+            <Input
               type="number"
-              className={styles.input}
               min={5}
               max={20}
               value={genConfig.questionCount}
@@ -196,50 +196,49 @@ export default function SettingsPage() {
                 ...prev,
                 questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
               }))}
-              style={{ maxWidth: 90 }}
+              className="max-w-[90px]"
             />
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Question types</label>
-            <div className={styles.typeToggles}>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Question types</Label>
+            <div className="flex flex-wrap gap-x-5 gap-y-2.5">
               {ALL_QUESTION_TYPES.map(type => {
                 const isOnly = genConfig.enabledTypes.includes(type) && genConfig.enabledTypes.length === 1
                 return (
-                  <label
+                  <Label
                     key={type}
-                    className={`${styles.typeToggle} ${isOnly ? styles.typeToggleOnly : ''}`}
+                    className={cn('gap-1.5 text-sm font-normal', isOnly && 'cursor-not-allowed opacity-50')}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={genConfig.enabledTypes.includes(type)}
                       disabled={isOnly}
-                      onChange={() => toggleType(type)}
+                      onCheckedChange={() => toggleType(type)}
                     />
                     {TYPE_LABELS[type]}
-                  </label>
+                  </Label>
                 )
               })}
             </div>
           </div>
 
-          <div className={styles.actions}>
-            <button className={styles.saveBtn} onClick={handleGenConfigSave}>
+          <div className="flex items-center gap-2.5">
+            <Button onClick={handleGenConfigSave}>
               {genConfigSaved ? '✓ Saved' : 'Save defaults'}
-            </button>
+            </Button>
           </div>
         </section>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Usage</h2>
-          <div className={styles.usageLine}>
-            <span className={styles.usageLabel}>Total tokens (all preps)</span>
-            <span className={styles.usageValue}>{totalTokens.toLocaleString()}</span>
+        <section className="flex flex-col gap-4">
+          <h2 className="text-base font-bold tracking-tight">Usage</h2>
+          <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-background px-4 py-3.5">
+            <span className="text-sm text-muted-foreground">Total tokens (all preps)</span>
+            <span className="text-sm font-semibold whitespace-nowrap">{totalTokens.toLocaleString()}</span>
           </div>
           {totalTokens > 0 && model && (
-            <div className={styles.usageLine}>
-              <span className={styles.usageLabel}>Estimated cost ({model})</span>
-              <span className={styles.usageValue}>
+            <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-background px-4 py-3.5">
+              <span className="text-sm text-muted-foreground">Estimated cost ({model})</span>
+              <span className="text-sm font-semibold whitespace-nowrap">
                 ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model))}
               </span>
             </div>

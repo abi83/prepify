@@ -19,10 +19,15 @@ import { insertQuestions } from '../actions/questions'
 import { getMyPrep, deletePrep, updatePrep } from '../actions/preps'
 import { generateAndSaveAssets } from '../lib/assetGeneration'
 import { disciplineFromEnum, disciplineToEnum } from '../lib/disciplineMapping'
-import FlashCard from '../components/questions/FlashCard'
+import { cn } from '@/lib/utils'
+import StudyTabs from '../components/StudyTabs'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import ShareModal from '../components/ShareModal'
-import styles from './PrepPage.module.css'
+import { Button } from '../components/ui/button'
+import { Checkbox } from '../components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
 
 type Tab = 'cards' | 'quiz' | 'test'
 type GenPhase = 'idle' | 'running' | 'done'
@@ -113,20 +118,21 @@ function rowsFromSummary(s: PartialRunSummary, prepTitle: string): ChecklistRowD
 
 function ChecklistRow({ row }: { row: ChecklistRowData }) {
   return (
-    <div className={styles.checklistRow}>
+    <div className="flex items-center gap-2.5 text-sm">
       <span
-        className={`${styles.checklistIcon} ${
-          row.status === 'done' ? styles.iconDone :
-          row.status === 'running' ? styles.iconRunning :
-          styles.iconPending
-        }`}
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center text-sm font-bold',
+          row.status === 'done' ? 'text-primary' : row.status === 'running' ? 'text-muted-foreground' : 'text-border',
+        )}
       >
-        {row.status === 'done' ? '✓' : row.status === 'running' ? <span className={styles.dotPulse} /> : '○'}
+        {row.status === 'done' ? '✓' : row.status === 'running' ? (
+          <span className="inline-block size-2 animate-pulse rounded-full bg-primary" />
+        ) : '○'}
       </span>
-      <span className={`${styles.checklistLabel} ${row.status === 'pending' ? styles.labelMuted : ''}`}>
+      <span className={cn('leading-snug', row.status === 'pending' && 'text-muted-foreground')}>
         {row.label}
         {row.detail && (
-          <span className={styles.checklistDetail}> ({row.detail})</span>
+          <span className="text-sm text-muted-foreground"> ({row.detail})</span>
         )}
       </span>
     </div>
@@ -137,15 +143,15 @@ function ChecklistRow({ row }: { row: ChecklistRowData }) {
 
 function VisualElementItem({ el }: { el: VisualElement }) {
   return (
-    <div className={styles.visualElementItem}>
-      <div className={styles.visualElementHeader}>
-        <span className={styles.visualElementType}>{el.type}</span>
-        <span className={styles.visualElementConfidence}>{Math.round(el.confidence * 100)}%</span>
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="rounded text-xs font-semibold tracking-wide text-muted-foreground uppercase bg-muted px-1.5 py-0.5">{el.type}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{Math.round(el.confidence * 100)}%</span>
       </div>
-      <p className={styles.visualElementDescription}>{el.description}</p>
-      {el.content && <pre className={styles.visualElementContent}>{el.content}</pre>}
-      {el.caption && <p className={styles.visualElementMeta}><strong>Caption:</strong> {el.caption}</p>}
-      {el.context && <p className={styles.visualElementMeta}><strong>Context:</strong> {el.context}</p>}
+      <p className="mb-1.5 text-sm text-foreground">{el.description}</p>
+      {el.content && <pre className="mb-1.5 rounded bg-muted p-2.5 text-sm break-words whitespace-pre-wrap text-muted-foreground">{el.content}</pre>}
+      {el.caption && <p className="mt-0.5 text-sm text-muted-foreground"><strong>Caption:</strong> {el.caption}</p>}
+      {el.context && <p className="mt-0.5 text-sm text-muted-foreground"><strong>Context:</strong> {el.context}</p>}
     </div>
   )
 }
@@ -154,20 +160,20 @@ function PageSection({ page }: { page: Page }) {
   const [open, setOpen] = useState(false)
   const hasVisuals = page.visual_elements.length > 0
   return (
-    <div className={styles.textCard}>
-      <div className={styles.textHeader}>
-        <span className={styles.textLabel}>Page {page.page}</span>
-        <button className={styles.toggle} onClick={() => setOpen(v => !v)}>
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Page {page.page}</span>
+        <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setOpen(v => !v)}>
           {open ? 'Collapse' : 'Expand'}
-        </button>
+        </Button>
       </div>
       {open && (
         <>
-          <div className={`${styles.textBody} ${styles.expanded}`}>
-            <pre className={styles.pre}>{page.text}</pre>
+          <div className="max-h-[2000px] overflow-hidden transition-[max-height]">
+            <pre className="p-5 font-body text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">{page.text}</pre>
           </div>
           {hasVisuals && (
-            <div className={styles.visualElementsList}>
+            <div className="flex flex-col gap-3 px-4 pt-3 pb-4">
               {page.visual_elements.map((el, i) => (
                 <VisualElementItem key={i} el={el} />
               ))}
@@ -195,9 +201,9 @@ export default function PrepPage({ prep, questions, attempts, assets, runSummary
 
   if (!prep) {
     return (
-      <div className={styles.center}>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5">
         <p>Prep not found.</p>
-        <button className={styles.back} onClick={() => router.push('/preps')}>← Back to My Preps</button>
+        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← Back to My Preps</Button>
       </div>
     )
   }
@@ -399,11 +405,11 @@ function PrepPageInner({
 
   if (activeAttempt && (activeAttempt === 'quiz' || activeAttempt === 'test') && userId) {
     return (
-      <div className={styles.root}>
-        <header className={styles.header}>
-          <button className={styles.back} onClick={handleExitAttempt}>← Back to Prep</button>
+      <div className="flex min-h-screen flex-col">
+        <header className="flex items-center justify-between border-b border-border px-6 py-4">
+          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={handleExitAttempt}>← Back to Prep</Button>
         </header>
-        <main className={styles.main}>
+        <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
           <AttemptFlow
             questions={studyQuestions}
             assets={assets}
@@ -425,53 +431,53 @@ function PrepPageInner({
     : null
 
   return (
-    <div className={styles.root}>
-      {showDeleteConfirm && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalBox}>
-            <h2 className={styles.modalTitle}>Delete prep?</h2>
-            <p className={styles.modalBody}>
+    <div className="flex min-h-screen flex-col">
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete prep?</DialogTitle>
+            <DialogDescription>
               This will permanently delete <strong>{prep.title}</strong> and all its questions, attempts, and pipeline data.
-            </p>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</button>
-              <button className={styles.modalDelete} onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {textTooLong && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalBox}>
-            <h2 className={styles.modalTitle}>Text too long</h2>
-            <p className={styles.modalBody}>
-              Your text is <strong>{textTooLong.length.toLocaleString()}</strong> characters.
+      <Dialog open={!!textTooLong} onOpenChange={open => !open && setTextTooLong(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Text too long</DialogTitle>
+            <DialogDescription>
+              Your text is <strong>{textTooLong?.length.toLocaleString()}</strong> characters.
               Only pages up to <strong>{BYOK_TEXT_HARD_LIMIT.toLocaleString()}</strong> characters will be processed —
               later pages will be ignored.
-            </p>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setTextTooLong(null)}>Cancel</button>
-              <button className={styles.modalConfirm} onClick={handleConfirmTruncate}>Continue anyway</button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTextTooLong(null)}>Cancel</Button>
+            <Button onClick={handleConfirmTruncate}>Continue anyway</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <header className={styles.header}>
-        <button className={styles.back} onClick={() => router.push('/preps')}>← My Preps</button>
-        <div className={styles.headerRight}>
+      <header className="flex items-center justify-between border-b border-border px-6 py-4">
+        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← My Preps</Button>
+        <div className="flex items-center gap-4">
           {prep.userId === userId && hasQuestions && (
-            <button className={styles.shareBtn} onClick={() => setShowShareModal(true)}>
+            <Button size="sm" onClick={() => setShowShareModal(true)}>
               {prep.visibility === 'private' ? 'Share' : 'Shared'}
-            </button>
+            </Button>
           )}
           {prep.userId === userId && (
-            <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+            <Button variant="link" className="h-auto p-0 text-sm text-error" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
           )}
-          <button className={styles.settingsLink} onClick={() => router.push('/settings')}>Settings</button>
+          <Button variant="link" className="h-auto p-0 text-sm text-muted-foreground" onClick={() => router.push('/settings')}>Settings</Button>
         </div>
       </header>
 
@@ -492,12 +498,12 @@ function PrepPageInner({
         />
       )}
 
-      <main className={styles.main}>
-        <div className={styles.meta}>
-          <h1 className={styles.title}>{prep.title}</h1>
-          <span className={styles.date}>{formatDate(prep.createdAt)}</span>
+      <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-2xl font-bold tracking-tight">{prep.title}</h1>
+          <span className="text-sm text-muted-foreground">{formatDate(prep.createdAt)}</span>
           {prep.tokensUsed > 0 && (
-            <span className={styles.tokensBadge}>
+            <span className="text-xs text-muted-foreground">
               {prep.tokensUsed.toLocaleString()} tokens
               {getApiKey() && (
                 <> · ~{formatCost(estimateCost(prep.tokensUsed * 0.8, prep.tokensUsed * 0.2, getApiKey()!.model))}</>
@@ -512,50 +518,49 @@ function PrepPageInner({
 
         {/* ── Generation area ── */}
         {!hasQuestions && (
-          <div className={styles.generateArea}>
+          <div className="flex flex-col gap-3">
             {checklistRows ? (
               <>
-                <div className={styles.checklist}>
+                <div className="flex flex-col gap-2.5">
                   {checklistRows.map(row => <ChecklistRow key={row.label} row={row} />)}
                 </div>
-                <div className={styles.checklistActions}>
+                <div className="mt-4 flex items-center gap-2.5">
                   {isRunning ? (
-                    <button className={styles.cancelGenBtn} onClick={() => abortRef.current?.abort()}>
+                    <Button variant="outline" onClick={() => abortRef.current?.abort()}>
                       Cancel
-                    </button>
+                    </Button>
                   ) : (
-                    <button className={styles.generateBtn} onClick={handleGenerate}>
+                    <Button onClick={handleGenerate}>
                       {hasPartialRun && runSummary.completedSlots > 0 ? 'Resume generation' : 'Start generation'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </>
             ) : (
               <>
-                <p className={styles.generateHint}>Generate study questions from this material.</p>
+                <p className="text-sm text-muted-foreground">Generate study questions from this material.</p>
 
-                <div className={styles.genConfigPanel}>
+                <div className="min-w-[280px] self-start overflow-hidden rounded-sm border border-border">
                   <button
-                    className={styles.genConfigToggle}
+                    className="flex w-full items-center justify-between gap-3 bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
                     onClick={() => setGenConfigOpen(v => !v)}
                   >
-                    <span className={styles.genConfigSummary}>
+                    <span className="flex-1">
                       {localConfig.questionCount} questions
                       {' · '}
                       {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
                         ? 'All types'
                         : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(', ')}
                     </span>
-                    <span className={styles.genConfigCaret}>{genConfigOpen ? '▲' : '▼'}</span>
+                    <span className="text-xs opacity-60">{genConfigOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {genConfigOpen && (
-                    <div className={styles.genConfigBody}>
-                      <div className={styles.genConfigRow}>
-                        <label className={styles.genConfigLabel}>Questions</label>
-                        <input
+                    <div className="flex flex-col gap-3 border-t border-border bg-background p-3.5">
+                      <div className="flex items-start gap-2.5">
+                        <Label className="min-w-[68px] pt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Questions</Label>
+                        <Input
                           type="number"
-                          className={styles.genConfigNumber}
                           min={5}
                           max={20}
                           value={localConfig.questionCount}
@@ -563,29 +568,29 @@ function PrepPageInner({
                             ...prev,
                             questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
                           }))}
+                          className="w-[68px]"
                         />
-                        <span className={styles.genConfigRange}>5–20</span>
+                        <span className="pt-1.5 text-xs text-muted-foreground">5–20</span>
                       </div>
 
-                      <div className={styles.genConfigRow}>
-                        <label className={styles.genConfigLabel}>Types</label>
-                        <div className={styles.genTypeToggles}>
+                      <div className="flex items-start gap-2.5">
+                        <Label className="min-w-[68px] pt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Types</Label>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
                           {ALL_QUESTION_TYPES.map(type => {
                             const checked = localConfig.enabledTypes.includes(type)
                             const isOnly = checked && localConfig.enabledTypes.length === 1
                             return (
-                              <label
+                              <Label
                                 key={type}
-                                className={`${styles.genTypeToggle} ${isOnly ? styles.genTypeToggleOnly : ''}`}
+                                className={cn('gap-1.5 text-sm font-normal', isOnly && 'cursor-not-allowed opacity-50')}
                               >
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={checked}
                                   disabled={isOnly}
-                                  onChange={() => toggleLocalType(type)}
+                                  onCheckedChange={() => toggleLocalType(type)}
                                 />
                                 {TYPE_LABELS[type]}
-                              </label>
+                              </Label>
                             )
                           })}
                         </div>
@@ -594,88 +599,50 @@ function PrepPageInner({
                   )}
                 </div>
 
-                <button className={styles.generateBtn} onClick={handleGenerate}>
+                <Button className="self-start" onClick={handleGenerate}>
                   Generate questions
-                </button>
+                </Button>
               </>
             )}
           </div>
         )}
 
         {genError && (
-          <div className={styles.genError}>
+          <div className="flex items-center gap-3 rounded-sm border border-error bg-error/10 px-4 py-3 text-sm text-error">
             <strong>Error:</strong> {genError}
-            <button className={styles.retryBtn} onClick={() => { setGenError(null); setGenPhase('idle') }}>
+            <Button variant="link" className="ml-auto h-auto p-0 text-xs text-error underline" onClick={() => { setGenError(null); setGenPhase('idle') }}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
         {(genPhase === 'done' || hasQuestions) && totalTokens > 0 && (
-          <div className={styles.statLine}>
+          <div className="text-xs text-muted-foreground">
             Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
           </div>
         )}
 
         {hasQuestions && (
           <>
-            <div className={styles.tabs}>
-              {(['cards', 'quiz', 'test'] as Tab[]).map(t => (
-                <button
-                  key={t}
-                  className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`}
-                  onClick={() => setTab(t)}
-                >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.tabContent}>
-              {tab === 'cards' && (
-                flashcards.length > 0
-                  ? <FlashCard cards={flashcards} />
-                  : <p className={styles.empty}>No flashcards in this set.</p>
-              )}
-
-              {tab === 'quiz' && (
-                <div className={styles.modeCard}>
-                  <p className={styles.modeDesc}>Answer questions one at a time — get instant feedback after each.</p>
-                  <button
-                    className={styles.startBtn}
-                    onClick={() => setActiveAttempt('quiz')}
-                    disabled={studyQuestions.length === 0}
-                  >
-                    Start Quiz ({studyQuestions.length} questions)
-                  </button>
-                </div>
-              )}
-
-              {tab === 'test' && (
-                <div className={styles.modeCard}>
-                  <p className={styles.modeDesc}>Answer all questions without hints — results revealed at the end.</p>
-                  <button
-                    className={styles.startBtn}
-                    onClick={() => setActiveAttempt('test')}
-                    disabled={studyQuestions.length === 0}
-                  >
-                    Start Test ({studyQuestions.length} questions)
-                  </button>
-                </div>
-              )}
-            </div>
+            <StudyTabs
+              tab={tab}
+              onTabChange={setTab}
+              flashcards={flashcards}
+              studyQuestions={studyQuestions}
+              onStartAttempt={mode => setActiveAttempt(mode)}
+            />
 
             {attempts.length > 0 && (
-              <div className={styles.history}>
-                <h3 className={styles.historyTitle}>Attempt history</h3>
-                <div className={styles.historyList}>
+              <div className="flex flex-col gap-3">
+                <h3 className="text-sm font-bold tracking-wide text-muted-foreground uppercase">Attempt history</h3>
+                <div className="flex flex-col gap-1.5">
                   {attempts.map(a => (
-                    <div key={a.id} className={styles.historyItem}>
-                      <span className={styles.historyMode}>{a.mode}</span>
-                      <span className={styles.historyScore}>
+                    <div key={a.id} className="flex items-center gap-3 rounded-sm border border-border bg-background px-4 py-3 text-sm">
+                      <span className="min-w-[40px] font-semibold capitalize">{a.mode}</span>
+                      <span className="font-semibold text-primary">
                         {a.score}/{a.total} ({Math.round((a.score / a.total) * 100)}%)
                       </span>
-                      <span className={styles.historyDate}>{formatDate(a.createdAt)}</span>
+                      <span className="ml-auto text-muted-foreground">{formatDate(a.createdAt)}</span>
                     </div>
                   ))}
                 </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
-import styles from './Home.module.css'
+import { Button } from '../components/ui/button'
 
 export default function Home() {
   const [loading, setLoading] = useState(false)
@@ -14,35 +14,45 @@ export default function Home() {
   }
 
   return (
-    <main className={styles.root}>
-      <div className={styles.hero}>
-        <div className={styles.badge}>AI-powered study tool</div>
-        <h1 className={styles.title}>
+    <main className="flex min-h-screen flex-col items-center gap-20 px-6 pt-20 pb-16">
+      <div className="flex max-w-[620px] flex-col items-center gap-5 text-center">
+        <div className="inline-block rounded-full border border-primary bg-primary/10 px-3.5 py-1 text-xs font-semibold tracking-wide text-primary uppercase">
+          AI-powered study tool
+        </div>
+        <h1 className="bg-gradient-to-br from-foreground from-40% to-primary bg-clip-text text-[clamp(3rem,10vw,5rem)] leading-[1.05] font-bold tracking-tight text-transparent">
           Prepify
         </h1>
-        <p className={styles.subtitle}>Turn any textbook page into a personal exam</p>
-        <p className={styles.sub}>
+        <p className="max-w-[420px] text-[clamp(1rem,2.5vw,1.2rem)] leading-relaxed text-muted-foreground">
+          Turn any textbook page into a personal exam
+        </p>
+        <p className="max-w-[480px] text-lg leading-relaxed text-muted-foreground">
           Snap a photo, and Test Preparer instantly creates flashcards,
           multiple-choice questions, and timed tests — just for you.
         </p>
-        <button className={styles.cta} onClick={signInWithGoogle} disabled={loading}>
+        <Button
+          size="lg"
+          // Google's sign-in button branding is fixed white/near-black, independent of app theme tokens.
+          className="mt-2 bg-white text-neutral-900 hover:bg-white/92 hover:-translate-y-px"
+          onClick={signInWithGoogle}
+          disabled={loading}
+        >
           {loading ? 'Redirecting…' : (
             <>
               <GoogleIcon />
               Sign in with Google
             </>
           )}
-        </button>
-        <p className={styles.note}>Free to start · No credit card required</p>
-        <Link href="/catalog" className={styles.catalogLink}>Browse public study sets →</Link>
+        </Button>
+        <p className="text-xs text-muted-foreground">Free to start · No credit card required</p>
+        <Link href="/catalog" className="text-sm text-primary transition-opacity hover:opacity-80">Browse public study sets →</Link>
       </div>
 
-      <div className={styles.features}>
+      <div className="grid w-full max-w-[820px] grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
         {FEATURES.map(f => (
-          <div key={f.title} className={styles.card}>
-            <span className={styles.icon}>{f.icon}</span>
-            <h3>{f.title}</h3>
-            <p>{f.desc}</p>
+          <div key={f.title} className="flex flex-col gap-2.5 rounded-lg border border-border bg-background p-7">
+            <span className="text-2xl">{f.icon}</span>
+            <h3 className="text-sm font-semibold">{f.title}</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
           </div>
         ))}
       </div>
