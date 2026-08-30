@@ -260,6 +260,17 @@ jobs:
           .github/scripts/pipeline/handoff-to-review.sh
           "${{ steps.issue.outputs.number }}" "${{ steps.verify_pr.outputs.pr_number }}"
 
+      - name: Write run summary
+        if: steps.guard.outputs.skip != 'true' && always() && (steps.claude_initial.outputs.execution_file != '' || steps.claude_fix.outputs.execution_file != '')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          .github/scripts/pipeline/run-summary.sh Coder
+          "${{ steps.claude_initial.outputs.execution_file }}${{ steps.claude_fix.outputs.execution_file }}"
+          --issue "${{ steps.issue.outputs.number }}"
+          --pr "${{ steps.verify_pr.outputs.pr_number || steps.pr.outputs.pr_number }}"
+          --round ${{ steps.mode.outputs.fix_round == 'true' && 'fix' || 'initial' }}
+
       - name: Flag failure
         if: steps.guard.outputs.skip != 'true' && failure()
         env:
@@ -422,6 +433,17 @@ jobs:
           .github/scripts/pipeline/apply-verdict.sh
           "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           "${{ steps.linked.outputs.issue_number }}"
+
+      - name: Write run summary
+        if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWER_BOT: ${{ steps.ident.outputs.bot }}
+        run: >
+          .github/scripts/pipeline/run-summary.sh Review
+          "${{ steps.claude.outputs.execution_file }}"
+          --pr "${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          --issue "${{ steps.linked.outputs.issue_number }}"
 
       - name: Flag failure
         if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && failure()

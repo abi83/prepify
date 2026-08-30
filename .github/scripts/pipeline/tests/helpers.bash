@@ -13,20 +13,34 @@ setup_stubs() {
 #!/usr/bin/env bash
 printf '%s\n' "gh $*" >>"$STUB_LOG"
 case "$1 $2" in
-  "issue view") echo "${STUB_ISSUE_LABELS-}" ;;
+  "issue view")
+    case "$*" in
+      *--json\ title*) echo "${STUB_ISSUE_TITLE-}" ;;
+      *) echo "${STUB_ISSUE_LABELS-}" ;;
+    esac ;;
   "pr view")
     case "$*" in
       *headRefOid*) echo "${STUB_HEAD_SHA-}" ;;
+      *--json\ title*) echo "${STUB_PR_TITLE-}" ;;
       *) echo "${STUB_PR_LABELS-}" ;;
     esac ;;
   "pr checks") echo "${STUB_PR_CHECKS-[]}" ;;
+  "pr diff") echo "${STUB_PR_FILES-}" ;;
 esac
 case "$1" in
   api)
-    case "$*" in
-      *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
-      *) echo "${STUB_LAST_STATE-}" ;;
-    esac ;;
+    if [[ "$*" == *"/reviews"* && -n "${STUB_REVIEWS-}" ]]; then
+      # Faithful path: run the real --jq expression against a reviews fixture.
+      jqexpr=; shift
+      while [[ $# -gt 0 ]]; do [[ "$1" == "--jq" ]] && { jqexpr="$2"; break; }; shift; done
+      jq -r "$jqexpr" <<<"$STUB_REVIEWS"
+    else
+      case "$*" in
+        *"| length"*) echo "${STUB_RC_COUNT-0}" ;;
+        *commit_id*) echo "${STUB_LAST_SHA-}" ;;
+        *) echo "${STUB_LAST_STATE-}" ;;
+      esac
+    fi ;;
 esac
 exit "${STUB_GH_EXIT-0}"
 EOF
