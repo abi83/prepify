@@ -447,7 +447,14 @@ jobs:
           --cost-warn "${{ steps.cfg.outputs.cost_warn_usd }}"
 
       - name: Flag failure
-        if: steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true' && failure()
+        # Also fires when Resolve agent config fails — that step runs before
+        # `checks`, so a bad config would otherwise leave checks.outputs.ok
+        # empty and skip the standard failure comment (#150's generic fallback).
+        if: >
+          failure() && (
+            steps.cfg.outcome == 'failure' ||
+            (steps.checks.outputs.ok == 'true' && steps.check.outputs.skip != 'true')
+          )
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
