@@ -1,0 +1,35 @@
+name: resolve-agent-config
+description: >
+  Resolve the effective execution limits for one agent job via
+  agent-config.sh (precedence: config file > Actions var PIPELINE_* > built-in).
+
+inputs:
+  agent:
+    description: refiner | estimator | coder | reviewer
+    required: true
+
+outputs:
+  model:
+    value: ${{ steps.resolve.outputs.model }}
+  max_turns:
+    value: ${{ steps.resolve.outputs.max_turns }}
+  timeout_minutes:
+    value: ${{ steps.resolve.outputs.timeout_minutes }}
+  max_output_tokens:
+    value: ${{ steps.resolve.outputs.max_output_tokens }}
+  cost_warn_usd:
+    value: ${{ steps.resolve.outputs.cost_warn_usd }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve agent config
+      id: resolve
+      shell: bash
+      env:
+        PIPELINE_MODEL: ${{ vars.PIPELINE_MODEL }}
+        PIPELINE_MAX_TURNS: ${{ vars.PIPELINE_MAX_TURNS }}
+        PIPELINE_TIMEOUT_MINUTES: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
+        PIPELINE_MAX_OUTPUT_TOKENS: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
+        PIPELINE_COST_WARN_USD: ${{ vars.PIPELINE_COST_WARN_USD }}
+      run: .github/scripts/pipeline/agent-config.sh ${{ inputs.agent }}
