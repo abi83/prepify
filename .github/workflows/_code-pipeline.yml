@@ -28,6 +28,13 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        description: OAuth token for anthropics/claude-code-action
+        required: true
+      REVIEWER_APP_PRIVATE_KEY:
+        description: Private key for the reviewer GitHub App (paired with vars.REVIEWER_APP_ID); reviewer job only
+        required: true
 
 permissions:
   contents: write

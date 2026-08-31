@@ -19,6 +19,10 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        description: OAuth token for anthropics/claude-code-action
+        required: true
 
 permissions:
   issues: write
