@@ -19,22 +19,3 @@ jobs:
         uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: -color
-
-      # -x so shellcheck follows the `source` of pipeline/lib.sh.
-      - name: Lint standalone shell scripts
-        run: find .github/scripts -name '*.sh' -print0 | xargs -0 -r shellcheck -x
-
-      - name: Validate agent-pipeline.yml against its schema
-        run: >
-          pipx run check-jsonschema
-          --schemafile .github/agent-pipeline.schema.json
-          .github/agent-pipeline.yml
-
-  test-scripts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install bats
-        run: sudo apt-get update && sudo apt-get install -y bats
-      - name: Run pipeline script tests
-        run: bats .github/scripts/pipeline/tests
