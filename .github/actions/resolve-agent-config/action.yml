@@ -2,11 +2,28 @@ name: resolve-agent-config
 description: >
   Resolve the effective execution limits for one agent job via
   agent-config.sh (precedence: config file > Actions var PIPELINE_* > built-in).
+  The PIPELINE_* Actions vars are passed in as inputs — the `vars` context is
+  not available inside composite actions.
 
 inputs:
   agent:
     description: refiner | estimator | coder | reviewer
     required: true
+  pipeline_model:
+    required: false
+    default: ""
+  pipeline_max_turns:
+    required: false
+    default: ""
+  pipeline_timeout_minutes:
+    required: false
+    default: ""
+  pipeline_max_output_tokens:
+    required: false
+    default: ""
+  pipeline_cost_warn_usd:
+    required: false
+    default: ""
 
 outputs:
   model:
@@ -27,9 +44,9 @@ runs:
       id: resolve
       shell: bash
       env:
-        PIPELINE_MODEL: ${{ vars.PIPELINE_MODEL }}
-        PIPELINE_MAX_TURNS: ${{ vars.PIPELINE_MAX_TURNS }}
-        PIPELINE_TIMEOUT_MINUTES: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
-        PIPELINE_MAX_OUTPUT_TOKENS: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
-        PIPELINE_COST_WARN_USD: ${{ vars.PIPELINE_COST_WARN_USD }}
+        PIPELINE_MODEL: ${{ inputs.pipeline_model }}
+        PIPELINE_MAX_TURNS: ${{ inputs.pipeline_max_turns }}
+        PIPELINE_TIMEOUT_MINUTES: ${{ inputs.pipeline_timeout_minutes }}
+        PIPELINE_MAX_OUTPUT_TOKENS: ${{ inputs.pipeline_max_output_tokens }}
+        PIPELINE_COST_WARN_USD: ${{ inputs.pipeline_cost_warn_usd }}
       run: .github/scripts/pipeline/agent-config.sh ${{ inputs.agent }}

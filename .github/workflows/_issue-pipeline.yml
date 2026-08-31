@@ -61,6 +61,11 @@ jobs:
         uses: ./.github/actions/resolve-agent-config
         with:
           agent: refiner
+          pipeline_model: ${{ vars.PIPELINE_MODEL }}
+          pipeline_max_turns: ${{ vars.PIPELINE_MAX_TURNS }}
+          pipeline_timeout_minutes: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
+          pipeline_max_output_tokens: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
+          pipeline_cost_warn_usd: ${{ vars.PIPELINE_COST_WARN_USD }}
 
       - name: Preserve original body
         env:
@@ -182,6 +187,11 @@ jobs:
         uses: ./.github/actions/resolve-agent-config
         with:
           agent: estimator
+          pipeline_model: ${{ vars.PIPELINE_MODEL }}
+          pipeline_max_turns: ${{ vars.PIPELINE_MAX_TURNS }}
+          pipeline_timeout_minutes: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
+          pipeline_max_output_tokens: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
+          pipeline_cost_warn_usd: ${{ vars.PIPELINE_COST_WARN_USD }}
 
       - name: Run Claude estimation
         id: claude
