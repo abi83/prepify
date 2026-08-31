@@ -1,6 +1,7 @@
 name: Coding Agents
 
-# Thin caller: owns the triggers, delegates all logic to _code-pipeline.yml.
+# Thin caller: owns the triggers, delegates all logic to the reusable core in
+# abi83/interns, pinned to an exact tag.
 on:
   issues:
     types: [labeled]
@@ -41,7 +42,7 @@ permissions:
 
 jobs:
   pipeline:
-    uses: ./.github/workflows/_code-pipeline.yml
+    uses: abi83/interns/.github/workflows/code-pipeline.yml@v0.1.0
     secrets: inherit
     with:
       issue_number: ${{ inputs.issue_number }}

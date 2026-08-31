@@ -1,5 +1,5 @@
 # Pipeline tuning for the agent jobs — one place to see and adjust every
-# execution limit. Schema: .github/agent-pipeline.schema.json
+# execution limit. Schema: abi83/interns .github/agent-pipeline.schema.json
 #
 # Effective value for an agent = agents.<name>.<key> if set, else
 # defaults.<key>. Flat one-level merge, no deep nesting. A repo consuming the
