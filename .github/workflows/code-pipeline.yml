@@ -138,6 +138,12 @@ jobs:
       - name: Resolve agent config
         id: cfg
         if: steps.guard.outputs.skip != 'true'
+        env:
+          PIPELINE_MODEL: ${{ vars.PIPELINE_MODEL }}
+          PIPELINE_MAX_TURNS: ${{ vars.PIPELINE_MAX_TURNS }}
+          PIPELINE_TIMEOUT_MINUTES: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
+          PIPELINE_MAX_OUTPUT_TOKENS: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
+          PIPELINE_COST_WARN_USD: ${{ vars.PIPELINE_COST_WARN_USD }}
         run: .github/scripts/pipeline/agent-config.sh coder
 
       - name: Resolve existing PR (fix round)
@@ -329,6 +335,12 @@ jobs:
 
       - name: Resolve agent config
         id: cfg
+        env:
+          PIPELINE_MODEL: ${{ vars.PIPELINE_MODEL }}
+          PIPELINE_MAX_TURNS: ${{ vars.PIPELINE_MAX_TURNS }}
+          PIPELINE_TIMEOUT_MINUTES: ${{ vars.PIPELINE_TIMEOUT_MINUTES }}
+          PIPELINE_MAX_OUTPUT_TOKENS: ${{ vars.PIPELINE_MAX_OUTPUT_TOKENS }}
+          PIPELINE_COST_WARN_USD: ${{ vars.PIPELINE_COST_WARN_USD }}
         run: .github/scripts/pipeline/agent-config.sh reviewer
 
       - name: Wait for test + build checks
