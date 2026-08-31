@@ -9,9 +9,13 @@
 # and the caller runs it with `if: always()`, so a summary lands even when the
 # Claude step itself failed.
 #
-# Usage: run-summary.sh <phase> <execution-file> [--issue N] [--pr N] [--round initial|fix]
-#   phase   Coder | Review | Refinement | Estimation
-#   --round Coder/Review only: whether this run is an initial pass or a fix round
+# Usage: run-summary.sh <phase> <execution-file> [--issue N] [--pr N]
+#                       [--round initial|fix] [--cost-warn USD]
+#   phase       Coder | Review | Refinement | Estimation
+#   --round     Coder/Review only: whether this run is an initial pass or a fix round
+#   --cost-warn append a ⚠️ line when the run cost exceeds this figure
+#   execution-file may be empty/absent — a SIGKILLed (timed-out) agent step
+#   leaves none; the summary then reports a timeout.
 #   Env: GH_TOKEN; REVIEWER_BOT for the Review phase
 
 set -euo pipefail
@@ -19,17 +23,19 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 phase="$1"
-exec_file="$2"
+exec_file="${2:-}"
 shift 2
 
 issue=""
 pr=""
 round=""
+cost_warn=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --issue) issue="$2"; shift 2 ;;
     --pr) pr="$2"; shift 2 ;;
     --round) round="$2"; shift 2 ;;
+    --cost-warn) cost_warn="$2"; shift 2 ;;
     *) echo "run-summary: unknown argument $1" >&2; exit 1 ;;
   esac
 done
@@ -39,6 +45,7 @@ summary="${GITHUB_STEP_SUMMARY:?run-summary: GITHUB_STEP_SUMMARY is not set}"
 
 # --- execution-file fields (all optional; a failed run may have none) ----------
 result_field() {
+  [[ -f "$exec_file" ]] || return 0
   jq -r "[.[] | select(.type==\"result\")][0].$1 // empty" "$exec_file" 2>/dev/null || true
 }
 raw_cost=$(result_field total_cost_usd)
@@ -182,9 +189,21 @@ case "$phase" in
     ;;
 esac
 
+if [[ ! -f "$exec_file" ]]; then
+  emit ""
+  emit "> _No execution file — the agent step was killed (timed out) before writing results._"
+fi
+
 cost_line="**Cost:** \$$(format_cost "$raw_cost")"
 [[ -n "$num_turns" ]] && cost_line+=" · ${num_turns} turns"
 emit "$cost_line"
+
+if [[ -n "$raw_cost" && -n "$cost_warn" ]] \
+  && awk -v c="$raw_cost" -v w="$cost_warn" 'BEGIN { exit !(c + 0 > w + 0) }'; then
+  emit ""
+  emit "⚠️ cost \$$(format_cost "$raw_cost") over the \$$(printf '%.2f' "$cost_warn") warn limit"
+fi
+
 emit "[Full run log]($(run_url))"
 emit ""
 emit "### Agent's final message"

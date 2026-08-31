@@ -156,6 +156,29 @@ summary() { cat "$GITHUB_STEP_SUMMARY"; }
   summary | grep -qF '> _No final message — the run produced no result output._'
 }
 
+@test "cost over the warn limit adds a warning line" {
+  echo '[{"type":"result","total_cost_usd":2.5,"result":"done"}]' >"$EXEC"
+  export STUB_ISSUE_LABELS="status:refined"
+  run "$PIPELINE_DIR/run-summary.sh" Refinement "$EXEC" --issue 7 --cost-warn 0.30
+  [ "$status" -eq 0 ]
+  summary | grep -qF '⚠️ cost $2.5000 over the $0.30 warn limit'
+}
+
+@test "cost under the warn limit adds no warning line" {
+  echo '[{"type":"result","total_cost_usd":0.10,"result":"done"}]' >"$EXEC"
+  export STUB_ISSUE_LABELS="status:refined"
+  run "$PIPELINE_DIR/run-summary.sh" Refinement "$EXEC" --issue 7 --cost-warn 0.30
+  [ "$status" -eq 0 ]
+  ! summary | grep -q 'warn limit'
+}
+
+@test "missing execution file reports a timeout" {
+  export STUB_ISSUE_LABELS="status:in-progress"
+  run "$PIPELINE_DIR/run-summary.sh" Refinement "" --issue 7 --cost-warn 0.30
+  [ "$status" -eq 0 ]
+  summary | grep -qF 'killed (timed out) before writing results'
+}
+
 @test "errors on an unknown phase" {
   echo '[]' >"$EXEC"
   run "$PIPELINE_DIR/run-summary.sh" Bogus "$EXEC" --issue 7
