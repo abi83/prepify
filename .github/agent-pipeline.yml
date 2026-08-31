@@ -19,4 +19,4 @@ agents:
   refiner:   { model: claude-haiku-4-5-20251001, max_turns: 15, timeout_minutes: 10, cost_warn_usd: 0.30 }
   estimator: { model: claude-haiku-4-5-20251001, max_turns: 10, timeout_minutes: 10, cost_warn_usd: 0.20 }
   coder:     { max_turns: 60, timeout_minutes: 45, cost_warn_usd: 2.00 }
-  reviewer:  { max_turns: 30, timeout_minutes: 20 }
+  reviewer:  { max_turns: 50, timeout_minutes: 25 }
