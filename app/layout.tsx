@@ -1,8 +1,24 @@
 import type { Metadata } from 'next'
+import { Inter, Sora } from 'next/font/google'
 import { SessionProvider } from 'next-auth/react'
 import { auth } from '@/lib/auth'
 import ThemeToggle from '@/components/ThemeToggle'
+import { cn } from '@/lib/utils'
 import '@/index.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+const sora = Sora({
+  subsets: ['latin'],
+  weight: ['600', '700'],
+  display: 'swap',
+  variable: '--font-sora',
+})
 
 export const metadata: Metadata = {
   title: 'Prepify',
@@ -24,13 +40,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap" rel="stylesheet" />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body>
+      <body className={cn(inter.variable, sora.variable)}>
         <SessionProvider session={session}>{children}</SessionProvider>
         <ThemeToggle />
       </body>
