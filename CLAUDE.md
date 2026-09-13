@@ -57,13 +57,7 @@ gcloud secrets versions access latest --secret=database-url-pooling --project=pr
 
 There's one shared **dev** Neon branch today, no per-PR isolation — tracked at [#85](https://github.com/abi83/prepify/issues/85), which will also document the finished local + CI workflow here. Until then: a human authors migrations locally against dev; an agent (interns pipeline, or Claude non-interactive) doesn't run `db:migrate` — flag a needed schema change for the owner instead of authoring one directly.
 
-Never edit an already-committed migration — create a new one instead.
-
----
-
-## Database Schema
-
-Schema and RLS policies live in migrations; application types mirror them in code.
+Never edit an already-committed migration — create a new one instead. Authorization is enforced in the repository layer (e.g. `prepRepository.isReadableBy`), not Postgres RLS.
 
 ---
 
@@ -79,10 +73,9 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. Apply migrations if the ticket needs one — see Database Migrations below for who does this and how
-3. Commit and push the branch
-4. Open a PR — no direct pushes to `main`. PRs are squash-merged, so give the PR itself a [Conventional Commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `refactor:`, etc.) — release-please derives the version bump and changelog from commit history on `main`, so a non-conventional title is an invisible, unlabeled change there.
-5. Once reviewed and merged, close the GitHub issue
+2. Apply migrations if the ticket needs one — see Database Migrations above for who does this and how
+3. Commit, push, open a PR — commit/PR/branch conventions are on the wiki's `Contributing` page
+4. Once reviewed and merged, close the GitHub issue
 
 ### TODO/FIXME comments
 A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
