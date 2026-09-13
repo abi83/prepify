@@ -1,19 +1,28 @@
 # Prepify — Claude Instructions
 
 ## Project Overview
-Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth) and Neon Postgres via Prisma (data).
+Prepify is a Next.js (App Router) + TypeScript app backed by Auth.js (auth) and Neon Postgres via Prisma (data).
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
 API keys are BYOK — users supply their own OpenAI key stored in localStorage; the OpenAI-calling pipeline stays entirely client-side.
-`app/**/page.tsx` are Server Components that fetch initial data via server actions (`src/actions/*.ts`, backed by `src/repositories/*.ts`). Client-triggered mutations call the same server actions directly. `src/screens/*.tsx` (one client component per page) is legacy — not the target pattern; migrating it is tracked in separate tickets, not prescribed here.
+Page/component structure and data-flow conventions: see [Coding Guidelines](#coding-guidelines) below.
 
 ## Tech Stack
 - Next.js (App Router, TypeScript)
-- Supabase (auth only)
+- Auth.js (Google OAuth)
 - Neon Postgres + Prisma (data layer)
 - Tailwind CSS + shadcn/ui
 - OpenAI API (LLM pipeline)
 
-## Style
+## Coding Guidelines
+
+- **Fail fast.** Invalid state throws — it doesn't fall back to a default or an empty result. No `catch` that swallows and returns `[]`/`null`.
+- **No nested if-else.** Guard clauses / early returns instead. Still nesting after that — extract a function.
+- **Minimize optional fields.** An optional field claims both the present and absent shape are valid; don't add one just because one code path happens not to set it.
+
+Everything else — rendering/data flow, file & naming conventions, types — lives in the wiki: [Contributing-Nextjs-Guidelines](https://github.com/abi83/prepify/wiki/Contributing-Nextjs-Guidelines). Styling and UI-component conventions: [Contributing-UI-Guidelines](https://github.com/abi83/prepify/wiki/Contributing-UI-Guidelines).
+Both are binding — read before writing component or page code.
+
+## Code-style
 
 Concise and direct, everywhere — code, comments, docs, commit messages, issues, PRs, and chat replies. Say it once, at the shortest length that stays clear. Long output is a cost the reader pays; default to less and expand only where a reader genuinely needs it.
 
@@ -34,13 +43,11 @@ Copy `.env.example` to `.env.local`:
 - `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
 - `AUTH_GOOGLE_CLIENT_ID` / `AUTH_GOOGLE_CLIENT_SECRET` — Google OAuth client credentials, passed explicitly to Auth.js's Google provider
 
-Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
-
 ---
 
 ## Database Migrations
 
-All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth). `supabase/migrations/*.sql` is historical record only — no new migrations go there.
+All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth).
 
 One-time setup — get the dev Neon connection strings into `.env.local`:
 ```bash
@@ -114,3 +121,5 @@ The GitHub wiki (separate repo, cloned locally at `../prepify.wiki`) is a high-l
 npm install
 npm run dev
 ```
+
+Before pushing, run the same checks CI gates on: `npm test` and `npm run build`. Lint/typecheck aren't wired into CI yet — testing strategy beyond that is a placeholder pending #78.
