@@ -47,33 +47,17 @@ Copy `.env.example` to `.env.local`:
 
 ## Database Migrations
 
-All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth).
+All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth): `npm run db:migrate` / `db:status` / `db:generate`.
 
-### Authoring locally (human)
-One-time setup — get the dev Neon connection strings into `.env.local`:
+One-time setup, get the dev Neon connection strings into `.env.local`:
 ```bash
 gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk  # → DATABASE_URL_DIRECT
 gcloud secrets versions access latest --secret=database-url-pooling --project=prepify-dev-vk # → DATABASE_URL_POOLING
 ```
 
-```bash
-npm run db:migrate    # prisma migrate dev — authors + applies a new migration against dev
-npm run db:status     # prisma migrate status
-npm run db:generate   # prisma generate (also runs automatically via postinstall)
-```
+There's one shared **dev** Neon branch today, no per-PR isolation — tracked at [#85](https://github.com/abi83/prepify/issues/85), which will also document the finished local + CI workflow here. Until then: a human authors migrations locally against dev; an agent (interns pipeline, or Claude non-interactive) doesn't run `db:migrate` — flag a needed schema change for the owner instead of authoring one directly.
 
-Migrations are authored and applied against the shared **dev** Neon branch, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR.
-
-### Authoring as an agent (interns pipeline, or Claude running non-interactively)
-Don't run `db:migrate` against the shared dev branch — there's no per-PR isolation yet ([#85](https://github.com/abi83/prepify/issues/85), open), so two migrations authored concurrently can collide. If a ticket's scope needs a schema change, stop and flag it for the owner instead of authoring one directly. Once #85 lands, agents get their own ephemeral branch and this restriction goes away.
-
-### Deploy
-CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if already applied locally, but catches anything forgotten. The prod step only runs after the same manual-approval gate that already protects prod deploys.
-
-### Conventions
-- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several).
-- Prisma's own naming (`prisma migrate dev --name <descriptive_name>`)
-- Never edit an already-committed migration — create a new one instead
+Never edit an already-committed migration — create a new one instead.
 
 ---
 
@@ -95,7 +79,7 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. Apply migrations if any (`npm run db:migrate`, against dev — see Database Migrations below)
+2. Apply migrations if the ticket needs one — see Database Migrations below for who does this and how
 3. Commit and push the branch
 4. Open a PR — no direct pushes to `main`. PRs are squash-merged, so give the PR itself a [Conventional Commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `refactor:`, etc.) — release-please derives the version bump and changelog from commit history on `main`, so a non-conventional title is an invisible, unlabeled change there.
 5. Once reviewed and merged, close the GitHub issue
