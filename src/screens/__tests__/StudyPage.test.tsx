@@ -7,10 +7,10 @@ vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: null, status: 'unauthenticated' }),
 }))
 
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'test-prep-id' }),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-}))
+vi.mock('next/navigation', async () => {
+  const { createNavigationMock } = await import('../../testUtils/navigationMock')
+  return { ...createNavigationMock(), useParams: () => ({ id: 'test-prep-id' }) }
+})
 
 vi.mock('../../actions/attempts', () => ({
   insertAttempt: vi.fn().mockResolvedValue({}),
@@ -38,18 +38,6 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('StudyPage — not found', () => {
-  it('shows not-available message when prep is null', () => {
-    render(<StudyPage prep={null} />)
-    expect(screen.getByText(/not available/i)).toBeInTheDocument()
-  })
-
-  it('shows a home navigation button on not-found', () => {
-    render(<StudyPage prep={null} />)
-    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
-  })
-})
-
 describe('StudyPage — loaded with questions', () => {
   const questions: Question[] = [
     {
@@ -69,12 +57,12 @@ describe('StudyPage — loaded with questions', () => {
   ]
 
   it('renders the prep title', () => {
-    render(<StudyPage prep={prep()} questions={questions} />)
+    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
     expect(screen.getByText('Biology Basics')).toBeInTheDocument()
   })
 
   it('renders the Cards, Quiz, and Test tabs', () => {
-    render(<StudyPage prep={prep()} questions={questions} />)
+    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
     expect(screen.getByRole('tab', { name: 'Cards' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Quiz' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Test' })).toBeInTheDocument()
@@ -82,14 +70,14 @@ describe('StudyPage — loaded with questions', () => {
 
   it('shows quiz start button when Quiz tab is selected', async () => {
     const user = userEvent.setup()
-    render(<StudyPage prep={prep()} questions={questions} />)
+    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
     await user.click(screen.getByRole('tab', { name: 'Quiz' }))
     expect(screen.getByRole('button', { name: /start quiz/i })).toBeInTheDocument()
   })
 
   it('shows test start button when Test tab is selected', async () => {
     const user = userEvent.setup()
-    render(<StudyPage prep={prep()} questions={questions} />)
+    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
     await user.click(screen.getByRole('tab', { name: 'Test' }))
     expect(screen.getByRole('button', { name: /start test/i })).toBeInTheDocument()
   })
@@ -97,7 +85,7 @@ describe('StudyPage — loaded with questions', () => {
 
 describe('StudyPage — anonymous user', () => {
   it('shows sign-in note for unauthenticated visitors', async () => {
-    render(<StudyPage prep={prep({ title: 'Test Prep', visibility: 'public', grade: null })} />)
+    render(<StudyPage prep={prep({ title: 'Test Prep', visibility: 'public', grade: null })} questions={[]} assets={[]} />)
     expect(await screen.findByText(/sign in/i)).toBeInTheDocument()
   })
 })

@@ -1,6 +1,9 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import PrepPage from '@/screens/PrepPage'
+import { ErrorState } from '@/components/ErrorState'
+import { Button } from '@/components/ui/button'
 import { getMyPrep } from '@/actions/preps'
 import { listMyQuestions } from '@/actions/questions'
 import { listMyAttempts } from '@/actions/attempts'
@@ -21,8 +24,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   try {
     prep = await getMyPrep(id)
   } catch (e) {
-    if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return <PrepPage prep={null} />
+    if (e instanceof NotFoundError) notFound()
+    if (e instanceof ForbiddenError) {
+      return (
+        <ErrorState
+          message="You don't have access to this prep."
+          action={
+            <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+              <Link href="/preps">← My Preps</Link>
+            </Button>
+          }
+        />
+      )
     }
     throw e
   }

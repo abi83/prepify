@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CatalogEntry } from '../../repositories/prepRepository'
+import { createNavigationMock } from '../../testUtils/navigationMock'
 
-const mockPush = vi.fn()
+// vi.mock is hoisted above this file's imports, so the mock object itself must be
+// created via vi.hoisted — a plain top-level `const` here would still be uninitialized
+// when the factory below runs.
+const mocks = vi.hoisted(() => ({ nav: undefined as unknown as ReturnType<typeof createNavigationMock> }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
-}))
+vi.mock('next/navigation', () => {
+  mocks.nav = createNavigationMock()
+  return mocks.nav
+})
 
 import CatalogPage from '../CatalogPage'
 
@@ -38,7 +43,8 @@ async function selectOption(user: ReturnType<typeof userEvent.setup>, triggerNam
 }
 
 beforeEach(() => {
-  mockPush.mockClear()
+  mocks.nav.mockPush.mockClear()
+  mocks.nav.useRouter().replace('/') // clear filters left over from the previous test
 })
 
 describe('CatalogPage — empty state', () => {
@@ -166,15 +172,8 @@ describe('CatalogPage — filtering', () => {
 })
 
 describe('CatalogPage — navigation', () => {
-  it('renders a back-to-home button', () => {
+  it('renders a back-to-home link', () => {
     renderCatalog([])
-    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
-  })
-
-  it('clicking back navigates to home', async () => {
-    const user = userEvent.setup()
-    renderCatalog([])
-    await user.click(screen.getByRole('button', { name: /home/i }))
-    expect(mockPush).toHaveBeenCalledWith('/')
+    expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/')
   })
 })

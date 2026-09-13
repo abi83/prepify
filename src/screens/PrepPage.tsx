@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { Prep, Question, Attempt, Asset } from '@prisma/client'
-import type { VisualElement, Page } from '../types/prep'
+import { parseStudyTab, type StudyTab, type VisualElement, type Page } from '../types/prep'
+import { useUrlParams } from '../lib/urlState'
 import type { FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
@@ -29,7 +31,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 
-type Tab = 'cards' | 'quiz' | 'test'
 type GenPhase = 'idle' | 'running' | 'done'
 
 // ── Pipeline checklist ──────────────────────────────────────────────────────
@@ -188,39 +189,6 @@ function PageSection({ page }: { page: Page }) {
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
-  prep: Prep | null
-  questions?: Question[]
-  attempts?: Attempt[]
-  assets?: Asset[]
-  runSummary?: PartialRunSummary | null
-  concepts?: Concept[]
-}
-
-export default function PrepPage({ prep, questions, attempts, assets, runSummary, concepts }: Props) {
-  const router = useRouter()
-
-  if (!prep) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-5">
-        <p>Prep not found.</p>
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← Back to My Preps</Button>
-      </div>
-    )
-  }
-
-  return (
-    <PrepPageInner
-      prep={prep}
-      questions={questions ?? []}
-      attempts={attempts ?? []}
-      assets={assets ?? []}
-      runSummary={runSummary ?? null}
-      concepts={concepts ?? []}
-    />
-  )
-}
-
-interface InnerProps {
   prep: Prep
   questions: Question[]
   attempts: Attempt[]
@@ -229,23 +197,28 @@ interface InnerProps {
   concepts: Concept[]
 }
 
-function PrepPageInner({
+export default function PrepPage({
   prep: initialPrep,
   questions: initialQuestions,
   attempts: initialAttempts,
   assets: initialAssets,
   runSummary: initialRunSummary,
   concepts: initialConcepts,
-}: InnerProps) {
+}: Props) {
   const router = useRouter()
+  const { searchParams, set: setUrlParams } = useUrlParams()
   const id = initialPrep.id
 
   const [prep, setPrep] = useState<Prep>(initialPrep)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
   const [attempts, setAttempts] = useState<Attempt[]>(initialAttempts)
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
-  const [tab, setTab] = useState<Tab>('cards')
-  const [activeAttempt, setActiveAttempt] = useState<Tab | null>(null)
+  const tab = parseStudyTab(searchParams.get('tab'))
+  const [activeAttempt, setActiveAttempt] = useState<StudyTab | null>(null)
+
+  function setTab(next: StudyTab) {
+    setUrlParams({ tab: next })
+  }
 
   useEffect(() => setPrep(initialPrep), [initialPrep])
   useEffect(() => setQuestions(initialQuestions), [initialQuestions])
@@ -467,7 +440,9 @@ function PrepPageInner({
       </Dialog>
 
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← My Preps</Button>
+        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
+          <Link href="/preps">← My Preps</Link>
+        </Button>
         <div className="flex items-center gap-4">
           {prep.userId === userId && hasQuestions && (
             <Button size="sm" onClick={() => setShowShareModal(true)}>
@@ -477,7 +452,9 @@ function PrepPageInner({
           {prep.userId === userId && (
             <Button variant="link" className="h-auto p-0 text-sm text-error" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
           )}
-          <Button variant="link" className="h-auto p-0 text-sm text-muted-foreground" onClick={() => router.push('/settings')}>Settings</Button>
+          <Button asChild variant="link" className="h-auto p-0 text-sm text-muted-foreground">
+            <Link href="/settings">Settings</Link>
+          </Button>
         </div>
       </header>
 
