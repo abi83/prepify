@@ -1,19 +1,28 @@
 # Prepify — Claude Instructions
 
 ## Project Overview
-Prepify is a Next.js (App Router) + TypeScript app backed by Supabase (auth) and Neon Postgres via Prisma (data).
+Prepify is a Next.js (App Router) + TypeScript app backed by Auth.js (auth) and Neon Postgres via Prisma (data).
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
 API keys are BYOK — users supply their own OpenAI key stored in localStorage; the OpenAI-calling pipeline stays entirely client-side.
-`app/**/page.tsx` are Server Components that fetch initial data via server actions (`src/actions/*.ts`, backed by `src/repositories/*.ts`). Client-triggered mutations call the same server actions directly. `src/screens/*.tsx` (one client component per page) is legacy — not the target pattern; migrating it is tracked in separate tickets, not prescribed here.
+Page/component structure and data-flow conventions: see [Coding Guidelines](#coding-guidelines) below.
 
 ## Tech Stack
 - Next.js (App Router, TypeScript)
-- Supabase (auth only)
+- Auth.js (Google OAuth)
 - Neon Postgres + Prisma (data layer)
 - Tailwind CSS + shadcn/ui
 - OpenAI API (LLM pipeline)
 
-## Style
+## Coding Guidelines
+
+- **Fail fast.** Invalid state throws — it doesn't fall back to a default or an empty result. No `catch` that swallows and returns `[]`/`null`.
+- **No nested if-else.** Guard clauses / early returns instead. Still nesting after that — extract a function.
+- **Minimize optional fields.** An optional field claims both the present and absent shape are valid; don't add one just because one code path happens not to set it.
+
+Everything else — rendering/data flow, file & naming conventions, types — lives in the wiki: [Contributing-Nextjs-Guidelines](https://github.com/abi83/prepify/wiki/Contributing-Nextjs-Guidelines). Styling and UI-component conventions: [Contributing-UI-Guidelines](https://github.com/abi83/prepify/wiki/Contributing-UI-Guidelines).
+Both are binding — read before writing component or page code.
+
+## Code-style
 
 Concise and direct, everywhere — code, comments, docs, commit messages, issues, PRs, and chat replies. Say it once, at the shortest length that stays clear. Long output is a cost the reader pays; default to less and expand only where a reader genuinely needs it.
 
@@ -34,38 +43,21 @@ Copy `.env.example` to `.env.local`:
 - `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
 - `AUTH_GOOGLE_CLIENT_ID` / `AUTH_GOOGLE_CLIENT_SECRET` — Google OAuth client credentials, passed explicitly to Auth.js's Google provider
 
-Supabase project ref: `yyqhjsdgemtcbgjcwhvm`
-
 ---
 
 ## Database Migrations
 
-All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth). `supabase/migrations/*.sql` is historical record only — no new migrations go there.
+All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth): `npm run db:migrate` / `db:status` / `db:generate`.
 
-One-time setup — get the dev Neon connection strings into `.env.local`:
+One-time setup, get the dev Neon connection strings into `.env.local`:
 ```bash
 gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk  # → DATABASE_URL_DIRECT
 gcloud secrets versions access latest --secret=database-url-pooling --project=prepify-dev-vk # → DATABASE_URL_POOLING
 ```
 
-```bash
-npm run db:migrate    # prisma migrate dev — authors + applies a new migration against dev
-npm run db:status     # prisma migrate status
-npm run db:generate   # prisma generate (also runs automatically via postinstall)
-```
+There's one shared **dev** Neon branch today, no per-PR isolation — tracked at [#85](https://github.com/abi83/prepify/issues/85), which will also document the finished local + CI workflow here. Until then: a human authors migrations locally against dev; an agent (interns pipeline, or Claude non-interactive) doesn't run `db:migrate` — flag a needed schema change for the owner instead of authoring one directly.
 
-Migrations are authored and applied against the **dev** Neon branch locally, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR. CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if you already applied it locally, but catches anything you forgot. The prod step only runs after the same manual-approval gate that already protects prod deploys.
-
-### Conventions
-- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several). Easier once per-PR Neon branches (#85) land.
-- Prisma's own naming (`prisma migrate dev --name <descriptive_name>`)
-- Never edit an already-committed migration — create a new one instead
-
----
-
-## Database Schema
-
-Schema and RLS policies live in migrations; application types mirror them in code.
+Never edit an already-committed migration — create a new one instead. Authorization is enforced in the repository layer (e.g. `prepRepository.isReadableBy`), not Postgres RLS.
 
 ---
 
@@ -81,10 +73,9 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. Apply migrations if any (`npm run db:migrate`, against dev — see Database Migrations below)
-3. Commit and push the branch
-4. Open a PR — no direct pushes to `main`. PRs are squash-merged, so give the PR itself a [Conventional Commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `refactor:`, etc.) — release-please derives the version bump and changelog from commit history on `main`, so a non-conventional title is an invisible, unlabeled change there.
-5. Once reviewed and merged, close the GitHub issue
+2. Apply migrations if the ticket needs one — see Database Migrations above for who does this and how
+3. Commit, push, open a PR — commit/PR/branch conventions are on the wiki's `Contributing` page
+4. Once reviewed and merged, close the GitHub issue
 
 ### TODO/FIXME comments
 A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
@@ -114,3 +105,5 @@ The GitHub wiki (separate repo, cloned locally at `../prepify.wiki`) is a high-l
 npm install
 npm run dev
 ```
+
+Before pushing, run the same checks CI gates on: `npm test` and `npm run build`. Lint/typecheck aren't wired into CI yet — testing strategy beyond that is a placeholder pending #78.
