@@ -106,8 +106,8 @@
   --radius-lg: var(--ui-radius);
   --radius-xl: calc(var(--ui-radius) + 4px);
 
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-highlight: 'Sora', system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-highlight: var(--font-sora), system-ui, sans-serif;
 }
 
 html, body {
