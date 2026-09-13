@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { CatalogEntry } from '../repositories/prepRepository'
 import { DISCIPLINES } from '../lib/agents/PrepLabeler'
@@ -38,10 +37,19 @@ interface Props {
 
 export default function CatalogPage({ entries }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [gradeFilter, setGradeFilter] = useState<number | ''>('')
-  const [disciplineFilter, setDisciplineFilter] = useState<string>('')
-  const [languageFilter, setLanguageFilter] = useState<string>('')
+  const gradeParam = searchParams.get('grade')
+  const gradeFilter: number | '' = gradeParam ? Number(gradeParam) : ''
+  const disciplineFilter = searchParams.get('discipline') ?? ''
+  const languageFilter = searchParams.get('language') ?? ''
+
+  function setFilter(key: 'grade' | 'discipline' | 'language', value: string) {
+    const params = new URLSearchParams(searchParams)
+    if (value === '') params.delete(key)
+    else params.set(key, value)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
 
   const displayEntries = entries.map(e => ({ ...e, discipline: disciplineFromEnum(e.discipline) }))
 
@@ -57,7 +65,9 @@ export default function CatalogPage({ entries }: Props) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center gap-4 border-b border-border px-6 py-4">
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/')}>← Home</Button>
+        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
+          <Link href="/">← Home</Link>
+        </Button>
         <h1 className="m-0 text-base font-bold tracking-tight">Prepify</h1>
         <div className="flex-1" />
       </header>
@@ -73,7 +83,7 @@ export default function CatalogPage({ entries }: Props) {
         <div className="flex flex-wrap gap-3">
           <Select
             value={gradeFilter === '' ? ALL_GRADES_VALUE : String(gradeFilter)}
-            onValueChange={v => setGradeFilter(v === ALL_GRADES_VALUE ? '' : Number(v))}
+            onValueChange={v => setFilter('grade', v === ALL_GRADES_VALUE ? '' : v)}
           >
             <SelectTrigger aria-label="Filter by grade" className="min-w-[140px]">
               <SelectValue />
@@ -88,7 +98,7 @@ export default function CatalogPage({ entries }: Props) {
 
           <Select
             value={disciplineFilter === '' ? ALL_DISCIPLINES_VALUE : disciplineFilter}
-            onValueChange={v => setDisciplineFilter(v === ALL_DISCIPLINES_VALUE ? '' : v)}
+            onValueChange={v => setFilter('discipline', v === ALL_DISCIPLINES_VALUE ? '' : v)}
           >
             <SelectTrigger aria-label="Filter by subject" className="min-w-[140px]">
               <SelectValue />
@@ -104,7 +114,7 @@ export default function CatalogPage({ entries }: Props) {
           {availableLanguages.length > 1 && (
             <Select
               value={languageFilter === '' ? ALL_LANGUAGES_VALUE : languageFilter}
-              onValueChange={v => setLanguageFilter(v === ALL_LANGUAGES_VALUE ? '' : v)}
+              onValueChange={v => setFilter('language', v === ALL_LANGUAGES_VALUE ? '' : v)}
             >
               <SelectTrigger aria-label="Filter by language" className="min-w-[140px]">
                 <SelectValue />

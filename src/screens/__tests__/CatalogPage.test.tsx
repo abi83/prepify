@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CatalogEntry } from '../../repositories/prepRepository'
+import type { createNavigationMock } from '../../testUtils/navigationMock'
 
-const mockPush = vi.fn()
+// eslint-disable-next-line no-var -- `var` avoids the TDZ error `let` hits from vi.mock's hoisting
+var nav: ReturnType<typeof createNavigationMock>
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
-}))
+vi.mock('next/navigation', async () => {
+  const { createNavigationMock } = await import('../../testUtils/navigationMock')
+  nav = createNavigationMock()
+  return nav
+})
 
 import CatalogPage from '../CatalogPage'
 
@@ -38,7 +42,8 @@ async function selectOption(user: ReturnType<typeof userEvent.setup>, triggerNam
 }
 
 beforeEach(() => {
-  mockPush.mockClear()
+  nav.mockPush.mockClear()
+  nav.useRouter().replace('/') // clear filters left over from the previous test
 })
 
 describe('CatalogPage — empty state', () => {
@@ -166,15 +171,8 @@ describe('CatalogPage — filtering', () => {
 })
 
 describe('CatalogPage — navigation', () => {
-  it('renders a back-to-home button', () => {
+  it('renders a back-to-home link', () => {
     renderCatalog([])
-    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
-  })
-
-  it('clicking back navigates to home', async () => {
-    const user = userEvent.setup()
-    renderCatalog([])
-    await user.click(screen.getByRole('button', { name: /home/i }))
-    expect(mockPush).toHaveBeenCalledWith('/')
+    expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/')
   })
 })

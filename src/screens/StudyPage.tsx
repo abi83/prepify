@@ -1,35 +1,42 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { Prep, Question, Asset } from '@prisma/client'
+import type { StudyTab } from '../types/prep'
 import type { FlashcardContent } from '../types/questions'
 import StudyTabs from '../components/StudyTabs'
 import AttemptFlow from '../components/attempt/AttemptFlow'
 import { Button } from '../components/ui/button'
 
-type Tab = 'cards' | 'quiz' | 'test'
-
 interface Props {
   prep: Prep | null
-  questions?: Question[]
-  assets?: Asset[]
+  questions: Question[]
+  assets: Asset[]
 }
 
-export default function StudyPage({ prep, questions = [], assets = [] }: Props) {
+export default function StudyPage({ prep, questions, assets }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [tab, setTab] = useState<Tab>('cards')
+  const tab = (searchParams.get('tab') as StudyTab | null) ?? 'cards'
   const [activeAttempt, setActiveAttempt] = useState<'quiz' | 'test' | null>(null)
   const { data: session } = useSession()
   const userId = session?.user.id ?? null
+
+  function setTab(next: StudyTab) {
+    const params = new URLSearchParams(searchParams)
+    params.set('tab', next)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
 
   if (!prep) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5">
         <p>This prep is not available.</p>
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/')}>← Home</Button>
+        <Link href="/" className="text-sm text-muted-foreground hover:underline">← Home</Link>
       </div>
     )
   }
@@ -63,7 +70,9 @@ export default function StudyPage({ prep, questions = [], assets = [] }: Props) 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/')}>← Home</Button>
+        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
+          <Link href="/">← Home</Link>
+        </Button>
         {!userId && (
           <span className="text-sm text-muted-foreground">Sign in to track your progress</span>
         )}

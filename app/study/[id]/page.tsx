@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     prep = await getSharedPrep(id)
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return <StudyPage prep={null} />
+      return <StudyPage prep={null} questions={[]} assets={[]} />
     }
     throw e
   }

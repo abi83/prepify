@@ -52,8 +52,8 @@ export default function MyPreps({ preps: initialPreps }: Props) {
           >
             Catalog
           </Link>
-          <Button variant="outline" size="icon" onClick={() => router.push('/settings')} title="Settings" aria-label="Settings">
-            <SettingsIcon />
+          <Button asChild variant="outline" size="icon" title="Settings" aria-label="Settings">
+            <Link href="/settings"><SettingsIcon /></Link>
           </Button>
           <Button variant="outline" size="sm" onClick={signOut}>Sign out</Button>
         </div>
@@ -78,13 +78,13 @@ export default function MyPreps({ preps: initialPreps }: Props) {
           <ul className="flex flex-col gap-2">
             {preps.map(prep => (
               <li key={prep.id} className="flex items-stretch gap-2">
-                <button
+                <Link
+                  href={`/preps/${prep.id}`}
                   className="flex flex-1 items-center justify-between gap-4 rounded-lg border border-border bg-background px-5 py-4.5 text-left transition-colors hover:border-primary hover:bg-muted"
-                  onClick={() => router.push(`/preps/${prep.id}`)}
                 >
                   <span className="text-sm font-medium">{prep.title}</span>
                   <span className="text-xs whitespace-nowrap text-muted-foreground">{formatDate(prep.createdAt)}</span>
-                </button>
+                </Link>
                 {confirmDeleteId === prep.id ? (
                   <div className="flex shrink-0 items-center gap-1.5 px-1">
                     <span className="text-sm whitespace-nowrap text-muted-foreground">Delete?</span>

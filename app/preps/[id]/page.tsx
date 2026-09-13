@@ -22,7 +22,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     prep = await getMyPrep(id)
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return <PrepPage prep={null} />
+      return <PrepPage prep={null} questions={[]} attempts={[]} assets={[]} runSummary={null} concepts={[]} />
     }
     throw e
   }

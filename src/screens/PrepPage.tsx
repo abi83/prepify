@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { Prep, Question, Attempt, Asset } from '@prisma/client'
-import type { VisualElement, Page } from '../types/prep'
+import type { StudyTab, VisualElement, Page } from '../types/prep'
 import type { FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
@@ -29,7 +30,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 
-type Tab = 'cards' | 'quiz' | 'test'
 type GenPhase = 'idle' | 'running' | 'done'
 
 // ── Pipeline checklist ──────────────────────────────────────────────────────
@@ -189,21 +189,19 @@ function PageSection({ page }: { page: Page }) {
 
 interface Props {
   prep: Prep | null
-  questions?: Question[]
-  attempts?: Attempt[]
-  assets?: Asset[]
-  runSummary?: PartialRunSummary | null
-  concepts?: Concept[]
+  questions: Question[]
+  attempts: Attempt[]
+  assets: Asset[]
+  runSummary: PartialRunSummary | null
+  concepts: Concept[]
 }
 
 export default function PrepPage({ prep, questions, attempts, assets, runSummary, concepts }: Props) {
-  const router = useRouter()
-
   if (!prep) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5">
         <p>Prep not found.</p>
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← Back to My Preps</Button>
+        <Link href="/preps" className="text-sm text-muted-foreground hover:underline">← Back to My Preps</Link>
       </div>
     )
   }
@@ -211,11 +209,11 @@ export default function PrepPage({ prep, questions, attempts, assets, runSummary
   return (
     <PrepPageInner
       prep={prep}
-      questions={questions ?? []}
-      attempts={attempts ?? []}
-      assets={assets ?? []}
-      runSummary={runSummary ?? null}
-      concepts={concepts ?? []}
+      questions={questions}
+      attempts={attempts}
+      assets={assets}
+      runSummary={runSummary}
+      concepts={concepts}
     />
   )
 }
@@ -238,14 +236,21 @@ function PrepPageInner({
   concepts: initialConcepts,
 }: InnerProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = initialPrep.id
 
   const [prep, setPrep] = useState<Prep>(initialPrep)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
   const [attempts, setAttempts] = useState<Attempt[]>(initialAttempts)
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
-  const [tab, setTab] = useState<Tab>('cards')
-  const [activeAttempt, setActiveAttempt] = useState<Tab | null>(null)
+  const tab = (searchParams.get('tab') as StudyTab | null) ?? 'cards'
+  const [activeAttempt, setActiveAttempt] = useState<StudyTab | null>(null)
+
+  function setTab(next: StudyTab) {
+    const params = new URLSearchParams(searchParams)
+    params.set('tab', next)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
 
   useEffect(() => setPrep(initialPrep), [initialPrep])
   useEffect(() => setQuestions(initialQuestions), [initialQuestions])
@@ -467,7 +472,9 @@ function PrepPageInner({
       </Dialog>
 
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => router.push('/preps')}>← My Preps</Button>
+        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
+          <Link href="/preps">← My Preps</Link>
+        </Button>
         <div className="flex items-center gap-4">
           {prep.userId === userId && hasQuestions && (
             <Button size="sm" onClick={() => setShowShareModal(true)}>
@@ -477,7 +484,9 @@ function PrepPageInner({
           {prep.userId === userId && (
             <Button variant="link" className="h-auto p-0 text-sm text-error" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
           )}
-          <Button variant="link" className="h-auto p-0 text-sm text-muted-foreground" onClick={() => router.push('/settings')}>Settings</Button>
+          <Button asChild variant="link" className="h-auto p-0 text-sm text-muted-foreground">
+            <Link href="/settings">Settings</Link>
+          </Button>
         </div>
       </header>
 

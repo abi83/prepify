@@ -1,3 +1,5 @@
+export type StudyTab = 'cards' | 'quiz' | 'test'
+
 export type VisualElementType = 'diagram' | 'formula' | 'table' | 'chart' | 'molecule' | 'image'
 
 export type VisualElement = {
