@@ -38,18 +38,6 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('StudyPage — not found', () => {
-  it('shows not-available message when prep is null', () => {
-    render(<StudyPage prep={null} questions={[]} assets={[]} />)
-    expect(screen.getByText(/not available/i)).toBeInTheDocument()
-  })
-
-  it('shows a home navigation link on not-found', () => {
-    render(<StudyPage prep={null} questions={[]} assets={[]} />)
-    expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/')
-  })
-})
-
 describe('StudyPage — loaded with questions', () => {
   const questions: Question[] = [
     {

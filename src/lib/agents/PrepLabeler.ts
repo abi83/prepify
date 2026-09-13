@@ -19,6 +19,10 @@ export const DISCIPLINES = [
 
 export type Discipline = (typeof DISCIPLINES)[number]
 
+export function isDiscipline(value: string): value is Discipline {
+  return DISCIPLINES.some(d => d === value)
+}
+
 export const prepLabelSchema = z.object({
   grade: z.number().int().min(1).max(13).nullable(),
   discipline: z.enum(DISCIPLINES).nullable(),

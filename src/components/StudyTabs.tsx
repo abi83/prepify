@@ -1,5 +1,5 @@
 import type { Question } from '@prisma/client'
-import type { StudyTab } from '../types/prep'
+import { isStudyTab, type StudyTab } from '../types/prep'
 import type { FlashcardContent } from '../types/questions'
 import FlashCard from './questions/FlashCard'
 import { Button } from './ui/button'
@@ -36,7 +36,13 @@ function ModePanel({
 
 export default function StudyTabs({ tab, onTabChange, flashcards, studyQuestions, onStartAttempt }: Props) {
   return (
-    <Tabs value={tab} onValueChange={v => onTabChange(v as StudyTab)}>
+    <Tabs
+      value={tab}
+      onValueChange={v => {
+        if (!isStudyTab(v)) throw new Error(`Unexpected tab value from Tabs: ${v}`)
+        onTabChange(v)
+      }}
+    >
       <TabsList>
         <TabsTrigger value="cards">Cards</TabsTrigger>
         <TabsTrigger value="quiz">Quiz</TabsTrigger>

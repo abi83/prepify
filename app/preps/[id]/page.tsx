@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import PrepPage from '@/screens/PrepPage'
 import { getMyPrep } from '@/actions/preps'
@@ -21,9 +21,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   try {
     prep = await getMyPrep(id)
   } catch (e) {
-    if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return <PrepPage prep={null} questions={[]} attempts={[]} assets={[]} runSummary={null} concepts={[]} />
-    }
+    // Forbidden renders as 404 too, so a private prep's existence isn't leaked to a non-owner.
+    if (e instanceof NotFoundError || e instanceof ForbiddenError) notFound()
     throw e
   }
 

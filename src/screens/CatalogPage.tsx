@@ -1,10 +1,10 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { CatalogEntry } from '../repositories/prepRepository'
-import { DISCIPLINES } from '../lib/agents/PrepLabeler'
+import { DISCIPLINES, isDiscipline, type Discipline } from '../lib/agents/PrepLabeler'
 import { disciplineFromEnum } from '../lib/disciplineMapping'
+import { useUrlParams } from '../lib/urlState'
 import { Button } from '../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
@@ -35,32 +35,41 @@ interface Props {
   entries: CatalogEntry[]
 }
 
+function parseGradeFilter(value: string | null): number | undefined {
+  if (value === null) return undefined
+  const grade = Number(value)
+  return ALL_GRADES.includes(grade) ? grade : undefined
+}
+
+function parseDisciplineFilter(value: string | null): Discipline | undefined {
+  return value !== null && isDiscipline(value) ? value : undefined
+}
+
+function parseLanguageFilter(value: string | null, availableLanguages: string[]): string | undefined {
+  return value !== null && availableLanguages.includes(value) ? value : undefined
+}
+
 export default function CatalogPage({ entries }: Props) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const { searchParams, set: setUrlParams } = useUrlParams()
 
-  const gradeParam = searchParams.get('grade')
-  const gradeFilter: number | '' = gradeParam ? Number(gradeParam) : ''
-  const disciplineFilter = searchParams.get('discipline') ?? ''
-  const languageFilter = searchParams.get('language') ?? ''
+  const availableLanguages = [...new Set(entries.map(e => e.language).filter((l): l is string => !!l))]
 
-  function setFilter(key: 'grade' | 'discipline' | 'language', value: string) {
-    const params = new URLSearchParams(searchParams)
-    if (value === '') params.delete(key)
-    else params.set(key, value)
-    router.replace(`?${params.toString()}`, { scroll: false })
+  const gradeFilter = parseGradeFilter(searchParams.get('grade'))
+  const disciplineFilter = parseDisciplineFilter(searchParams.get('discipline'))
+  const languageFilter = parseLanguageFilter(searchParams.get('language'), availableLanguages)
+
+  function setFilter(key: 'grade' | 'discipline' | 'language', value: string | undefined) {
+    setUrlParams({ [key]: value })
   }
 
   const displayEntries = entries.map(e => ({ ...e, discipline: disciplineFromEnum(e.discipline) }))
 
   const filtered = displayEntries.filter(e => {
-    if (gradeFilter !== '' && e.grade !== gradeFilter) return false
-    if (disciplineFilter !== '' && e.discipline !== disciplineFilter) return false
-    if (languageFilter !== '' && e.language !== languageFilter) return false
+    if (gradeFilter !== undefined && e.grade !== gradeFilter) return false
+    if (disciplineFilter !== undefined && e.discipline !== disciplineFilter) return false
+    if (languageFilter !== undefined && e.language !== languageFilter) return false
     return true
   })
-
-  const availableLanguages = [...new Set(entries.map(e => e.language).filter((l): l is string => !!l))]
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -82,8 +91,8 @@ export default function CatalogPage({ entries }: Props) {
 
         <div className="flex flex-wrap gap-3">
           <Select
-            value={gradeFilter === '' ? ALL_GRADES_VALUE : String(gradeFilter)}
-            onValueChange={v => setFilter('grade', v === ALL_GRADES_VALUE ? '' : v)}
+            value={gradeFilter === undefined ? ALL_GRADES_VALUE : String(gradeFilter)}
+            onValueChange={v => setFilter('grade', v === ALL_GRADES_VALUE ? undefined : v)}
           >
             <SelectTrigger aria-label="Filter by grade" className="min-w-[140px]">
               <SelectValue />
@@ -97,8 +106,8 @@ export default function CatalogPage({ entries }: Props) {
           </Select>
 
           <Select
-            value={disciplineFilter === '' ? ALL_DISCIPLINES_VALUE : disciplineFilter}
-            onValueChange={v => setFilter('discipline', v === ALL_DISCIPLINES_VALUE ? '' : v)}
+            value={disciplineFilter === undefined ? ALL_DISCIPLINES_VALUE : disciplineFilter}
+            onValueChange={v => setFilter('discipline', v === ALL_DISCIPLINES_VALUE ? undefined : v)}
           >
             <SelectTrigger aria-label="Filter by subject" className="min-w-[140px]">
               <SelectValue />
@@ -113,8 +122,8 @@ export default function CatalogPage({ entries }: Props) {
 
           {availableLanguages.length > 1 && (
             <Select
-              value={languageFilter === '' ? ALL_LANGUAGES_VALUE : languageFilter}
-              onValueChange={v => setFilter('language', v === ALL_LANGUAGES_VALUE ? '' : v)}
+              value={languageFilter === undefined ? ALL_LANGUAGES_VALUE : languageFilter}
+              onValueChange={v => setFilter('language', v === ALL_LANGUAGES_VALUE ? undefined : v)}
             >
               <SelectTrigger aria-label="Filter by language" className="min-w-[140px]">
                 <SelectValue />

@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import StudyPage from '@/screens/StudyPage'
 import { getSharedPrep } from '@/actions/preps'
 import { listSharedQuestions } from '@/actions/questions'
@@ -14,9 +15,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   try {
     prep = await getSharedPrep(id)
   } catch (e) {
-    if (e instanceof NotFoundError || e instanceof ForbiddenError) {
-      return <StudyPage prep={null} questions={[]} assets={[]} />
-    }
+    // Forbidden renders as 404 too, so a private prep's existence isn't leaked to a non-owner.
+    if (e instanceof NotFoundError || e instanceof ForbiddenError) notFound()
     throw e
   }
 

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { Prep, Question, Attempt, Asset } from '@prisma/client'
-import type { StudyTab, VisualElement, Page } from '../types/prep'
+import { parseStudyTab, type StudyTab, type VisualElement, type Page } from '../types/prep'
+import { useUrlParams } from '../lib/urlState'
 import type { FlashcardContent } from '../types/questions'
 import type { PipelineProgressEvent, Concept } from '../types/pipeline'
 import { getApiKey, estimateCost, formatCost } from '../lib/apiKey'
@@ -188,37 +189,6 @@ function PageSection({ page }: { page: Page }) {
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
-  prep: Prep | null
-  questions: Question[]
-  attempts: Attempt[]
-  assets: Asset[]
-  runSummary: PartialRunSummary | null
-  concepts: Concept[]
-}
-
-export default function PrepPage({ prep, questions, attempts, assets, runSummary, concepts }: Props) {
-  if (!prep) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-5">
-        <p>Prep not found.</p>
-        <Link href="/preps" className="text-sm text-muted-foreground hover:underline">← Back to My Preps</Link>
-      </div>
-    )
-  }
-
-  return (
-    <PrepPageInner
-      prep={prep}
-      questions={questions}
-      attempts={attempts}
-      assets={assets}
-      runSummary={runSummary}
-      concepts={concepts}
-    />
-  )
-}
-
-interface InnerProps {
   prep: Prep
   questions: Question[]
   attempts: Attempt[]
@@ -227,29 +197,27 @@ interface InnerProps {
   concepts: Concept[]
 }
 
-function PrepPageInner({
+export default function PrepPage({
   prep: initialPrep,
   questions: initialQuestions,
   attempts: initialAttempts,
   assets: initialAssets,
   runSummary: initialRunSummary,
   concepts: initialConcepts,
-}: InnerProps) {
+}: Props) {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const { searchParams, set: setUrlParams } = useUrlParams()
   const id = initialPrep.id
 
   const [prep, setPrep] = useState<Prep>(initialPrep)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
   const [attempts, setAttempts] = useState<Attempt[]>(initialAttempts)
   const [assets, setAssets] = useState<Asset[]>(initialAssets)
-  const tab = (searchParams.get('tab') as StudyTab | null) ?? 'cards'
+  const tab = parseStudyTab(searchParams.get('tab'))
   const [activeAttempt, setActiveAttempt] = useState<StudyTab | null>(null)
 
   function setTab(next: StudyTab) {
-    const params = new URLSearchParams(searchParams)
-    params.set('tab', next)
-    router.replace(`?${params.toString()}`, { scroll: false })
+    setUrlParams({ tab: next })
   }
 
   useEffect(() => setPrep(initialPrep), [initialPrep])
