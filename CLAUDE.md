@@ -49,6 +49,7 @@ Copy `.env.example` to `.env.local`:
 
 All schema changes via **Prisma migrations** against Neon Postgres (`prisma/schema.prisma` is the source of truth).
 
+### Authoring locally (human)
 One-time setup — get the dev Neon connection strings into `.env.local`:
 ```bash
 gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk  # → DATABASE_URL_DIRECT
@@ -61,10 +62,16 @@ npm run db:status     # prisma migrate status
 npm run db:generate   # prisma generate (also runs automatically via postinstall)
 ```
 
-Migrations are authored and applied against the **dev** Neon branch locally, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR. CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if you already applied it locally, but catches anything you forgot. The prod step only runs after the same manual-approval gate that already protects prod deploys.
+Migrations are authored and applied against the shared **dev** Neon branch, then the generated SQL under `prisma/migrations/` is committed and reviewed as part of the PR.
+
+### Authoring as an agent (interns pipeline, or Claude running non-interactively)
+Don't run `db:migrate` against the shared dev branch — there's no per-PR isolation yet ([#85](https://github.com/abi83/prepify/issues/85), open), so two migrations authored concurrently can collide. If a ticket's scope needs a schema change, stop and flag it for the owner instead of authoring one directly. Once #85 lands, agents get their own ephemeral branch and this restriction goes away.
+
+### Deploy
+CI (`.github/workflows/deploy.yml`) runs `prisma migrate deploy` before each Cloud Run deploy — idempotent, so it's a no-op if already applied locally, but catches anything forgotten. The prod step only runs after the same manual-approval gate that already protects prod deploys.
 
 ### Conventions
-- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several). Easier once per-PR Neon branches (#85) land.
+- Aim for one migration per PR — iterate locally, then collapse into a single clean migration before committing (drop and regenerate if you made several).
 - Prisma's own naming (`prisma migrate dev --name <descriptive_name>`)
 - Never edit an already-committed migration — create a new one instead
 
