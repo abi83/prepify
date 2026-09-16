@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
 import type { AgentImage } from '../agent'
+import { SUPPORTED_LANGUAGES } from '../config'
 
 const visualElementSchema = z.object({
   type: z.enum(['diagram', 'formula', 'table', 'chart', 'molecule', 'image']),
@@ -14,7 +15,7 @@ const visualElementSchema = z.object({
 const ocrSchema = z.object({
   text: z.string(),
   confidence: z.number().min(0).max(1),
-  language: z.string().min(1),
+  language: z.enum(SUPPORTED_LANGUAGES),
   visual_elements: z.array(visualElementSchema),
 })
 

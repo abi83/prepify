@@ -1,3 +1,6 @@
+export const SUPPORTED_LANGUAGES = ['en', 'de', 'fr', 'it', 'es', 'pl'] as const
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
+
 /** Characters per chunk sent to ConceptExtractor. */
 export const CHUNK_SIZE = 15_000
 
