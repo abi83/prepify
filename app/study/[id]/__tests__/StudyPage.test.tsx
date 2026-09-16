@@ -8,11 +8,11 @@ vi.mock('next-auth/react', () => ({
 }))
 
 vi.mock('next/navigation', async () => {
-  const { createNavigationMock } = await import('../../testUtils/navigationMock')
+  const { createNavigationMock } = await import('@/testUtils/navigationMock')
   return { ...createNavigationMock(), useParams: () => ({ id: 'test-prep-id' }) }
 })
 
-vi.mock('../../actions/attempts', () => ({
+vi.mock('@/actions/attempts', () => ({
   insertAttempt: vi.fn().mockResolvedValue({}),
 }))
 

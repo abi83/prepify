@@ -1,4 +1,4 @@
-import CatalogPage from '@/screens/CatalogPage'
+import CatalogPage from './CatalogPage'
 import { listCatalog } from '@/actions/preps'
 
 // Data changes per-user-action and there's no DB access at build time — always render per-request.

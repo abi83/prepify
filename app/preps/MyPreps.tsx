@@ -6,9 +6,9 @@ import Link from 'next/link'
 import type { Prep } from '@prisma/client'
 import { signOut as authSignOut } from 'next-auth/react'
 import { SettingsIcon, XIcon } from 'lucide-react'
-import { deletePrep } from '../actions/preps'
-import UploadModal from '../components/UploadModal'
-import { Button } from '../components/ui/button'
+import { deletePrep } from '@/actions/preps'
+import UploadModal from '@/components/UploadModal'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   preps: Prep[]

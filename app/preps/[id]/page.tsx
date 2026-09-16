@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
-import PrepPage from '@/screens/PrepPage'
+import PrepPage from './PrepPage'
 import { ErrorState } from '@/components/ErrorState'
 import { Button } from '@/components/ui/button'
 import { getMyPrep } from '@/actions/preps'

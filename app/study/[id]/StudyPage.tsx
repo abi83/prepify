@@ -4,12 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { Prep, Question, Asset } from '@prisma/client'
-import { parseStudyTab, type StudyTab } from '../types/prep'
-import { useUrlParams } from '../lib/urlState'
-import type { FlashcardContent } from '../types/questions'
-import StudyTabs from '../components/StudyTabs'
-import AttemptFlow from '../components/attempt/AttemptFlow'
-import { Button } from '../components/ui/button'
+import { parseStudyTab, type StudyTab } from '@/types/prep'
+import { useUrlParams } from '@/lib/urlState'
+import type { FlashcardContent } from '@/types/questions'
+import StudyTabs from '@/components/StudyTabs'
+import AttemptFlow from '@/components/attempt/AttemptFlow'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   prep: Prep

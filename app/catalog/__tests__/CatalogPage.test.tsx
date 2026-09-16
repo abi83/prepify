@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { CatalogEntry } from '../../repositories/prepRepository'
-import { createNavigationMock } from '../../testUtils/navigationMock'
+import type { CatalogEntry } from '@/repositories/prepRepository'
+import { createNavigationMock } from '@/testUtils/navigationMock'
 
 // vi.mock is hoisted above this file's imports, so the mock object itself must be
 // created via vi.hoisted — a plain top-level `const` here would still be uninitialized
