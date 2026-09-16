@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import SettingsPage from '@/screens/SettingsPage'
+import SettingsPage from './SettingsPage'
 
 export default async function Page() {
   const session = await auth()

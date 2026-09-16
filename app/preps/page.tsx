@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import MyPreps from '@/screens/MyPreps'
+import MyPreps from './MyPreps'
 import { listMyPreps } from '@/actions/preps'
 
 // Data changes per-user-action (create/delete) and there's no DB access at build time — always render per-request.

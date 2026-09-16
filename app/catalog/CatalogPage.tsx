@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import type { CatalogEntry } from '../repositories/prepRepository'
-import { DISCIPLINES, isDiscipline, type Discipline } from '../lib/agents/PrepLabeler'
-import { disciplineFromEnum } from '../lib/disciplineMapping'
-import { LANGUAGE_LABELS } from '../lib/config'
-import { useUrlParams } from '../lib/urlState'
-import { Button } from '../components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import type { CatalogEntry } from '@/repositories/prepRepository'
+import { DISCIPLINES, isDiscipline, type Discipline } from '@/lib/agents/PrepLabeler'
+import { disciplineFromEnum } from '@/lib/disciplineMapping'
+import { LANGUAGE_LABELS } from '@/lib/config'
+import { formatDate } from '@/lib/format'
+import { useUrlParams } from '@/lib/urlState'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const ALL_GRADES = Array.from({ length: 13 }, (_, i) => i + 1)
 const ALL_GRADES_VALUE = 'all-grades'
@@ -159,6 +160,3 @@ export default function CatalogPage({ entries }: Props) {
   )
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}

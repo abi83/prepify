@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import Home from '@/screens/Home'
+import Home from './Home'
 
 export default async function Page() {
   const session = await auth()

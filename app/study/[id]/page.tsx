@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import StudyPage from '@/screens/StudyPage'
+import StudyPage from './StudyPage'
 import { ErrorState } from '@/components/ErrorState'
 import { getSharedPrep } from '@/actions/preps'
 import { listSharedQuestions } from '@/actions/questions'
