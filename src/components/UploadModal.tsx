@@ -29,7 +29,7 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
   })
 
   const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model)
-  return { text: output.text, language: output.language ?? 'en', visual_elements: output.visual_elements }
+  return { text: output.text, language: output.language, visual_elements: output.visual_elements }
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {

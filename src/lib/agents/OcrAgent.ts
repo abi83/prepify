@@ -58,6 +58,7 @@ export async function runOcrAgent(
     ...result,
     output: {
       ...result.output,
+      language: result.output.language || 'en',
       visual_elements: result.output.visual_elements.filter(e => e.confidence >= MIN_ELEMENT_CONFIDENCE),
     },
   }
