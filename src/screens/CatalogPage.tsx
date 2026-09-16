@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { CatalogEntry } from '../repositories/prepRepository'
 import { DISCIPLINES, isDiscipline, type Discipline } from '../lib/agents/PrepLabeler'
 import { disciplineFromEnum } from '../lib/disciplineMapping'
+import { LANGUAGE_LABELS } from '../lib/config'
 import { useUrlParams } from '../lib/urlState'
 import { Button } from '../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
@@ -13,23 +14,6 @@ const ALL_GRADES_VALUE = 'all-grades'
 const ALL_DISCIPLINES_VALUE = 'all-disciplines'
 const ALL_LANGUAGES_VALUE = 'all-languages'
 
-const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English',
-  de: 'Deutsch',
-  fr: 'Français',
-  it: 'Italiano',
-  es: 'Español',
-  pl: 'Polski',
-  nl: 'Nederlands',
-  pt: 'Português',
-  ru: 'Русский',
-  uk: 'Українська',
-  cs: 'Čeština',
-  sk: 'Slovenčina',
-  ro: 'Română',
-  hu: 'Magyar',
-  tr: 'Türkçe',
-}
 
 interface Props {
   entries: CatalogEntry[]
@@ -131,7 +115,7 @@ export default function CatalogPage({ entries }: Props) {
               <SelectContent>
                 <SelectItem value={ALL_LANGUAGES_VALUE}>All languages</SelectItem>
                 {availableLanguages.map(l => (
-                  <SelectItem key={l} value={l}>{LANGUAGE_LABELS[l] ?? l.toUpperCase()}</SelectItem>
+                  <SelectItem key={l} value={l}>{LANGUAGE_LABELS[l as keyof typeof LANGUAGE_LABELS] ?? l.toUpperCase()}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
