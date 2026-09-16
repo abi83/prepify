@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
+import type { AgentImage } from '../agent'
 
 const visualElementSchema = z.object({
   type: z.enum(['diagram', 'formula', 'table', 'chart', 'molecule', 'image']),
@@ -36,15 +37,14 @@ const MIN_PAGE_CONFIDENCE = 0.5
 const MIN_ELEMENT_CONFIDENCE = 0.6
 
 export async function runOcrAgent(
-  imageBase64: string,
-  imageMimeType: string,
+  images: AgentImage[],
   apiKey: string,
   model: string,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: 'ocr',
     systemPrompt: SYSTEM_PROMPT,
-    userContent: { textContent: USER_PROMPT, imageBase64, imageMimeType },
+    userContent: { textContent: USER_PROMPT, images },
     schema: ocrSchema,
     apiKey,
     model,

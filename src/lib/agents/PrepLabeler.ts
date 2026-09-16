@@ -62,7 +62,7 @@ export async function runPrepLabeler(
   return runAgent({
     name: 'PrepLabeler',
     systemPrompt: SYSTEM_PROMPT,
-    userContent: `Concepts:\n${conceptList}`,
+    userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepLabelSchema,
     apiKey,
     model,

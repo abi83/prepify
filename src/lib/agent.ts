@@ -14,30 +14,34 @@ export interface AgentResult<T> {
   metrics: AgentMetrics
 }
 
-export interface AgentImageInput {
+export interface AgentImage {
+  base64: string
+  mimeType: string
+}
+
+export interface AgentInput {
   textContent: string
-  imageBase64: string
-  imageMimeType: string
+  images?: AgentImage[]
 }
 
 interface RunAgentConfig<T> {
   name: string
   systemPrompt: string
-  userContent: string | AgentImageInput
+  userContent: AgentInput
   schema: ZodSchema<T>
   apiKey: string
   model?: string
   signal?: AbortSignal
 }
 
-function buildUserContent(userContent: string | AgentImageInput): string | OpenAI.ChatCompletionContentPart[] {
-  if (typeof userContent === 'string') return userContent
+function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.ChatCompletionContentPart[] {
+  if (!images?.length) return textContent
   return [
-    {
-      type: 'image_url',
-      image_url: { url: `data:${userContent.imageMimeType};base64,${userContent.imageBase64}`, detail: 'high' },
-    },
-    { type: 'text', text: userContent.textContent },
+    ...images.map(img => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: 'high' as const },
+    })),
+    { type: 'text' as const, text: textContent },
   ]
 }
 

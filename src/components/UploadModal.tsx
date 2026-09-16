@@ -28,7 +28,7 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
     reader.readAsDataURL(file)
   })
 
-  const { output } = await runOcrAgent(base64, file.type, apiKey, model)
+  const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model)
   return { text: output.text, language: output.language ?? 'en', visual_elements: output.visual_elements }
 }
 

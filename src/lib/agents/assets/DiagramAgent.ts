@@ -42,7 +42,7 @@ export async function runDiagramAgent(
   const result = await runAgent({
     name: 'DiagramAgent',
     systemPrompt: SYSTEM_PROMPT,
-    userContent: `Generate a Mermaid diagram for: ${description}`,
+    userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
     schema: responseSchema,
     apiKey,
     model,

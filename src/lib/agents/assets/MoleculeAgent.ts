@@ -31,7 +31,7 @@ export async function runMoleculeAgent(
   const result = await runAgent({
     name: 'MoleculeAgent',
     systemPrompt: SYSTEM_PROMPT,
-    userContent: `Generate SMILES for: ${description}`,
+    userContent: { textContent: `Generate SMILES for: ${description}` },
     schema: responseSchema,
     apiKey,
     model,
