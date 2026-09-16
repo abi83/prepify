@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Prep } from '@prisma/client'
@@ -14,14 +14,11 @@ interface Props {
   preps: Prep[]
 }
 
-export default function MyPreps({ preps: initialPreps }: Props) {
-  const [preps, setPreps] = useState<Prep[]>(initialPreps)
+export default function MyPreps({ preps }: Props) {
   const [showUpload, setShowUpload] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
-
-  useEffect(() => setPreps(initialPreps), [initialPreps])
 
   async function signOut() {
     await authSignOut({ redirectTo: '/' })
@@ -35,10 +32,8 @@ export default function MyPreps({ preps: initialPreps }: Props) {
   async function handleDelete(id: string) {
     setDeleting(true)
     await deletePrep(id)
-    setPreps(prev => prev.filter(p => p.id !== id))
     setConfirmDeleteId(null)
     setDeleting(false)
-    router.refresh()
   }
 
   return (

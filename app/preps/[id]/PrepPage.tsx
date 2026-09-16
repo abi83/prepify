@@ -200,10 +200,10 @@ interface Props {
 export default function PrepPage({
   prep: initialPrep,
   questions: initialQuestions,
-  attempts: initialAttempts,
-  assets: initialAssets,
+  attempts,
+  assets,
   runSummary: initialRunSummary,
-  concepts: initialConcepts,
+  concepts,
 }: Props) {
   const router = useRouter()
   const { searchParams, set: setUrlParams } = useUrlParams()
@@ -211,8 +211,6 @@ export default function PrepPage({
 
   const [prep, setPrep] = useState<Prep>(initialPrep)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
-  const [attempts, setAttempts] = useState<Attempt[]>(initialAttempts)
-  const [assets, setAssets] = useState<Asset[]>(initialAssets)
   const tab = parseStudyTab(searchParams.get('tab'))
   const [activeAttempt, setActiveAttempt] = useState<StudyTab | null>(null)
 
@@ -222,8 +220,6 @@ export default function PrepPage({
 
   useEffect(() => setPrep(initialPrep), [initialPrep])
   useEffect(() => setQuestions(initialQuestions), [initialQuestions])
-  useEffect(() => setAttempts(initialAttempts), [initialAttempts])
-  useEffect(() => setAssets(initialAssets), [initialAssets])
 
   const [genPhase, setGenPhase] = useState<GenPhase>('idle')
   const [pipelineProgress, setPipelineProgress] = useState<PipelineProgressEvent | null>(null)
@@ -242,7 +238,6 @@ export default function PrepPage({
 
   const { data: session } = useSession()
   const userId = session?.user.id ?? null
-  const [concepts] = useState<Concept[]>(initialConcepts)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
