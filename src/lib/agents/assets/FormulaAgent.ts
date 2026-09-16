@@ -28,7 +28,7 @@ export async function runFormulaAgent(
   const result = await runAgent({
     name: 'FormulaAgent',
     systemPrompt: SYSTEM_PROMPT,
-    userPrompt: `Generate LaTeX for: ${description}`,
+    userContent: { textContent: `Generate LaTeX for: ${description}` },
     schema: responseSchema,
     apiKey,
     model,

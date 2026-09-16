@@ -14,14 +14,35 @@ export interface AgentResult<T> {
   metrics: AgentMetrics
 }
 
+export interface AgentImage {
+  base64: string
+  mimeType: string
+}
+
+export interface AgentInput {
+  textContent: string
+  images?: AgentImage[]
+}
+
 interface RunAgentConfig<T> {
   name: string
   systemPrompt: string
-  userPrompt: string
+  userContent: AgentInput
   schema: ZodSchema<T>
   apiKey: string
   model?: string
   signal?: AbortSignal
+}
+
+function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.ChatCompletionContentPart[] {
+  if (!images?.length) return textContent
+  return [
+    ...images.map(img => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: 'high' as const },
+    })),
+    { type: 'text' as const, text: textContent },
+  ]
 }
 
 const MAX_ATTEMPTS = 3
@@ -45,7 +66,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userPrompt, schema, apiKey, model = 'gpt-5-nano', signal } = config
+  const { name, systemPrompt, userContent, schema, apiKey, model = 'gpt-5-nano', signal } = config
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -60,7 +81,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
+            { role: 'user', content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
           service_tier: 'flex',

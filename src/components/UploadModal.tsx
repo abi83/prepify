@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import OpenAI from 'openai'
 import type { Prisma } from '@prisma/client'
-import type { VisualElement, Page } from '../types/prep'
+import type { Page } from '../types/prep'
+import type { VisualElementOutput } from '../lib/agents/OcrAgent'
+import { runOcrAgent } from '../lib/agents/OcrAgent'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import { listMyPreps, createPrep } from '../actions/preps'
@@ -19,14 +20,7 @@ type Props = {
 
 type Phase = 'collect' | 'ocr' | 'saving' | 'error'
 
-type OcrResult = {
-  text: string
-  confidence: number
-  language: string
-  visual_elements: VisualElement[]
-}
-
-async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElement[] }> {
+async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(',')[1])
@@ -34,62 +28,8 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
     reader.readAsDataURL(file)
   })
 
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
-  const response = await client.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:${file.type};base64,${base64}`, detail: 'high' },
-          },
-          {
-            type: 'text',
-            text: `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
-
-Respond with JSON only:
-{
-  "text": "<extracted text, preserving structure and line breaks>",
-  "confidence": <0.0–1.0>,
-  "language": "<ISO 639-1 code of the text language, e.g. en, de, fr, it, es, pl>",
-  "visual_elements": [
-    {
-      "type": "<diagram|formula|table|chart|molecule|image>",
-      "description": "<plain-language description of what it shows>",
-      "content": "<LaTeX for formulas, SMILES for molecules, Mermaid DSL for diagrams, markdown for tables, or descriptive text>",
-      "caption": "<caption text visible on the page, or null>",
-      "context": "<surrounding text that references this element, or null>",
-      "confidence": <0.0–1.0 for this specific element>
-    }
-  ]
-}
-
-Confidence rubric (top-level):
-- 0.9–1.0: Sharp image, all text clearly readable
-- 0.7–0.9: Mostly readable, minor blur or cropping
-- 0.5–0.7: Partial — some words/lines unclear or missing
-- 0.0–0.5: Poor quality — large portions unreadable
-
-If no visual elements are present, return an empty array for visual_elements.`,
-          },
-        ],
-      },
-    ],
-    response_format: { type: 'json_object' },
-    service_tier: 'flex',
-  })
-
-  const raw = response.choices[0]?.message?.content?.trim() ?? ''
-  const parsed: OcrResult = JSON.parse(raw)
-
-  if (parsed.confidence < 0.5) {
-    throw new Error(`low_confidence:${parsed.confidence}`)
-  }
-
-  const elements = (parsed.visual_elements ?? []).filter(e => e.confidence >= 0.6)
-  return { text: parsed.text, language: parsed.language ?? 'en', visual_elements: elements }
+  const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model)
+  return { text: output.text, language: output.language, visual_elements: output.visual_elements }
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
@@ -148,7 +88,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase('ocr')
     setOcrProgress({ done: 0, total: files.length })
 
-    let results: { text: string; language: string; visual_elements: VisualElement[] }[]
+    let results: { text: string; language: string; visual_elements: VisualElementOutput[] }[]
     try {
       results = await Promise.all(
         files.map(async (file) => {
