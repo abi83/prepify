@@ -18,73 +18,12 @@ import { getMyPrep, updatePrep } from '@/actions/preps'
 import { generateAndSaveAssets } from '@/lib/assetGeneration'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from './GenerationChecklist'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-type GenPhase = 'idle' | 'running' | 'done'
-type RowStatus = 'pending' | 'running' | 'done'
-
-interface ChecklistRowData {
-  label: string
-  status: RowStatus
-  detail?: string
-}
-
-function rowsFromProgress(
-  progress: PipelineProgressEvent | null,
-  craft: { done: number; total: number } | null,
-  review: { done: number; total: number } | null,
-  titleReady: boolean,
-): ChecklistRowData[] {
-  const stage = progress?.stage ?? null
-  const conceptsDone = stage !== null && stage !== 'concepts'
-  const namingActive = conceptsDone && stage !== 'done'
-  const namingDone = titleReady || stage === 'done'
-  const craftingDone = stage === 'reviewing' || stage === 'done'
-  const craftingRunning = stage === 'crafting' || stage === 'resuming'
-  const reviewingDone = stage === 'done'
-  const reviewingRunning = stage === 'reviewing'
-  return [
-    { label: 'Extract educational concepts', status: conceptsDone ? 'done' : 'running' },
-    { label: 'Name the prep', status: namingDone ? 'done' : namingActive ? 'running' : 'pending' },
-    { label: 'Craft questions', status: craftingDone ? 'done' : craftingRunning ? 'running' : 'pending', detail: craft ? `${craft.done}/${craft.total}` : undefined },
-    { label: 'Validate questions', status: reviewingDone ? 'done' : reviewingRunning ? 'running' : 'pending', detail: review ? `${review.done}/${review.total}` : undefined },
-  ]
-}
-
-const DEFAULT_TITLE_RE = /^Prep #\d+$/
-
-function rowsFromSummary(s: PartialRunSummary, prepTitle: string): ChecklistRowData[] {
-  const total = s.totalTasks || 10
-  const n = s.completedSlots
-  const titled = !DEFAULT_TITLE_RE.test(prepTitle)
-  return [
-    { label: 'Extract educational concepts', status: s.hasConcepts ? 'done' : 'pending' },
-    { label: 'Name the prep', status: titled ? 'done' : 'pending' },
-    { label: 'Craft questions', status: n > 0 ? 'done' : 'pending', detail: s.totalTasks > 0 ? `${n}/${total}` : undefined },
-    { label: 'Validate questions', status: n > 0 ? 'done' : 'pending', detail: s.totalTasks > 0 ? `${n}/${total}` : undefined },
-  ]
-}
-
-function ChecklistRow({ row }: { row: ChecklistRowData }) {
-  return (
-    <div className="flex items-center gap-2.5 text-sm">
-      <span className={cn('flex size-5 shrink-0 items-center justify-center text-sm font-bold',
-        row.status === 'done' ? 'text-primary' : row.status === 'running' ? 'text-muted-foreground' : 'text-border',
-      )}>
-        {row.status === 'done' ? '✓' : row.status === 'running'
-          ? <span className="inline-block size-2 animate-pulse rounded-full bg-primary" />
-          : '○'}
-      </span>
-      <span className={cn('leading-snug', row.status === 'pending' && 'text-muted-foreground')}>
-        {row.label}
-        {row.detail && <span className="text-sm text-muted-foreground"> ({row.detail})</span>}
-      </span>
-    </div>
-  )
-}
 
 interface Props {
   prepId: string

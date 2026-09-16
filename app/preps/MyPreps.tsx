@@ -6,6 +6,7 @@ import Link from 'next/link'
 import type { Prep } from '@prisma/client'
 import { signOut as authSignOut } from 'next-auth/react'
 import { SettingsIcon, XIcon } from 'lucide-react'
+import { formatDate } from '@/lib/format'
 import { deletePrep } from '@/actions/preps'
 import UploadModal from '@/components/UploadModal'
 import { Button } from '@/components/ui/button'
@@ -125,6 +126,3 @@ export default function MyPreps({ preps }: Props) {
   )
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-}
