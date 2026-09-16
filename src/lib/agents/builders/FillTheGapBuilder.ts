@@ -58,7 +58,7 @@ export async function runFillTheGapBuilder(
   const result = await runAgent({
     name: 'FillTheGapBuilder',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: formatConcepts(task.concepts),
+    userContent: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,

@@ -47,7 +47,7 @@ export async function runQuestionReviewer(
     return await runAgent({
       name: 'QuestionReviewer',
       systemPrompt: SYSTEM_PROMPT + langInstruction,
-      userPrompt: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}`,
+      userContent: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}`,
       schema: reviewerResponseSchema,
       apiKey,
       model,

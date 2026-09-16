@@ -62,7 +62,7 @@ export async function runMultipleChoiceBuilder(
   const result = await runAgent({
     name: 'MultipleChoiceBuilder',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: formatConcepts(task.concepts),
+    userContent: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,

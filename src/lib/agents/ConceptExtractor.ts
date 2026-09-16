@@ -101,7 +101,7 @@ export async function runConceptExtractor(
     const result = await runAgent({
       name: 'ConceptExtractor',
       systemPrompt: SYSTEM_PROMPT + langInstruction,
-      userPrompt: `Source text:\n\n${chunk}`,
+      userContent: `Source text:\n\n${chunk}`,
       schema: conceptsResponseSchema,
       apiKey,
       model,

@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import type { ChatCompletionContentPart } from 'openai/resources/chat/completions'
 import { zodResponseFormat } from 'openai/helpers/zod'
 import { ZodSchema } from 'zod'
 
@@ -17,7 +18,7 @@ export interface AgentResult<T> {
 interface RunAgentConfig<T> {
   name: string
   systemPrompt: string
-  userPrompt: string
+  userContent: string | ChatCompletionContentPart[]
   schema: ZodSchema<T>
   apiKey: string
   model?: string
@@ -45,7 +46,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userPrompt, schema, apiKey, model = 'gpt-5-nano', signal } = config
+  const { name, systemPrompt, userContent, schema, apiKey, model = 'gpt-5-nano', signal } = config
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -60,7 +61,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
+            { role: 'user', content: userContent },
           ],
           response_format: zodResponseFormat(schema, config.name),
           service_tier: 'flex',

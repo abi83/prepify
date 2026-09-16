@@ -39,7 +39,7 @@ export async function runConceptMerger(
   const result = await runAgent({
     name: 'ConceptMerger',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: JSON.stringify(payload),
+    userContent: JSON.stringify(payload),
     schema: mergerResponseSchema,
     apiKey,
     model,

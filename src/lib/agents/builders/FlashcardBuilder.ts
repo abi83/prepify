@@ -51,7 +51,7 @@ export async function runFlashcardBuilder(
   const result = await runAgent({
     name: 'FlashcardBuilder',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: formatConcepts(task.concepts),
+    userContent: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,

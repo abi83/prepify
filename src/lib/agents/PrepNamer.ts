@@ -35,7 +35,7 @@ export async function runPrepNamer(
   return runAgent({
     name: 'PrepNamer',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: `Concepts:\n${conceptList}`,
+    userContent: `Concepts:\n${conceptList}`,
     schema: prepNameSchema,
     apiKey,
     model,

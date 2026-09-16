@@ -59,7 +59,7 @@ export async function runSingleChoiceBuilder(
   const result = await runAgent({
     name: 'SingleChoiceBuilder',
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userPrompt: formatConcepts(task.concepts),
+    userContent: formatConcepts(task.concepts),
     schema: responseSchema,
     apiKey,
     model,
