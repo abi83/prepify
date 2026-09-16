@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import type { Page } from '../types/prep'
-import { runAgent } from '../lib/agent'
+import type { VisualElementOutput } from '../lib/agents/OcrAgent'
+import { runOcrAgent } from '../lib/agents/OcrAgent'
 import { getApiKey } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import { listMyPreps, createPrep } from '../actions/preps'
@@ -20,35 +20,7 @@ type Props = {
 
 type Phase = 'collect' | 'ocr' | 'saving' | 'error'
 
-const visualElementSchema = z.object({
-  type: z.enum(['diagram', 'formula', 'table', 'chart', 'molecule', 'image']),
-  description: z.string(),
-  content: z.string(),
-  caption: z.string().nullable(),
-  context: z.string().nullable(),
-  confidence: z.number().min(0).max(1),
-})
-
-const ocrSchema = z.object({
-  text: z.string(),
-  confidence: z.number().min(0).max(1),
-  language: z.string(),
-  visual_elements: z.array(visualElementSchema),
-})
-
-const OCR_SYSTEM_PROMPT = `You are an OCR agent. Extract all text and visual elements from the textbook page image provided.`
-
-const OCR_TEXT_PROMPT = `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
-
-Confidence rubric (top-level):
-- 0.9–1.0: Sharp image, all text clearly readable
-- 0.7–0.9: Mostly readable, minor blur or cropping
-- 0.5–0.7: Partial — some words/lines unclear or missing
-- 0.0–0.5: Poor quality — large portions unreadable
-
-If no visual elements are present, return an empty array for visual_elements.`
-
-async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: z.infer<typeof visualElementSchema>[] }> {
+async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(',')[1])
@@ -56,27 +28,8 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
     reader.readAsDataURL(file)
   })
 
-  const { output } = await runAgent({
-    name: 'ocr',
-    systemPrompt: OCR_SYSTEM_PROMPT,
-    userContent: [
-      {
-        type: 'image_url',
-        image_url: { url: `data:${file.type};base64,${base64}`, detail: 'high' },
-      },
-      { type: 'text', text: OCR_TEXT_PROMPT },
-    ],
-    schema: ocrSchema,
-    apiKey,
-    model,
-  })
-
-  if (output.confidence < 0.5) {
-    throw new Error(`low_confidence:${output.confidence}`)
-  }
-
-  const elements = output.visual_elements.filter(e => e.confidence >= 0.6)
-  return { text: output.text, language: output.language ?? 'en', visual_elements: elements }
+  const { output } = await runOcrAgent(base64, file.type, apiKey, model)
+  return { text: output.text, language: output.language ?? 'en', visual_elements: output.visual_elements }
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
@@ -135,7 +88,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase('ocr')
     setOcrProgress({ done: 0, total: files.length })
 
-    let results: { text: string; language: string; visual_elements: z.infer<typeof visualElementSchema>[] }[]
+    let results: { text: string; language: string; visual_elements: VisualElementOutput[] }[]
     try {
       results = await Promise.all(
         files.map(async (file) => {

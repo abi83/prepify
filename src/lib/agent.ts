@@ -1,5 +1,4 @@
 import OpenAI from 'openai'
-import type { ChatCompletionContentPart } from 'openai/resources/chat/completions'
 import { zodResponseFormat } from 'openai/helpers/zod'
 import { ZodSchema } from 'zod'
 
@@ -15,14 +14,31 @@ export interface AgentResult<T> {
   metrics: AgentMetrics
 }
 
+export interface AgentImageInput {
+  textContent: string
+  imageBase64: string
+  imageMimeType: string
+}
+
 interface RunAgentConfig<T> {
   name: string
   systemPrompt: string
-  userContent: string | ChatCompletionContentPart[]
+  userContent: string | AgentImageInput
   schema: ZodSchema<T>
   apiKey: string
   model?: string
   signal?: AbortSignal
+}
+
+function buildUserContent(userContent: string | AgentImageInput): string | OpenAI.ChatCompletionContentPart[] {
+  if (typeof userContent === 'string') return userContent
+  return [
+    {
+      type: 'image_url',
+      image_url: { url: `data:${userContent.imageMimeType};base64,${userContent.imageBase64}`, detail: 'high' },
+    },
+    { type: 'text', text: userContent.textContent },
+  ]
 }
 
 const MAX_ATTEMPTS = 3
@@ -61,7 +77,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent },
+            { role: 'user', content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
           service_tier: 'flex',
