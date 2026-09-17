@@ -4,7 +4,6 @@ import { deduplicateExact } from './mergeConceptLists'
 import { BYOK_TEXT_HARD_LIMIT } from './config'
 import type { Page } from '../types/prep'
 import { runPrepNamer } from './agents/PrepNamer'
-import { runPrepDescriber } from './agents/PrepDescriber'
 import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
 import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
 import { runMultipleChoiceBuilder } from './agents/builders/MultipleChoiceBuilder'
@@ -173,26 +172,17 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
   }
 
-  // Start naming + description in parallel — non-critical, failures are silently ignored.
-  // Callbacks fire immediately when each finishes so results are saved even if the pipeline
-  // is cancelled later.
+  // Non-critical; fires callbacks so title+description are saved even if pipeline is cancelled.
   let prepTitle: string | null = null
   let prepDescription: string | null = null
 
   const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
     .then(r => {
       prepTitle = r.output.title
-      totalTokens += r.metrics.total_tokens
-      void incrementPrepTokens(prepId, r.metrics.total_tokens)
-      onTitleReady?.(r.output.title)
-    })
-    .catch(() => null)
-
-  const describingPromise = runPrepDescriber(concepts, apiKey, model, language, signal)
-    .then(r => {
       prepDescription = r.output.description
       totalTokens += r.metrics.total_tokens
       void incrementPrepTokens(prepId, r.metrics.total_tokens)
+      onTitleReady?.(r.output.title)
       onDescriptionReady?.(r.output.description)
     })
     .catch(() => null)
@@ -255,7 +245,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     }
   })
 
-  await Promise.all([namingPromise, describingPromise])
+  await namingPromise
   onProgress({ stage: 'done' })
 
   // Assemble in task order — only slots that completed successfully
