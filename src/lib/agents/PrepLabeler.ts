@@ -42,7 +42,7 @@ Given a list of study concepts extracted from educational material, determine:
 1. The school grade level (1–13, where 1 is first grade and 13 is the final pre-university year)
 2. The school subject discipline from the allowed list
 
-Allowed disciplines: History, Geography, Literature, Social Studies, Economics, Philosophy/Ethics, Biology, Chemistry, Physics, Mathematics, Computer Science, English, French, German, Spanish, Italian, Latin, Russian
+Allowed disciplines: History, Geography, Literature, Social Studies, Economics, Philosophy/Ethics, Biology, Chemistry, Physics, Mathematics, Computer Science — and foreign languages such as English, French, German, Spanish, Italian, Latin, Russian
 
 Rules:
 - Only return a discipline if the material clearly belongs to a school curriculum subject

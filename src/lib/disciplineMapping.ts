@@ -27,16 +27,14 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
   'Russian': 'Russian',
 }
 
-// Languages is a legacy enum value kept for existing DB rows — not mapped forward
-const ENUM_TO_DISCIPLINE: Partial<Record<PrepDiscipline, Discipline>> = Object.fromEntries(
+const ENUM_TO_DISCIPLINE = Object.fromEntries(
   Object.entries(DISCIPLINE_TO_ENUM).map(([label, value]) => [value, label]),
-)
+) as Record<PrepDiscipline, Discipline>
 
 export function disciplineToEnum(discipline: Discipline | null): PrepDiscipline | null {
   return discipline ? DISCIPLINE_TO_ENUM[discipline] : null
 }
 
 export function disciplineFromEnum(discipline: PrepDiscipline | null): Discipline | null {
-  if (!discipline) return null
-  return ENUM_TO_DISCIPLINE[discipline] ?? null
+  return discipline ? ENUM_TO_DISCIPLINE[discipline] : null
 }

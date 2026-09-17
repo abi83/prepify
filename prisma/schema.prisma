@@ -16,7 +16,6 @@ enum PrepDiscipline {
   History
   Geography
   Literature
-  Languages        // legacy — superseded by specific language disciplines
   SocialStudies    @map("Social Studies")
   Economics
   PhilosophyEthics @map("Philosophy/Ethics")
