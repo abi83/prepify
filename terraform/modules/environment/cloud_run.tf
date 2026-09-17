@@ -77,6 +77,23 @@ resource "google_cloud_run_v2_service" "app" {
           }
         }
       }
+
+      startup_probe {
+        http_get {
+          path = "/api/readyz"
+        }
+        initial_delay_seconds = 5
+        period_seconds        = 5
+        failure_threshold     = 10
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/api/healthz"
+        }
+        period_seconds    = 30
+        failure_threshold = 3
+      }
     }
   }
 
