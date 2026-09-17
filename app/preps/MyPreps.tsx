@@ -3,13 +3,27 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Prep } from '@prisma/client'
+import type { Prep, PrepVisibility } from '@prisma/client'
 import { signOut as authSignOut } from 'next-auth/react'
 import { SettingsIcon, XIcon } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { deletePrep } from '@/actions/preps'
 import UploadModal from '@/components/UploadModal'
 import { Button } from '@/components/ui/button'
+
+const VISIBILITY_STYLES: Record<PrepVisibility, string> = {
+  private: 'bg-muted text-muted-foreground',
+  link: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  public: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+}
+
+function VisibilityBadge({ visibility }: { visibility: PrepVisibility }) {
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${VISIBILITY_STYLES[visibility]}`}>
+      {visibility}
+    </span>
+  )
+}
 
 interface Props {
   preps: Prep[]
@@ -76,10 +90,18 @@ export default function MyPreps({ preps }: Props) {
               <li key={prep.id} className="flex items-stretch gap-2">
                 <Link
                   href={`/preps/${prep.id}`}
-                  className="flex flex-1 items-center justify-between gap-4 rounded-lg border border-border bg-background px-5 py-4.5 text-left transition-colors hover:border-primary hover:bg-muted"
+                  className="flex flex-1 items-start justify-between gap-4 rounded-lg border border-border bg-background px-5 py-4 text-left transition-colors hover:border-primary hover:bg-muted"
                 >
-                  <span className="text-sm font-medium">{prep.title}</span>
-                  <span className="text-xs whitespace-nowrap text-muted-foreground">{formatDate(prep.createdAt)}</span>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{prep.title}</span>
+                      <VisibilityBadge visibility={prep.visibility} />
+                    </div>
+                    {prep.description && (
+                      <span className="truncate text-xs text-muted-foreground">{prep.description}</span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">{formatDate(prep.createdAt)}</span>
                 </Link>
                 {confirmDeleteId === prep.id ? (
                   <div className="flex shrink-0 items-center gap-1.5 px-1">

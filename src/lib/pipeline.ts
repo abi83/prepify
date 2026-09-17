@@ -4,6 +4,7 @@ import { deduplicateExact } from './mergeConceptLists'
 import { BYOK_TEXT_HARD_LIMIT } from './config'
 import type { Page } from '../types/prep'
 import { runPrepNamer } from './agents/PrepNamer'
+import { runPrepDescriber } from './agents/PrepDescriber'
 import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
 import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
 import { runMultipleChoiceBuilder } from './agents/builders/MultipleChoiceBuilder'
@@ -82,6 +83,7 @@ const BUILDERS: Record<QuestionType, BuilderFn> = {
 export interface PipelineResult {
   questions: GeneratedQuestion[]
   prepTitle: string | null
+  prepDescription: string | null
   totalTokens: number
 }
 
@@ -100,10 +102,12 @@ export interface PipelineConfig {
   onProgress: (event: PipelineProgressEvent) => void
   /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
   onTitleReady?: (title: string) => void
+  /** Called as soon as the prep description is ready — fires even if the pipeline is later cancelled. */
+  onDescriptionReady?: (description: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
+  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady, onDescriptionReady } = config
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -169,16 +173,27 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
   }
 
-  // Start naming in parallel — non-critical, failure is silently ignored.
-  // onTitleReady fires immediately when naming finishes so the title is saved
-  // even if the pipeline is cancelled later.
+  // Start naming + description in parallel — non-critical, failures are silently ignored.
+  // Callbacks fire immediately when each finishes so results are saved even if the pipeline
+  // is cancelled later.
   let prepTitle: string | null = null
+  let prepDescription: string | null = null
+
   const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
     .then(r => {
       prepTitle = r.output.title
       totalTokens += r.metrics.total_tokens
       void incrementPrepTokens(prepId, r.metrics.total_tokens)
       onTitleReady?.(r.output.title)
+    })
+    .catch(() => null)
+
+  const describingPromise = runPrepDescriber(concepts, apiKey, model, language, signal)
+    .then(r => {
+      prepDescription = r.output.description
+      totalTokens += r.metrics.total_tokens
+      void incrementPrepTokens(prepId, r.metrics.total_tokens)
+      onDescriptionReady?.(r.output.description)
     })
     .catch(() => null)
 
@@ -240,7 +255,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     }
   })
 
-  await namingPromise
+  await Promise.all([namingPromise, describingPromise])
   onProgress({ stage: 'done' })
 
   // Assemble in task order — only slots that completed successfully
@@ -248,5 +263,5 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .map((_, i) => builtQuestions.get(i))
     .filter((q): q is GeneratedQuestion => q != null)
 
-  return { questions, prepTitle, totalTokens }
+  return { questions, prepTitle, prepDescription, totalTokens }
 }

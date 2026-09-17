@@ -106,6 +106,9 @@ export default function GenerationPanel({
           onTitleReady(title)
           setTitleReady(true)
         },
+        onDescriptionReady: (description) => {
+          void updatePrep(prepId, { description })
+        },
       })
 
       const elapsed = Math.round(performance.now() - genStartRef.current)

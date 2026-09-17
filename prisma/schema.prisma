@@ -47,6 +47,8 @@ model Prep {
   discipline PrepDiscipline?
   language   String?
 
+  description String          @default("")
+
   questions   Question[]
   attempts    Attempt[]
   pipelineRun PipelineRun?

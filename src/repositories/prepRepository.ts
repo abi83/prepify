@@ -42,6 +42,7 @@ export async function createPrep(userId: string, data: CreatePrepInput): Promise
 
 export interface UpdatePrepInput {
   title?: string
+  description?: string
   visibility?: PrepVisibility
   grade?: number | null
   discipline?: PrepDiscipline | null

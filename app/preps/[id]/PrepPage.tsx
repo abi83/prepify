@@ -153,6 +153,9 @@ export default function PrepPage({
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-2xl font-bold tracking-tight">{prep.title}</h1>
+          {prep.description && (
+            <p className="text-sm text-muted-foreground">{prep.description}</p>
+          )}
           <span className="text-sm text-muted-foreground">{formatDate(prep.createdAt)}</span>
           {prep.tokensUsed > 0 && (
             <span className="text-xs text-muted-foreground">
