@@ -28,6 +28,7 @@ function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
     grade: null,
     discipline: null,
     language: null,
+    description: '',
     questionCount: 0,
     ...overrides,
   }

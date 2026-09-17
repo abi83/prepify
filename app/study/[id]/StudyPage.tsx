@@ -69,6 +69,9 @@ export default function StudyPage({ prep, questions, assets }: Props) {
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-2xl font-bold tracking-tight">{prep.title}</h1>
+          {prep.description && (
+            <p className="text-sm text-muted-foreground">{prep.description}</p>
+          )}
         </div>
 
         {questions.length === 0 ? (

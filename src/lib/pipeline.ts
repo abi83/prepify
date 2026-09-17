@@ -82,6 +82,7 @@ const BUILDERS: Record<QuestionType, BuilderFn> = {
 export interface PipelineResult {
   questions: GeneratedQuestion[]
   prepTitle: string | null
+  prepDescription: string | null
   totalTokens: number
 }
 
@@ -98,12 +99,12 @@ export interface PipelineConfig {
   enabledTypes?: QuestionType[]
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
-  /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
-  onTitleReady?: (title: string) => void
+  /** Called as soon as title+description are ready — fires even if the pipeline is later cancelled. */
+  onMetaReady?: (title: string, description: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady } = config
+  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -169,16 +170,17 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
   }
 
-  // Start naming in parallel — non-critical, failure is silently ignored.
-  // onTitleReady fires immediately when naming finishes so the title is saved
-  // even if the pipeline is cancelled later.
+  // Non-critical; fires callbacks so title+description are saved even if pipeline is cancelled.
   let prepTitle: string | null = null
+  let prepDescription: string | null = null
+
   const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
     .then(r => {
       prepTitle = r.output.title
+      prepDescription = r.output.description
       totalTokens += r.metrics.total_tokens
       void incrementPrepTokens(prepId, r.metrics.total_tokens)
-      onTitleReady?.(r.output.title)
+      onMetaReady?.(r.output.title, r.output.description)
     })
     .catch(() => null)
 
@@ -248,5 +250,5 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .map((_, i) => builtQuestions.get(i))
     .filter((q): q is GeneratedQuestion => q != null)
 
-  return { questions, prepTitle, totalTokens }
+  return { questions, prepTitle, prepDescription, totalTokens }
 }

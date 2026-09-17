@@ -30,6 +30,7 @@ function prep(overrides: Partial<Prep> = {}): Prep {
     grade: 10,
     discipline: null,
     language: null,
+    description: '',
     ...overrides,
   }
 }
