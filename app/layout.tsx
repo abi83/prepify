@@ -20,8 +20,13 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
-  title: 'Prepify',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  title: { default: 'Prepify', template: '%s | Prepify' },
   description: 'Turn any textbook page into a personal exam',
+  openGraph: {
+    siteName: 'Prepify',
+    type: 'website',
+  },
 }
 
 // Runs before paint so the persisted theme applies without a flash of the wrong theme.
