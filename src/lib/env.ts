@@ -10,13 +10,30 @@ const envSchema = z.object({
   AUTH_GOOGLE_CLIENT_SECRET: z.string().min(1),
 })
 
-function loadEnv() {
-  const parsed = envSchema.safeParse(process.env)
-  if (!parsed.success) {
-    const missing = parsed.error.issues.map(issue => issue.path.join('.')).join(', ')
-    throw new Error(`Invalid environment configuration — missing or empty: ${missing}`)
+class Config {
+  private _data: z.infer<typeof envSchema> | undefined
+
+  private get data() {
+    if (!this._data) {
+      // Skip validation during next build — modules are evaluated for static
+      // analysis but request handlers never run, so missing secrets are fine.
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return process.env as unknown as z.infer<typeof envSchema>
+      }
+      const parsed = envSchema.safeParse(process.env)
+      if (!parsed.success) {
+        const missing = parsed.error.issues.map(issue => issue.path.join('.')).join(', ')
+        throw new Error(`Invalid environment configuration — missing or empty: ${missing}`)
+      }
+      this._data = parsed.data
+    }
+    return this._data
   }
-  return parsed.data
+
+  get DATABASE_URL_POOLING()     { return this.data.DATABASE_URL_POOLING }
+  get AUTH_SECRET()              { return this.data.AUTH_SECRET }
+  get AUTH_GOOGLE_CLIENT_ID()    { return this.data.AUTH_GOOGLE_CLIENT_ID }
+  get AUTH_GOOGLE_CLIENT_SECRET(){ return this.data.AUTH_GOOGLE_CLIENT_SECRET }
 }
 
-export const env = loadEnv()
+export const config = new Config()
