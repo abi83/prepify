@@ -99,14 +99,12 @@ export interface PipelineConfig {
   enabledTypes?: QuestionType[]
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
-  /** Called as soon as the prep title is ready — fires even if the pipeline is later cancelled. */
-  onTitleReady?: (title: string) => void
-  /** Called as soon as the prep description is ready — fires even if the pipeline is later cancelled. */
-  onDescriptionReady?: (description: string) => void
+  /** Called as soon as title+description are ready — fires even if the pipeline is later cancelled. */
+  onMetaReady?: (title: string, description: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onTitleReady, onDescriptionReady } = config
+  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -182,8 +180,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       prepDescription = r.output.description
       totalTokens += r.metrics.total_tokens
       void incrementPrepTokens(prepId, r.metrics.total_tokens)
-      onTitleReady?.(r.output.title)
-      onDescriptionReady?.(r.output.description)
+      onMetaReady?.(r.output.title, r.output.description)
     })
     .catch(() => null)
 

@@ -101,13 +101,10 @@ export default function GenerationPanel({
           if (event.stage === 'crafting') setCraftProgress({ done: event.done, total: event.total })
           if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
         },
-        onTitleReady: (title) => {
-          void updatePrep(prepId, { title })
+        onMetaReady: (title, description) => {
+          void updatePrep(prepId, { title, description })
           onTitleReady(title)
           setTitleReady(true)
-        },
-        onDescriptionReady: (description) => {
-          void updatePrep(prepId, { description })
         },
       })
 
