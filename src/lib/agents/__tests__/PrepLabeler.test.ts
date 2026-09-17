@@ -29,10 +29,14 @@ describe('prepLabelSchema', () => {
 })
 
 describe('DISCIPLINES', () => {
-  it('contains exactly the 12 agreed school subjects', () => {
-    expect(DISCIPLINES).toHaveLength(12)
+  it('contains the agreed school subjects including specific languages', () => {
+    expect(DISCIPLINES).toHaveLength(18)
     expect(DISCIPLINES).toContain('Mathematics')
     expect(DISCIPLINES).toContain('Philosophy/Ethics')
     expect(DISCIPLINES).toContain('Computer Science')
+    expect(DISCIPLINES).toContain('French')
+    expect(DISCIPLINES).toContain('German')
+    expect(DISCIPLINES).toContain('Latin')
+    expect(DISCIPLINES).not.toContain('Languages')
   })
 })

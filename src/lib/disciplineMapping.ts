@@ -10,7 +10,6 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
   'History': 'History',
   'Geography': 'Geography',
   'Literature': 'Literature',
-  'Languages': 'Languages',
   'Social Studies': 'SocialStudies',
   'Economics': 'Economics',
   'Philosophy/Ethics': 'PhilosophyEthics',
@@ -19,6 +18,13 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
   'Physics': 'Physics',
   'Mathematics': 'Mathematics',
   'Computer Science': 'ComputerScience',
+  'English': 'English',
+  'French': 'French',
+  'German': 'German',
+  'Spanish': 'Spanish',
+  'Italian': 'Italian',
+  'Latin': 'Latin',
+  'Russian': 'Russian',
 }
 
 const ENUM_TO_DISCIPLINE = Object.fromEntries(
