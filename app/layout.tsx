@@ -20,7 +20,7 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(process.env.AUTH_URL ?? 'http://localhost:3000'),
   title: { default: 'Prepify', template: '%s | Prepify' },
   description: 'Turn any textbook page into a personal exam',
   openGraph: {

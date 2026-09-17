@@ -3,7 +3,7 @@ import { listPublicCatalog } from '@/repositories/prepRepository'
 
 export const dynamic = 'force-dynamic'
 
-const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+const appUrl = process.env.AUTH_URL ?? 'http://localhost:3000'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const preps = await listPublicCatalog()

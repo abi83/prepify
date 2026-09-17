@@ -39,11 +39,6 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name  = "APP_URL"
-        value = var.auth_url
-      }
-
-      env {
         name = "DATABASE_URL_POOLING"
         value_source {
           secret_key_ref {
