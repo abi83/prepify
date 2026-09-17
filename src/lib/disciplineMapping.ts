@@ -10,7 +10,6 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
   'History': 'History',
   'Geography': 'Geography',
   'Literature': 'Literature',
-  'Languages': 'Languages',
   'Social Studies': 'SocialStudies',
   'Economics': 'Economics',
   'Philosophy/Ethics': 'PhilosophyEthics',
@@ -19,16 +18,25 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
   'Physics': 'Physics',
   'Mathematics': 'Mathematics',
   'Computer Science': 'ComputerScience',
+  'English': 'English',
+  'French': 'French',
+  'German': 'German',
+  'Spanish': 'Spanish',
+  'Italian': 'Italian',
+  'Latin': 'Latin',
+  'Russian': 'Russian',
 }
 
-const ENUM_TO_DISCIPLINE = Object.fromEntries(
+// Languages is a legacy enum value kept for existing DB rows — not mapped forward
+const ENUM_TO_DISCIPLINE: Partial<Record<PrepDiscipline, Discipline>> = Object.fromEntries(
   Object.entries(DISCIPLINE_TO_ENUM).map(([label, value]) => [value, label]),
-) as Record<PrepDiscipline, Discipline>
+)
 
 export function disciplineToEnum(discipline: Discipline | null): PrepDiscipline | null {
   return discipline ? DISCIPLINE_TO_ENUM[discipline] : null
 }
 
 export function disciplineFromEnum(discipline: PrepDiscipline | null): Discipline | null {
-  return discipline ? ENUM_TO_DISCIPLINE[discipline] : null
+  if (!discipline) return null
+  return ENUM_TO_DISCIPLINE[discipline] ?? null
 }
