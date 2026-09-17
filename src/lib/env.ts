@@ -15,11 +15,6 @@ class Config {
 
   private get data() {
     if (!this._data) {
-      // Skip validation during next build — modules are evaluated for static
-      // analysis but request handlers never run, so missing secrets are fine.
-      if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return process.env as unknown as z.infer<typeof envSchema>
-      }
       const parsed = envSchema.safeParse(process.env)
       if (!parsed.success) {
         const missing = parsed.error.issues.map(issue => issue.path.join('.')).join(', ')

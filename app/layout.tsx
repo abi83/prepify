@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter, Sora } from 'next/font/google'
 import { SessionProvider } from 'next-auth/react'
-import { auth } from '@/lib/auth'
 import ThemeToggle from '@/components/ThemeToggle'
 import { cn } from '@/lib/utils'
 import '@/index.css'
@@ -34,16 +33,14 @@ const themeInitScript = `
   } catch {}
 `
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={cn(inter.variable, sora.variable)}>
-        <SessionProvider session={session}>{children}</SessionProvider>
+        <SessionProvider>{children}</SessionProvider>
         <ThemeToggle />
       </body>
     </html>
