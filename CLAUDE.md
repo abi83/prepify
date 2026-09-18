@@ -38,7 +38,7 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 
 ## Environment
 Copy `.env.example` to `.env.local`:
-- `DATABASE_URL_POOLING` — pooled Neon connection string (app runtime)
+- `DATABASE_URL_POOLING` — pooled Neon connection string, as the `app_runtime` role (DML only, no DDL — migrations always go through `DATABASE_URL_DIRECT`)
 - `DATABASE_URL_DIRECT` — direct Neon connection string (running migrations only)
 - `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
 - `AUTH_GOOGLE_CLIENT_ID` / `AUTH_GOOGLE_CLIENT_SECRET` — Google OAuth client credentials, passed explicitly to Auth.js's Google provider
