@@ -117,3 +117,21 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# DNS records for this mapping (shown by `gcloud run domain-mappings describe`
+# after apply) still have to be added at the registrar by hand.
+resource "google_cloud_run_domain_mapping" "custom_domain" {
+  count = var.custom_domain != null ? 1 : 0
+
+  project  = google_project.this.project_id
+  location = var.region
+  name     = var.custom_domain
+
+  metadata {
+    namespace = google_project.this.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.app.name
+  }
+}
