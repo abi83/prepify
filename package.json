@@ -4,12 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node scripts/write-local-version.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/write-local-version.mjs",
     "build": "next build",
     "start": "next start",
-    "pretest": "node scripts/write-local-version.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
