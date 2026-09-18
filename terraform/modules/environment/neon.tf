@@ -38,7 +38,19 @@ resource "google_secret_manager_secret_iam_member" "github_deploy_db_url_direct_
   member    = "serviceAccount:${var.github_deploy_service_account_email}"
 }
 
-# Pooled connection — what the app actually connects with at runtime.
+# Least-privilege role for the Cloud Run runtime — no DDL rights, only
+# DML on application tables (granted in the 20260918120000_grant_app_runtime_role
+# Prisma migration, since this provider can't run GRANT/ALTER DEFAULT
+# PRIVILEGES itself). Grants apply per-branch, so this role must exist
+# before that migration runs. See issue #91.
+resource "neon_role" "app_runtime" {
+  project_id = neon_project.this.id
+  branch_id  = neon_project.this.default_branch_id
+  name       = "app_runtime"
+}
+
+# Pooled connection — what the app actually connects with at runtime, as
+# the restricted app_runtime role rather than the neondb_owner default role.
 resource "google_secret_manager_secret" "db_url_pooling" {
   project   = google_project.this.project_id
   secret_id = "database-url-pooling"
@@ -51,8 +63,14 @@ resource "google_secret_manager_secret" "db_url_pooling" {
 }
 
 resource "google_secret_manager_secret_version" "db_url_pooling" {
-  secret      = google_secret_manager_secret.db_url_pooling.id
-  secret_data = neon_project.this.connection_uri_pooler
+  secret = google_secret_manager_secret.db_url_pooling.id
+  secret_data = format(
+    "postgresql://%s:%s@%s/%s?sslmode=require",
+    neon_role.app_runtime.name,
+    urlencode(neon_role.app_runtime.password),
+    neon_project.this.database_host_pooler,
+    neon_project.this.database_name,
+  )
 }
 
 resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_pooling_access" {
