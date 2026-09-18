@@ -114,7 +114,7 @@ html, body {
   height: 100%;
   background: var(--ui-background);
   color: var(--ui-foreground);
-  font-family: var(--font-body);
+  font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
