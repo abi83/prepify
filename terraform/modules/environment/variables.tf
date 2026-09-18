@@ -31,6 +31,14 @@ variable "billing_account_id" {
   type = string
 }
 
+# Requires the domain already verified in this project via Search Console —
+# Cloud Run's domain mapping rejects unverified domains. Leave null for
+# environments served only on their *.run.app URL (e.g. dev).
+variable "custom_domain" {
+  type    = string
+  default = null
+}
+
 # Deterministic — account_id and infra project are fixed, so no cross-state
 # reference to the shared root is needed to know these. Values must match
 # the service accounts terraform/shared/github_actions.tf creates; a rename
