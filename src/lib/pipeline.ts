@@ -16,6 +16,7 @@ import type { AgentResult } from './agent'
 import { incrementPrepTokens } from '../actions/preps'
 import { buildQuestionTasks } from './taskBuilder'
 import { DEFAULT_GEN_CONFIG } from './generationConfig'
+import type { TierId } from './apiKey'
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -67,6 +68,7 @@ type BuilderFn = (
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ) => Promise<AgentResult<GeneratedQuestion>>
@@ -84,6 +86,10 @@ export interface PipelineResult {
   prepTitle: string | null
   prepDescription: string | null
   totalTokens: number
+  /** Real (not estimated) token breakdown for this run, for an exact cost calculation. */
+  promptTokens: number
+  cachedTokens: number
+  completionTokens: number
 }
 
 export interface PipelineConfig {
@@ -91,6 +97,7 @@ export interface PipelineConfig {
   pages: Page[]
   apiKey: string
   model: string
+  tier: TierId
   /** ISO 639-1 language code detected from the source image (e.g. 'de', 'fr'). Defaults to 'en'. */
   language?: string
   /** Target number of questions to generate (default 10, range 5–20). */
@@ -104,8 +111,14 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
-  let totalTokens = 0
+  const { prepId, pages, apiKey, model, tier, language = 'en', questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
+  const usage = { totalTokens: 0, promptTokens: 0, cachedTokens: 0, completionTokens: 0 }
+  function accumulate(metrics: { total_tokens: number; prompt_tokens: number; cached_tokens: number; completion_tokens: number }) {
+    usage.totalTokens += metrics.total_tokens
+    usage.promptTokens += metrics.prompt_tokens
+    usage.cachedTokens += metrics.cached_tokens
+    usage.completionTokens += metrics.completion_tokens
+  }
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
   if (totalTextLength > BYOK_TEXT_HARD_LIMIT) {
@@ -122,16 +135,16 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: 'concepts' })
-    const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
-    totalTokens += metrics.total_tokens
+    const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, tier, language, signal)
+    accumulate(metrics)
     void incrementPrepTokens(prepId, metrics.total_tokens)
 
     // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
     // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
-      ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
-          totalTokens += r.metrics.total_tokens
+      ? await runConceptMerger(deduped, apiKey, model, tier, language, signal).then(r => {
+          accumulate(r.metrics)
           void incrementPrepTokens(prepId, r.metrics.total_tokens)
           return r.output
         })
@@ -174,11 +187,11 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let prepTitle: string | null = null
   let prepDescription: string | null = null
 
-  const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
+  const namingPromise = runPrepNamer(concepts, apiKey, model, tier, language, signal)
     .then(r => {
       prepTitle = r.output.title
       prepDescription = r.output.description
-      totalTokens += r.metrics.total_tokens
+      accumulate(r.metrics)
       void incrementPrepTokens(prepId, r.metrics.total_tokens)
       onMetaReady?.(r.output.title, r.output.description)
     })
@@ -205,22 +218,22 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       const task = tasks[taskIdx]
 
       // Build
-      const buildResult = await BUILDERS[task.type](task, apiKey, model, language, signal)
-      totalTokens += buildResult.metrics.total_tokens
+      const buildResult = await BUILDERS[task.type](task, apiKey, model, tier, language, signal)
+      accumulate(buildResult.metrics)
       void incrementPrepTokens(prepId, buildResult.metrics.total_tokens)
       craftDone++
       onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
-      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
-      totalTokens += reviewed.metrics.total_tokens
+      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, tier, language, signal)
+      accumulate(reviewed.metrics)
       void incrementPrepTokens(prepId, reviewed.metrics.total_tokens)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
-        const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
-        totalTokens += retry.metrics.total_tokens
+        const retry = await BUILDERS[task.type](task, apiKey, model, tier, language, signal)
+        accumulate(retry.metrics)
         void incrementPrepTokens(prepId, retry.metrics.total_tokens)
         question = retry.output
       } else {
@@ -250,5 +263,13 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .map((_, i) => builtQuestions.get(i))
     .filter((q): q is GeneratedQuestion => q != null)
 
-  return { questions, prepTitle, prepDescription, totalTokens }
+  return {
+    questions,
+    prepTitle,
+    prepDescription,
+    totalTokens: usage.totalTokens,
+    promptTokens: usage.promptTokens,
+    cachedTokens: usage.cachedTokens,
+    completionTokens: usage.completionTokens,
+  }
 }

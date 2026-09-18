@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
 import type { Concept } from '../../types/pipeline'
+import type { TierId } from '../apiKey'
 
 const prepNameSchema = z.object({
   title: z.string(),
@@ -26,6 +27,7 @@ export async function runPrepNamer(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ title: string; description: string }>> {
@@ -44,6 +46,7 @@ export async function runPrepNamer(
     schema: prepNameSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 }

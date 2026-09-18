@@ -4,6 +4,7 @@ import type { Page } from '../types/prep'
 import type { VisualElementOutput } from '../lib/agents/OcrAgent'
 import { runOcrAgent } from '../lib/agents/OcrAgent'
 import { getApiKey } from '../lib/apiKey'
+import type { TierId } from '../lib/apiKey'
 import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
 import { listMyPreps, createPrep } from '../actions/preps'
 import { cn } from '@/lib/utils'
@@ -20,7 +21,7 @@ type Props = {
 
 type Phase = 'collect' | 'ocr' | 'saving' | 'error'
 
-async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
+async function extractTextFromImage(file: File, apiKey: string, model: string, tier: TierId): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(',')[1])
@@ -28,7 +29,7 @@ async function extractTextFromImage(file: File, apiKey: string, model: string): 
     reader.readAsDataURL(file)
   })
 
-  const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model)
+  const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model, tier)
   return { text: output.text, language: output.language, visual_elements: output.visual_elements }
 }
 
@@ -92,7 +93,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     try {
       results = await Promise.all(
         files.map(async (file) => {
-          const result = await extractTextFromImage(file, config.key, config.model)
+          const result = await extractTextFromImage(file, config.key, config.model, config.tier)
           setOcrProgress(p => ({ ...p, done: p.done + 1 }))
           return result
         })

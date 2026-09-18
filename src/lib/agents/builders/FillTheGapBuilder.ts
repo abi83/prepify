@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../../agent'
 import { fillTheGapContentSchema } from '../../../types/questions'
 import type { FillTheGapContent } from '../../../types/questions'
 import type { QuestionTask } from '../../../types/pipeline'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({ content: fillTheGapContentSchema })
 
@@ -51,6 +52,7 @@ export async function runFillTheGapBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'fill_the_gap'; content: FillTheGapContent }>> {
@@ -62,6 +64,7 @@ export async function runFillTheGapBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
   return { output: { type: 'fill_the_gap', content: result.output.content }, metrics: result.metrics }

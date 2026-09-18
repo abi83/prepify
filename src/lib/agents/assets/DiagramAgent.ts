@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../../agent'
+import type { TierId } from '../../apiKey'
 
 const diagramTypeSchema = z.enum(['flowchart', 'graph'])
 
@@ -37,6 +38,7 @@ export async function runDiagramAgent(
   description: string,
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
@@ -46,6 +48,7 @@ export async function runDiagramAgent(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 

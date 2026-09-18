@@ -3,6 +3,7 @@ import type { AssetHint } from '../types/questions'
 import { routeAsset, type ActiveAssetHint } from './agents/assets/assetRouter'
 import { insertAsset } from '../actions/assets'
 import { incrementPrepTokens } from '../actions/preps'
+import type { TierId } from './apiKey'
 
 function extractAssetHint(question: Question): AssetHint | null {
   const content = question.content as Record<string, unknown>
@@ -19,6 +20,7 @@ export async function generateAndSaveAssets(
   prepId: string,
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<void> {
   const pending = questions
@@ -32,7 +34,7 @@ export async function generateAndSaveAssets(
   await Promise.allSettled(
     pending.map(async ({ q, hint }) => {
       try {
-        const result = await routeAsset(hint, apiKey, model, signal)
+        const result = await routeAsset(hint, apiKey, model, tier, signal)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)

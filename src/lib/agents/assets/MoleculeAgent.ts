@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../../agent'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({
   molecules: z.array(z.object({
@@ -26,6 +27,7 @@ export async function runMoleculeAgent(
   description: string,
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
@@ -35,6 +37,7 @@ export async function runMoleculeAgent(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 

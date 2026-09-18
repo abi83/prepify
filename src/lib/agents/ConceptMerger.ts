@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
 import type { Concept } from '../../types/pipeline'
+import type { TierId } from '../apiKey'
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
 
@@ -27,10 +28,11 @@ export async function runConceptMerger(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<Concept[]>> {
-  if (concepts.length === 0) return { output: [], metrics: { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
+  if (concepts.length === 0) return { output: [], metrics: { latency_ms: 0, prompt_tokens: 0, cached_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
 
   const nameSet = new Set(concepts.map(c => c.name))
   const payload = concepts.map(c => ({ name: c.name, importance: c.importance }))
@@ -43,6 +45,7 @@ export async function runConceptMerger(
     schema: mergerResponseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 

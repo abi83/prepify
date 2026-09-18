@@ -3,6 +3,7 @@ import { runFormulaAgent } from './FormulaAgent'
 import { runMoleculeAgent } from './MoleculeAgent'
 import { runDiagramAgent } from './DiagramAgent'
 import type { AgentResult } from '../../agent'
+import type { TierId } from '../../apiKey'
 
 export interface AssetOutput {
   type: AssetType
@@ -15,24 +16,25 @@ export async function routeAsset(
   hint: ActiveAssetHint,
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
     case 'formula': {
-      const r = await runFormulaAgent(hint.description, apiKey, model, signal)
+      const r = await runFormulaAgent(hint.description, apiKey, model, tier, signal)
       return { output: { type: 'formula', blob: r.output }, metrics: r.metrics }
     }
     case 'molecule': {
-      const r = await runMoleculeAgent(hint.description, apiKey, model, signal)
+      const r = await runMoleculeAgent(hint.description, apiKey, model, tier, signal)
       return { output: { type: 'molecule', blob: r.output }, metrics: r.metrics }
     }
     case 'diagram': {
-      const r = await runDiagramAgent(hint.description, apiKey, model, signal)
+      const r = await runDiagramAgent(hint.description, apiKey, model, tier, signal)
       return { output: { type: 'diagram', blob: r.output }, metrics: r.metrics }
     }
     case 'table':
     case 'svg':
       // Not yet implemented — skip silently
-      return { output: { type: hint.type, blob: '' }, metrics: { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
+      return { output: { type: hint.type, blob: '' }, metrics: { latency_ms: 0, prompt_tokens: 0, cached_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
   }
 }

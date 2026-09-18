@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../agent'
 import type { Concept } from '../../types/pipeline'
+import type { TierId } from '../apiKey'
 
 export const DISCIPLINES = [
   'History',
@@ -57,6 +58,7 @@ export async function runPrepLabeler(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<AgentResult<PrepLabel>> {
   const conceptList = concepts
@@ -72,6 +74,7 @@ export async function runPrepLabeler(
     schema: prepLabelSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 }

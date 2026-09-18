@@ -4,6 +4,7 @@ import { updatePrep } from '../actions/preps'
 import { runPrepLabeler, DISCIPLINES, type Discipline } from '../lib/agents/PrepLabeler'
 import { disciplineToEnum } from '../lib/disciplineMapping'
 import type { Concept } from '../types/pipeline'
+import type { TierId } from '../lib/apiKey'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Input } from './ui/input'
@@ -15,6 +16,7 @@ interface Props {
   concepts: Concept[]
   apiKey: string
   model: string
+  tier: TierId
   initialVisibility: PrepVisibility
   initialGrade: number | null
   initialDiscipline: Discipline | null
@@ -32,6 +34,7 @@ export default function ShareModal({
   concepts,
   apiKey,
   model,
+  tier,
   initialVisibility,
   initialGrade,
   initialDiscipline,
@@ -71,7 +74,7 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, apiKey, model, ac.signal).then(result => {
+    runPrepLabeler(concepts, apiKey, model, tier, ac.signal).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)

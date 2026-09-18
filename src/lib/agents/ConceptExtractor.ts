@@ -3,6 +3,7 @@ import { conceptsResponseSchema } from '../../types/pipeline'
 import type { Concept } from '../../types/pipeline'
 import { CHUNK_SIZE } from '../config'
 import type { Page } from '../../types/prep'
+import type { TierId } from '../apiKey'
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 
@@ -88,13 +89,14 @@ export async function runConceptExtractor(
   pages: Page[],
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== 'en' ? `\nRespond in the same language as the source text (${language}).` : ''
 
-  let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+  let totalTokens = { latency_ms: 0, prompt_tokens: 0, cached_tokens: 0, completion_tokens: 0, total_tokens: 0 }
   const allConcepts: Concept[] = []
 
   for (const chunk of chunks) {
@@ -105,6 +107,7 @@ export async function runConceptExtractor(
       schema: conceptsResponseSchema,
       apiKey,
       model,
+      tier,
       signal,
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
@@ -112,6 +115,7 @@ export async function runConceptExtractor(
     totalTokens = {
       latency_ms: totalTokens.latency_ms + result.metrics.latency_ms,
       prompt_tokens: totalTokens.prompt_tokens + result.metrics.prompt_tokens,
+      cached_tokens: totalTokens.cached_tokens + result.metrics.cached_tokens,
       completion_tokens: totalTokens.completion_tokens + result.metrics.completion_tokens,
       total_tokens: totalTokens.total_tokens + result.metrics.total_tokens,
     }

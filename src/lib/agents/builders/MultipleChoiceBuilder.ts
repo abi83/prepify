@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../../agent'
 import { multipleChoiceContentSchema } from '../../../types/questions'
 import type { MultipleChoiceContent } from '../../../types/questions'
 import type { QuestionTask } from '../../../types/pipeline'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({ content: multipleChoiceContentSchema })
 
@@ -55,6 +56,7 @@ export async function runMultipleChoiceBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'multiple_choice'; content: MultipleChoiceContent }>> {
@@ -66,6 +68,7 @@ export async function runMultipleChoiceBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
   return { output: { type: 'multiple_choice', content: result.output.content }, metrics: result.metrics }

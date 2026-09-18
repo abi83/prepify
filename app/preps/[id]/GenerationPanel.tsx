@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Prep, Question } from '@prisma/client'
 import type { Page } from '@/types/prep'
 import type { PipelineProgressEvent } from '@/types/pipeline'
-import { getApiKey } from '@/lib/apiKey'
+import { getApiKey, estimateCost, formatCost } from '@/lib/apiKey'
 import { runPipeline, TextTooLongError } from '@/lib/pipeline'
 import { BYOK_TEXT_HARD_LIMIT } from '@/lib/config'
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from '@/lib/generationConfig'
@@ -57,6 +57,7 @@ export default function GenerationPanel({
   const [genConfigOpen, setGenConfigOpen] = useState(false)
   const [genMs, setGenMs] = useState(0)
   const [totalTokens, setTotalTokens] = useState(0)
+  const [genCost, setGenCost] = useState<number | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
   const [textTooLong, setTextTooLong] = useState<{ length: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -92,6 +93,7 @@ export default function GenerationPanel({
         pages: pagesToProcess,
         apiKey: keyConfig.key,
         model: keyConfig.model,
+        tier: keyConfig.tier,
         language,
         questionCount: localConfig.questionCount,
         enabledTypes: localConfig.enabledTypes,
@@ -112,7 +114,7 @@ export default function GenerationPanel({
       const savedQuestions = await insertQuestions(prepId, result.questions.map(q => ({ type: q.type, content: q.content })))
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, abortRef.current?.signal)
+        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current?.signal)
       }
 
       const freshPrep = await getMyPrep(prepId)
@@ -120,6 +122,7 @@ export default function GenerationPanel({
 
       setGenMs(elapsed)
       setTotalTokens(result.totalTokens)
+      setGenCost(estimateCost(result.promptTokens, result.cachedTokens, result.completionTokens, keyConfig.model, keyConfig.tier))
       setGenPhase('done')
       await refreshRunSummary()
       router.refresh()
@@ -274,6 +277,7 @@ export default function GenerationPanel({
       {genPhase === 'done' && totalTokens > 0 && (
         <div className="text-xs text-muted-foreground">
           Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
+          {genCost !== null && <> · {formatCost(genCost)}</>}
         </div>
       )}
     </>

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { runAgent, AgentResult } from '../../agent'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({
   latex: z.string(),
@@ -23,6 +24,7 @@ export async function runFormulaAgent(
   description: string,
   apiKey: string,
   model: string,
+  tier: TierId,
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
@@ -32,6 +34,7 @@ export async function runFormulaAgent(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
 

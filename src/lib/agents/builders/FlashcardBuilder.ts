@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../../agent'
 import { flashcardContentSchema } from '../../../types/questions'
 import type { FlashcardContent } from '../../../types/questions'
 import type { QuestionTask } from '../../../types/pipeline'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({ content: flashcardContentSchema })
 
@@ -44,6 +45,7 @@ export async function runFlashcardBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'flashcard'; content: FlashcardContent }>> {
@@ -55,6 +57,7 @@ export async function runFlashcardBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
   return { output: { type: 'flashcard', content: result.output.content }, metrics: result.metrics }

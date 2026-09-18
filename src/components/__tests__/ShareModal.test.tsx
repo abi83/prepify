@@ -14,7 +14,7 @@ vi.mock('../../lib/agents/PrepLabeler', async () => {
     ...actual,
     runPrepLabeler: vi.fn().mockResolvedValue({
       output: { grade: 9, discipline: 'Biology', confidence: 0.9 },
-      metrics: { latency_ms: 100, prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 },
+      metrics: { latency_ms: 100, prompt_tokens: 50, cached_tokens: 0, completion_tokens: 20, total_tokens: 70 },
     }),
   }
 })
@@ -26,6 +26,7 @@ const baseProps = {
   concepts: [],
   apiKey: 'sk-test',
   model: 'gpt-5-nano',
+  tier: 'flex' as const,
   initialVisibility: 'private' as const,
   initialGrade: null,
   initialDiscipline: null,

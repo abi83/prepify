@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../agent'
 import type { AgentImage } from '../agent'
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '../config'
 import type { SupportedLanguage } from '../config'
+import type { TierId } from '../apiKey'
 
 const visualElementSchema = z.object({
   type: z.enum(['diagram', 'formula', 'table', 'chart', 'molecule', 'image']),
@@ -53,6 +54,7 @@ export async function runOcrAgent(
   images: AgentImage[],
   apiKey: string,
   model: string,
+  tier: TierId,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: 'ocr',
@@ -61,6 +63,7 @@ export async function runOcrAgent(
     schema: ocrSchema,
     apiKey,
     model,
+    tier,
   })
 
   if (result.output.confidence < MIN_PAGE_CONFIDENCE) {

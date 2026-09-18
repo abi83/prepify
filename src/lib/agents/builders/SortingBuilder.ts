@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../../agent'
 import { sortingContentSchema } from '../../../types/questions'
 import type { SortingContent } from '../../../types/questions'
 import type { QuestionTask } from '../../../types/pipeline'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({ content: sortingContentSchema })
 
@@ -51,6 +52,7 @@ export async function runSortingBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'sorting'; content: SortingContent }>> {
@@ -62,6 +64,7 @@ export async function runSortingBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
   return { output: { type: 'sorting', content: result.output.content }, metrics: result.metrics }

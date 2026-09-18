@@ -3,6 +3,7 @@ import { runAgent, AgentResult } from '../../agent'
 import { singleChoiceContentSchema } from '../../../types/questions'
 import type { SingleChoiceContent } from '../../../types/questions'
 import type { QuestionTask } from '../../../types/pipeline'
+import type { TierId } from '../../apiKey'
 
 const responseSchema = z.object({ content: singleChoiceContentSchema })
 
@@ -52,6 +53,7 @@ export async function runSingleChoiceBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: TierId,
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ type: 'single_choice'; content: SingleChoiceContent }>> {
@@ -63,6 +65,7 @@ export async function runSingleChoiceBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
   })
   return { output: { type: 'single_choice', content: result.output.content }, metrics: result.metrics }

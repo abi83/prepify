@@ -1,10 +1,13 @@
 import OpenAI from 'openai'
 import { zodResponseFormat } from 'openai/helpers/zod'
 import { ZodSchema } from 'zod'
+import type { TierId } from './apiKey'
 
 export interface AgentMetrics {
   latency_ms: number
   prompt_tokens: number
+  /** Subset of prompt_tokens OpenAI served from its automatic prompt cache. */
+  cached_tokens: number
   completion_tokens: number
   total_tokens: number
 }
@@ -31,6 +34,7 @@ interface RunAgentConfig<T> {
   schema: ZodSchema<T>
   apiKey: string
   model?: string
+  tier?: TierId
   signal?: AbortSignal
 }
 
@@ -58,6 +62,9 @@ function backoffMs(attempt: number): number {
   return Math.round(base * jitter)
 }
 
+// OpenAI's API calls the "Standard" pricing tier "default", not "standard".
+const SERVICE_TIER: Record<TierId, 'default' | 'flex'> = { standard: 'default', flex: 'flex' }
+
 function isNonRetryable(err: unknown): boolean {
   if (err instanceof OpenAI.APIError) {
     return err.status === 400 || err.status === 401 || err.status === 403
@@ -66,7 +73,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, apiKey, model = 'gpt-5-nano', signal } = config
+  const { name, systemPrompt, userContent, schema, apiKey, model = 'gpt-5-nano', tier = 'flex', signal } = config
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -84,7 +91,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
             { role: 'user', content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
-          service_tier: 'flex',
+          service_tier: SERVICE_TIER[tier],
         },
         { signal }
       )
@@ -102,6 +109,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const metrics: AgentMetrics = {
         latency_ms,
         prompt_tokens: usage?.prompt_tokens ?? 0,
+        cached_tokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
         completion_tokens: usage?.completion_tokens ?? 0,
         total_tokens: usage?.total_tokens ?? 0,
       }
