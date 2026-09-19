@@ -50,6 +50,24 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # Same skip switch as `test`. Kept a separate check so a green/red audit
+  # signal is distinct from tests, lint and build.
+  audit:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
   # Same skip switch as `test`. Kept a separate check so a green/red lint
   # signal is distinct from tests and build.
   lint:
@@ -88,8 +106,9 @@ jobs:
         run: npm run build
 
   deploy-dev:
-    needs: [lint, test, build]
+    needs: [audit, lint, test, build]
     if: |
+      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
@@ -140,8 +159,9 @@ jobs:
 
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
-    needs: [lint, test, build]
+    needs: [audit, lint, test, build]
     if: |
+      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
