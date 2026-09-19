@@ -42,8 +42,6 @@ gcloud secrets versions access latest --secret=database-url-pooling --project=pr
 
 There's one shared **dev** Neon branch today, no per-PR isolation — tracked at [#85](https://github.com/abi83/prepify/issues/85), which will also document the finished local + CI workflow here. Until then: a human authors migrations locally against dev; an agent (interns pipeline, or Claude non-interactive) doesn't run `db:migrate` — flag a needed schema change for the owner instead of authoring one directly.
 
-Direction: move off `.env` files for dev/PR secrets entirely — pull them in-memory from `gcloud secrets` at process start instead, so isolated dev-per-PR branches (#85) don't each need a checked-out `.env.local`. Tracked at [#196](https://github.com/abi83/prepify/issues/196).
-
 Never edit an already-committed migration — create a new one instead. Authorization is enforced in the repository layer (e.g. `prepRepository.isReadableBy`), not Postgres RLS.
 
 ---
