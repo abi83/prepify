@@ -1,8 +1,9 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
-import { flashcardContentSchema } from '../../../types/questions'
-import type { FlashcardContent } from '../../../types/questions'
-import type { QuestionTask } from '../../../types/pipeline'
+import { z } from "zod"
+
+import type { QuestionTask } from "../../../types/pipeline"
+import { flashcardContentSchema } from "../../../types/questions"
+import type { FlashcardContent } from "../../../types/questions"
+import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({ content: flashcardContentSchema })
 
@@ -27,35 +28,35 @@ ASSET HINT: Decide if a visual asset would improve this flashcard.
 
 Return JSON: { "content": { "front": "...", "back": "...", "back_explanation": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
-function formatConcepts(concepts: QuestionTask['concepts']): string {
-  if (concepts.length === 1) {
-    const c = concepts[0]
-    const mis = c.misconceptions.length > 0 ? c.misconceptions.join('; ') : 'none listed'
-    return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
-  }
-  return `Concepts to assess (connect or contrast them in your question):\n\n` +
+function formatConcepts(concepts: QuestionTask["concepts"]): string {
+    if (concepts.length === 1) {
+        const c = concepts[0]
+        const mis = c.misconceptions.length > 0 ? c.misconceptions.join("; ") : "none listed"
+        return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
+    }
+    return "Concepts to assess (connect or contrast them in your question):\n\n" +
     concepts.map((c, i) => {
-      const mis = c.misconceptions.length > 0 ? c.misconceptions.join('; ') : 'none listed'
-      return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
-    }).join('\n\n')
+        const mis = c.misconceptions.length > 0 ? c.misconceptions.join("; ") : "none listed"
+        return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions: ${mis}`
+    }).join("\n\n")
 }
 
 export async function runFlashcardBuilder(
-  task: QuestionTask,
-  apiKey: string,
-  model: string,
-  language: string,
-  signal?: AbortSignal,
-): Promise<AgentResult<{ type: 'flashcard'; content: FlashcardContent }>> {
-  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
-  const result = await runAgent({
-    name: 'FlashcardBuilder',
-    systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: formatConcepts(task.concepts) },
-    schema: responseSchema,
-    apiKey,
-    model,
-    signal,
-  })
-  return { output: { type: 'flashcard', content: result.output.content }, metrics: result.metrics }
+    task: QuestionTask,
+    apiKey: string,
+    model: string,
+    language: string,
+    signal?: AbortSignal,
+): Promise<AgentResult<{ type: "flashcard"; content: FlashcardContent }>> {
+    const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
+    const result = await runAgent({
+        name: "FlashcardBuilder",
+        systemPrompt: SYSTEM_PROMPT + langInstruction,
+        userContent: { textContent: formatConcepts(task.concepts) },
+        schema: responseSchema,
+        apiKey,
+        model,
+        signal,
+    })
+    return { output: { type: "flashcard", content: result.output.content }, metrics: result.metrics }
 }

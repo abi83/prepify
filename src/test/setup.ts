@@ -1,30 +1,30 @@
-import { vi } from 'vitest'
-import '@testing-library/jest-dom'
+import { vi } from "vitest"
+import "@testing-library/jest-dom"
 
 // next-auth's `lib/env.js` imports the bare `next/server` specifier at module
 // scope, which fails Node ESM resolution outside of Next's own bundler
 // (see https://github.com/nextauthjs/next-auth/issues re: package.json#exports).
 // Only `NextRequest` is referenced, and only inside a helper this app never hits.
-vi.mock('next/server', () => ({ NextRequest: class NextRequest {} }))
+vi.mock("next/server", () => ({ NextRequest: class NextRequest {} }))
 
 // Radix primitives (Dialog, Select) call pointer-capture and layout APIs jsdom
 // doesn't implement.
 if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = () => false
+    Element.prototype.hasPointerCapture = () => false
 }
 if (!Element.prototype.setPointerCapture) {
-  Element.prototype.setPointerCapture = () => {}
+    Element.prototype.setPointerCapture = () => {}
 }
 if (!Element.prototype.releasePointerCapture) {
-  Element.prototype.releasePointerCapture = () => {}
+    Element.prototype.releasePointerCapture = () => {}
 }
 if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => {}
+    Element.prototype.scrollIntoView = () => {}
 }
-if (!('ResizeObserver' in globalThis)) {
-  globalThis.ResizeObserver = class ResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
+if (!("ResizeObserver" in globalThis)) {
+    globalThis.ResizeObserver = class ResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
 }

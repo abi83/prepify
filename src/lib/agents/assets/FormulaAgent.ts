@@ -1,9 +1,10 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
+import { z } from "zod"
+
+import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({
-  latex: z.string(),
-  is_chemical: z.boolean(),
+    latex: z.string(),
+    is_chemical: z.boolean(),
 })
 
 const SYSTEM_PROMPT = `You are a LaTeX math expert generating formulas for school-level study questions.
@@ -20,33 +21,33 @@ Rules:
 Return JSON: { "latex": "...", "is_chemical": false }`
 
 export async function runFormulaAgent(
-  description: string,
-  apiKey: string,
-  model: string,
-  signal?: AbortSignal,
+    description: string,
+    apiKey: string,
+    model: string,
+    signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
-  const result = await runAgent({
-    name: 'FormulaAgent',
-    systemPrompt: SYSTEM_PROMPT,
-    userContent: { textContent: `Generate LaTeX for: ${description}` },
-    schema: responseSchema,
-    apiKey,
-    model,
-    signal,
-  })
+    const result = await runAgent({
+        name: "FormulaAgent",
+        systemPrompt: SYSTEM_PROMPT,
+        userContent: { textContent: `Generate LaTeX for: ${description}` },
+        schema: responseSchema,
+        apiKey,
+        model,
+        signal,
+    })
 
-  const { latex, is_chemical } = result.output
-  const blob = buildFormulaBlob(latex, is_chemical)
-  return { output: blob, metrics: result.metrics }
+    const { latex, is_chemical } = result.output
+    const blob = buildFormulaBlob(latex, is_chemical)
+    return { output: blob, metrics: result.metrics }
 }
 
 function buildFormulaBlob(latex: string, isChemical: boolean): string {
-  const escaped = latex.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')
-  const katexCss = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'
-  const katexJs = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js'
-  const mhchemJs = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js'
+    const escaped = latex.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$/g, "\\$")
+    const katexCss = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+    const katexJs = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+    const mhchemJs = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js"
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -58,7 +59,7 @@ function buildFormulaBlob(latex: string, isChemical: boolean): string {
 </head>
 <body>
 <div class="wrap" id="formula"></div>
-<script src="${katexJs}"></script>${isChemical ? `\n<script src="${mhchemJs}"></script>` : ''}
+<script src="${katexJs}"></script>${isChemical ? `\n<script src="${mhchemJs}"></script>` : ""}
 <script>
   try {
     katex.render(\`${escaped}\`, document.getElementById('formula'), {

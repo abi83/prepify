@@ -1,15 +1,17 @@
-import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
-import MyPreps from './MyPreps'
-import { listMyPreps } from '@/actions/preps'
+import { redirect } from "next/navigation"
+
+import { listMyPreps } from "@/actions/preps"
+import { auth } from "@/lib/auth"
+
+import MyPreps from "./MyPreps"
 
 // Data changes per-user-action (create/delete) and there's no DB access at build time — always render per-request.
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export default async function Page() {
-  const session = await auth()
-  if (!session) redirect('/')
+    const session = await auth()
+    if (!session) redirect("/")
 
-  const preps = await listMyPreps()
-  return <MyPreps preps={preps} />
+    const preps = await listMyPreps()
+    return <MyPreps preps={preps} />
 }

@@ -1,11 +1,12 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
+import { z } from "zod"
 
-const diagramTypeSchema = z.enum(['flowchart', 'graph'])
+import { runAgent, AgentResult } from "../../agent"
+
+const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
 const responseSchema = z.object({
-  type: diagramTypeSchema,
-  dsl: z.string(),
+    type: diagramTypeSchema,
+    dsl: z.string(),
 })
 
 const SYSTEM_PROMPT = `You are an expert at creating Mermaid diagrams for school-level study materials.
@@ -31,35 +32,35 @@ flowchart TD
 
 Return JSON: { "type": "flowchart", "dsl": "flowchart TD\\n  ..." }`
 
-const beautifulMermaidEsm = 'https://esm.sh/beautiful-mermaid@1.1.3'
+const beautifulMermaidEsm = "https://esm.sh/beautiful-mermaid@1.1.3"
 
 export async function runDiagramAgent(
-  description: string,
-  apiKey: string,
-  model: string,
-  signal?: AbortSignal,
+    description: string,
+    apiKey: string,
+    model: string,
+    signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
-  const result = await runAgent({
-    name: 'DiagramAgent',
-    systemPrompt: SYSTEM_PROMPT,
-    userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
-    schema: responseSchema,
-    apiKey,
-    model,
-    signal,
-  })
+    const result = await runAgent({
+        name: "DiagramAgent",
+        systemPrompt: SYSTEM_PROMPT,
+        userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
+        schema: responseSchema,
+        apiKey,
+        model,
+        signal,
+    })
 
-  const blob = buildDiagramBlob(result.output.dsl)
-  return { output: blob, metrics: result.metrics }
+    const blob = buildDiagramBlob(result.output.dsl)
+    return { output: blob, metrics: result.metrics }
 }
 
 function buildDiagramBlob(dsl: string): string {
-  const escapedDsl = dsl
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$')
+    const escapedDsl = dsl
+        .replace(/\\/g, "\\\\")
+        .replace(/`/g, "\\`")
+        .replace(/\$/g, "\\$")
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
