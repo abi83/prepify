@@ -1,5 +1,6 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
+import { z } from "zod"
+
+import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({
   latex: z.string(),
@@ -26,7 +27,7 @@ export async function runFormulaAgent(
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
-    name: 'FormulaAgent',
+    name: "FormulaAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate LaTeX for: ${description}` },
     schema: responseSchema,
@@ -41,10 +42,10 @@ export async function runFormulaAgent(
 }
 
 function buildFormulaBlob(latex: string, isChemical: boolean): string {
-  const escaped = latex.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')
-  const katexCss = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'
-  const katexJs = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js'
-  const mhchemJs = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js'
+  const escaped = latex.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$/g, "\\$")
+  const katexCss = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+  const katexJs = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+  const mhchemJs = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/mhchem.min.js"
 
   return `<!DOCTYPE html>
 <html>
@@ -58,7 +59,7 @@ function buildFormulaBlob(latex: string, isChemical: boolean): string {
 </head>
 <body>
 <div class="wrap" id="formula"></div>
-<script src="${katexJs}"></script>${isChemical ? `\n<script src="${mhchemJs}"></script>` : ''}
+<script src="${katexJs}"></script>${isChemical ? `\n<script src="${mhchemJs}"></script>` : ""}
 <script>
   try {
     katex.render(\`${escaped}\`, document.getElementById('formula'), {

@@ -1,16 +1,17 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { signIn } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
+import Link from "next/link"
+import { signIn } from "next-auth/react"
+import { useState } from "react"
+
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
-  const [loading, setLoading] = useState(false)
+  const [ loading, setLoading ] = useState(false)
 
   async function signInWithGoogle() {
     setLoading(true)
-    await signIn('google', { redirectTo: '/preps' })
+    await signIn("google", { redirectTo: "/preps" })
   }
 
   return (
@@ -36,7 +37,7 @@ export default function Home() {
           onClick={signInWithGoogle}
           disabled={loading}
         >
-          {loading ? 'Redirecting…' : (
+          {loading ? "Redirecting…" : (
             <>
               <GoogleIcon />
               Sign in with Google
@@ -72,7 +73,7 @@ function GoogleIcon() {
 }
 
 const FEATURES = [
-  { icon: '📷', title: 'Snap & go', desc: 'Upload any textbook photo. Your image is sent to OpenAI Vision for OCR, then the text feeds the question pipeline.' },
-  { icon: '🧠', title: 'AI-generated questions', desc: 'Flashcards, multiple-choice, and fill-in-the-blank questions crafted from exactly what you uploaded.' },
-  { icon: '📊', title: 'Track your progress', desc: 'Take timed tests, see your scores, and revisit past sessions to study smarter over time.' },
+  { icon: "📷", title: "Snap & go", desc: "Upload any textbook photo. Your image is sent to OpenAI Vision for OCR, then the text feeds the question pipeline." },
+  { icon: "🧠", title: "AI-generated questions", desc: "Flashcards, multiple-choice, and fill-in-the-blank questions crafted from exactly what you uploaded." },
+  { icon: "📊", title: "Track your progress", desc: "Take timed tests, see your scores, and revisit past sessions to study smarter over time." },
 ]

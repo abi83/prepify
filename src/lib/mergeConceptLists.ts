@@ -1,4 +1,4 @@
-import type { Concept } from '../types/pipeline'
+import type { Concept } from "../types/pipeline"
 
 /**
  * Normalizes a concept name for exact-match deduplication.
@@ -6,10 +6,10 @@ import type { Concept } from '../types/pipeline'
  */
 function normalizeName(name: string): string {
   return name
-    .normalize('NFC')
+    .normalize("NFC")
     .toLowerCase()
-    .replace(/[\p{P}\p{S}]/gu, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[\p{P}\p{S}]/gu, "")
+    .replace(/\s+/g, " ")
     .trim()
 }
 

@@ -1,33 +1,33 @@
-import { runConceptExtractor } from './agents/ConceptExtractor'
-import { runConceptMerger } from './agents/ConceptMerger'
-import { deduplicateExact } from './mergeConceptLists'
-import { BYOK_TEXT_HARD_LIMIT } from './config'
-import type { Page } from '../types/prep'
-import { runPrepNamer } from './agents/PrepNamer'
-import { runFlashcardBuilder } from './agents/builders/FlashcardBuilder'
-import { runSingleChoiceBuilder } from './agents/builders/SingleChoiceBuilder'
-import { runMultipleChoiceBuilder } from './agents/builders/MultipleChoiceBuilder'
-import { runFillTheGapBuilder } from './agents/builders/FillTheGapBuilder'
-import { runSortingBuilder } from './agents/builders/SortingBuilder'
-import { runQuestionReviewer } from './agents/QuestionReviewer'
-import type { Concept, QuestionTask, PipelineProgressEvent } from '../types/pipeline'
-import type { GeneratedQuestion, QuestionType } from '../types/questions'
-import type { AgentResult } from './agent'
-import { incrementPrepTokens } from '../actions/preps'
-import { buildQuestionTasks } from './taskBuilder'
-import { DEFAULT_GEN_CONFIG } from './generationConfig'
+import type { AgentResult } from "./agent"
 import {
   loadOrCreateRun,
   saveConcepts,
   saveQuestionTasksAndInitSlots,
   saveQuestionSlot,
-} from '../actions/pipeline'
+} from "../actions/pipeline"
+import { incrementPrepTokens } from "../actions/preps"
+import type { Concept, QuestionTask, PipelineProgressEvent } from "../types/pipeline"
+import type { Page } from "../types/prep"
+import type { GeneratedQuestion, QuestionType } from "../types/questions"
+import { runFillTheGapBuilder } from "./agents/builders/FillTheGapBuilder"
+import { runFlashcardBuilder } from "./agents/builders/FlashcardBuilder"
+import { runMultipleChoiceBuilder } from "./agents/builders/MultipleChoiceBuilder"
+import { runSingleChoiceBuilder } from "./agents/builders/SingleChoiceBuilder"
+import { runSortingBuilder } from "./agents/builders/SortingBuilder"
+import { runConceptExtractor } from "./agents/ConceptExtractor"
+import { runConceptMerger } from "./agents/ConceptMerger"
+import { runPrepNamer } from "./agents/PrepNamer"
+import { runQuestionReviewer } from "./agents/QuestionReviewer"
+import { BYOK_TEXT_HARD_LIMIT } from "./config"
+import { DEFAULT_GEN_CONFIG } from "./generationConfig"
+import { deduplicateExact } from "./mergeConceptLists"
+import { buildQuestionTasks } from "./taskBuilder"
 
 /** Thrown when total page text exceeds BYOK_TEXT_HARD_LIMIT. The UI catches this and shows a confirmation modal. */
 export class TextTooLongError extends Error {
   constructor(public readonly length: number) {
     super(`Text too long: ${length} characters`)
-    this.name = 'TextTooLongError'
+    this.name = "TextTooLongError"
   }
 }
 
@@ -50,9 +50,9 @@ async function withConcurrency<T>(
     while (next < tasks.length) {
       const idx = next++
       try {
-        results[idx] = { status: 'fulfilled', value: await tasks[idx]() }
+        results[idx] = { status: "fulfilled", value: await tasks[idx]() }
       } catch (e) {
-        results[idx] = { status: 'rejected', reason: e }
+        results[idx] = { status: "rejected", reason: e }
       }
     }
   }
@@ -104,7 +104,7 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = 'en', questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
+  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -121,7 +121,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   if (state.concepts) {
     concepts = state.concepts
   } else {
-    onProgress({ stage: 'concepts' })
+    onProgress({ stage: "concepts" })
     const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
     totalTokens += metrics.total_tokens
     void incrementPrepTokens(prepId, metrics.total_tokens)
@@ -131,10 +131,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
       ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
-          totalTokens += r.metrics.total_tokens
-          void incrementPrepTokens(prepId, r.metrics.total_tokens)
-          return r.output
-        })
+        totalTokens += r.metrics.total_tokens
+        void incrementPrepTokens(prepId, r.metrics.total_tokens)
+        return r.output
+      })
       : deduped
 
     concepts = merged
@@ -161,13 +161,13 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Populate already-built questions from stored slots
   const builtQuestions = new Map<number, GeneratedQuestion>(
-    [...state.questionSlots.entries()]
+    [ ...state.questionSlots.entries() ]
       .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
   )
 
   const resumedCount = builtQuestions.size
   if (resumedCount > 0) {
-    onProgress({ stage: 'resuming', done: resumedCount, total: tasks.length })
+    onProgress({ stage: "resuming", done: resumedCount, total: tasks.length })
   }
 
   // Non-critical; fires callbacks so title+description are saved even if pipeline is cancelled.
@@ -198,7 +198,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let craftDone = resumedCount
   let reviewDone = resumedCount
 
-  onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
+  onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
   const settled = await withConcurrency(
     missingIndices.map((taskIdx) => async () => {
@@ -209,7 +209,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       totalTokens += buildResult.metrics.total_tokens
       void incrementPrepTokens(prepId, buildResult.metrics.total_tokens)
       craftDone++
-      onProgress({ stage: 'crafting', done: craftDone, total: tasks.length })
+      onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
       const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
@@ -231,19 +231,19 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       await saveQuestionSlot(runId, taskIdx, question)
       builtQuestions.set(taskIdx, question)
       reviewDone++
-      onProgress({ stage: 'reviewing', done: reviewDone, total: tasks.length })
+      onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
     }),
     CONCURRENCY,
   )
 
   settled.forEach((r, i) => {
-    if (r.status === 'rejected') {
+    if (r.status === "rejected") {
       console.warn(`[pipeline] slot ${missingIndices[i]} failed, will retry next run:`, r.reason)
     }
   })
 
   await namingPromise
-  onProgress({ stage: 'done' })
+  onProgress({ stage: "done" })
 
   // Assemble in task order — only slots that completed successfully
   const questions = tasks

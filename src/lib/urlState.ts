@@ -1,6 +1,6 @@
-'use client'
+"use client"
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from "next/navigation"
 
 /**
  * Reads and writes the current URL's query string, for page state that should be
@@ -12,7 +12,7 @@ export function useUrlParams() {
 
   function set(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams)
-    for (const [key, value] of Object.entries(updates)) {
+    for (const [ key, value ] of Object.entries(updates)) {
       if (value === undefined) params.delete(key)
       else params.set(key, value)
     }

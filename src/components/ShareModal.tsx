@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
-import type { PrepVisibility } from '@prisma/client'
-import { updatePrep } from '../actions/preps'
-import { runPrepLabeler, DISCIPLINES, type Discipline } from '../lib/agents/PrepLabeler'
-import { disciplineToEnum } from '../lib/disciplineMapping'
-import type { Concept } from '../types/pipeline'
-import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import type { PrepVisibility } from "@prisma/client"
+import { useState, useEffect, useRef } from "react"
+
+import { updatePrep } from "../actions/preps"
+import { runPrepLabeler, DISCIPLINES, type Discipline } from "../lib/agents/PrepLabeler"
+import { disciplineToEnum } from "../lib/disciplineMapping"
+import type { Concept } from "../types/pipeline"
+import { Button } from "./ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
+import { Input } from "./ui/input"
+import { Label } from "./ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 
 interface Props {
   prepId: string
@@ -22,10 +23,10 @@ interface Props {
   onClose: () => void
 }
 
-type LabelPhase = 'loading' | 'done' | 'error'
+type LabelPhase = "loading" | "done" | "error"
 
 const GRADE_OPTIONS = Array.from({ length: 13 }, (_, i) => i + 1)
-const UNSET = '__unset__'
+const UNSET = "__unset__"
 
 export default function ShareModal({
   prepId,
@@ -38,16 +39,19 @@ export default function ShareModal({
   onSave,
   onClose,
 }: Props) {
-  const [visibility, setVisibility] = useState<'link' | 'public'>(
-    initialVisibility === 'public' ? 'public' : 'link',
+  const [ visibility, setVisibility ] = useState<"link" | "public">(
+    initialVisibility === "public" ? "public" : "link",
   )
-  const [grade, setGrade] = useState<number | null>(initialGrade)
-  const [discipline, setDiscipline] = useState<Discipline | null>(initialDiscipline)
-  const [labelPhase, setLabelPhase] = useState<LabelPhase>('loading')
-  const [lowConfidence, setLowConfidence] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [saved, setSaved] = useState(initialVisibility !== 'private')
+  const [ grade, setGrade ] = useState<number | null>(initialGrade)
+  const [ discipline, setDiscipline ] = useState<Discipline | null>(initialDiscipline)
+  const needsLabeling = initialVisibility === "private"
+        && initialGrade === null && initialDiscipline === null
+        && concepts.length > 0 && !!apiKey
+  const [ labelPhase, setLabelPhase ] = useState<LabelPhase>(needsLabeling ? "loading" : "done")
+  const [ lowConfidence, setLowConfidence ] = useState(false)
+  const [ saving, setSaving ] = useState(false)
+  const [ copied, setCopied ] = useState(false)
+  const [ saved, setSaved ] = useState(initialVisibility !== "private")
   const abortRef = useRef<AbortController | null>(null)
   // ShareModal is mounted/unmounted by its parent rather than opened via a
   // DialogTrigger, so Radix has no trigger element to return focus to on
@@ -55,18 +59,7 @@ export default function ShareModal({
   const triggerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null)
 
   useEffect(() => {
-    if (initialVisibility !== 'private') {
-      setLabelPhase('done')
-      return
-    }
-    if (initialGrade !== null || initialDiscipline !== null) {
-      setLabelPhase('done')
-      return
-    }
-    if (!concepts.length || !apiKey) {
-      setLabelPhase('done')
-      return
-    }
+    if (!needsLabeling) return
 
     const ac = new AbortController()
     abortRef.current = ac
@@ -76,12 +69,14 @@ export default function ShareModal({
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)
       setLowConfidence(result.output.confidence <= 0.5)
-      setLabelPhase('done')
+      setLabelPhase("done")
     }).catch(() => {
-      if (!ac.signal.aborted) setLabelPhase('error')
+      if (!ac.signal.aborted) setLabelPhase("error")
     })
 
     return () => ac.abort()
+    // Runs once on mount only — deps captured are the mount-time values on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleConfirm() {
@@ -98,8 +93,8 @@ export default function ShareModal({
   async function handleUnpublish() {
     setSaving(true)
     try {
-      await updatePrep(prepId, { visibility: 'private' })
-      onSave('private', grade, discipline)
+      await updatePrep(prepId, { visibility: "private" })
+      onSave("private", grade, discipline)
     } finally {
       setSaving(false)
     }
@@ -133,12 +128,12 @@ export default function ShareModal({
         {saved ? (
           <div className="flex flex-col gap-3.5">
             <p className="text-sm text-muted-foreground">
-              {visibility === 'link' ? 'Anyone with the link can study this prep.' : 'This prep is publicly listed.'}
+              {visibility === "link" ? "Anyone with the link can study this prep." : "This prep is publicly listed."}
             </p>
             <div className="flex gap-2">
               <Input readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} className="text-xs" />
               <Button onClick={handleCopyLink} className="shrink-0">
-                {copied ? 'Copied!' : 'Copy'}
+                {copied ? "Copied!" : "Copy"}
               </Button>
             </div>
             <Button
@@ -147,48 +142,48 @@ export default function ShareModal({
               disabled={saving}
               className="h-auto self-start p-0 text-muted-foreground"
             >
-              {saving ? 'Saving…' : 'Make private'}
+              {saving ? "Saving…" : "Make private"}
             </Button>
           </div>
         ) : (
           <>
-            {labelPhase === 'loading' && (
+            {labelPhase === "loading" && (
               <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" />
                 <span>Detecting subject and grade…</span>
               </div>
             )}
 
-            {labelPhase === 'error' && (
+            {labelPhase === "error" && (
               <p className="text-sm text-muted-foreground">Could not auto-detect subject — you can set it manually below.</p>
             )}
 
-            {lowConfidence && labelPhase === 'done' && (
+            {lowConfidence && labelPhase === "done" && (
               <p className="rounded-md border border-error/30 bg-error/5 px-3.5 py-2.5 text-sm text-muted-foreground">
-                This material doesn't look like school curriculum. Grade and subject may not apply.
+                This material doesn&apos;t look like school curriculum. Grade and subject may not apply.
               </p>
             )}
 
             <div className="flex flex-col gap-2">
               <Label>Visibility</Label>
               <div className="flex gap-2">
-                {(['link', 'public'] as const).map(v => (
+                {([ "link", "public" ] as const).map(v => (
                   <Button
                     key={v}
                     type="button"
-                    variant={visibility === v ? 'default' : 'outline'}
+                    variant={visibility === v ? "default" : "outline"}
                     aria-pressed={visibility === v}
                     onClick={() => setVisibility(v)}
                     className="flex-1"
                   >
-                    {v === 'link' ? 'Link only' : 'Public'}
+                    {v === "link" ? "Link only" : "Public"}
                   </Button>
                 ))}
               </div>
               <span className="text-xs text-muted-foreground">
-                {visibility === 'link'
-                  ? 'Only people with the link can access this prep.'
-                  : 'Listed publicly — anyone can find and study it.'}
+                {visibility === "link"
+                  ? "Only people with the link can access this prep."
+                  : "Listed publicly — anyone can find and study it."}
               </span>
             </div>
 
@@ -232,8 +227,8 @@ export default function ShareModal({
 
             <div className="mt-1 flex justify-end gap-2.5">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={saving || labelPhase === 'loading'}>
-                {saving ? 'Publishing…' : 'Publish'}
+              <Button onClick={handleConfirm} disabled={saving || labelPhase === "loading"}>
+                {saving ? "Publishing…" : "Publish"}
               </Button>
             </div>
           </>

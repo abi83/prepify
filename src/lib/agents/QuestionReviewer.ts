@@ -1,8 +1,9 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../agent'
-import { generatedQuestionSchema } from '../../types/questions'
-import type { GeneratedQuestion } from '../../types/questions'
-import type { Concept } from '../../types/pipeline'
+import { z } from "zod"
+
+import type { Concept } from "../../types/pipeline"
+import { generatedQuestionSchema } from "../../types/questions"
+import type { GeneratedQuestion } from "../../types/questions"
+import { runAgent, AgentResult } from "../agent"
 
 const reviewerResponseSchema = z.object({
   question: generatedQuestionSchema.nullable(),
@@ -30,8 +31,8 @@ function formatConcepts(concepts: Concept[]): string {
     const c = concepts[0]
     return `Concept being assessed:\nName: ${c.name}\nDescription: ${c.description}`
   }
-  return `Concepts being assessed:\n` +
-    concepts.map((c, i) => `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}`).join('\n\n')
+  return "Concepts being assessed:\n" +
+    concepts.map((c, i) => `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}`).join("\n\n")
 }
 
 export async function runQuestionReviewer(
@@ -42,10 +43,10 @@ export async function runQuestionReviewer(
   language: string,
   signal?: AbortSignal,
 ): Promise<AgentResult<{ question: GeneratedQuestion | null }>> {
-  const langInstruction = language !== 'en' ? `\nAll question text must be in ${language}.` : ''
+  const langInstruction = language !== "en" ? `\nAll question text must be in ${language}.` : ""
   try {
     return await runAgent({
-      name: 'QuestionReviewer',
+      name: "QuestionReviewer",
       systemPrompt: SYSTEM_PROMPT + langInstruction,
       userContent: { textContent: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}` },
       schema: reviewerResponseSchema,
@@ -54,7 +55,7 @@ export async function runQuestionReviewer(
       signal,
     }) as AgentResult<{ question: GeneratedQuestion | null }>
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') throw err
+    if (err instanceof Error && err.name === "AbortError") throw err
     // Reviewer failed — pass the original question through rather than losing it
     return {
       output: { question },

@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { config } from './env'
+import { PrismaPg } from "@prisma/adapter-pg"
+import { PrismaClient } from "@prisma/client"
+
+import { config } from "./env"
 
 // Next.js dev hot-reload re-evaluates this module on every edit; cache the
 // client on `globalThis` so we don't open a fresh pool each time.
@@ -18,6 +19,6 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_, prop) {
     const client = getClient()
     const value = (client as unknown as Record<string | symbol, unknown>)[prop as string | symbol]
-    return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(client) : value
+    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(client) : value
   },
 })

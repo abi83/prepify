@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react'
-import { vi } from 'vitest'
+import { useSyncExternalStore } from "react"
+import { vi } from "vitest"
 
 /**
  * A `next/navigation` mock whose `useSearchParams()` actually reacts to `router.replace(url)` —
@@ -11,7 +11,7 @@ export function createNavigationMock() {
   const listeners = new Set<() => void>()
 
   function replace(url: string) {
-    searchParams = new URLSearchParams(url.split('?')[1] ?? '')
+    searchParams = new URLSearchParams(url.split("?")[1] ?? "")
     listeners.forEach(listener => listener())
   }
 

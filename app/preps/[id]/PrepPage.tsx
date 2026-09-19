@@ -1,25 +1,27 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useSession } from 'next-auth/react'
-import type { Prep, Question, Attempt, Asset } from '@prisma/client'
-import { parseStudyTab, type StudyTab, type Page } from '@/types/prep'
-import { useUrlParams } from '@/lib/urlState'
-import type { FlashcardContent } from '@/types/questions'
-import type { Concept } from '@/types/pipeline'
-import { getApiKey, estimateCost, formatCost } from '@/lib/apiKey'
-import { formatDate } from '@/lib/format'
-import { deletePrep } from '@/actions/preps'
-import { disciplineFromEnum, disciplineToEnum } from '@/lib/disciplineMapping'
-import GenerationPanel from './GenerationPanel'
-import PageSection from './PageSection'
-import StudyTabs from '@/components/StudyTabs'
-import AttemptFlow from '@/components/attempt/AttemptFlow'
-import ShareModal from '@/components/ShareModal'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import type { Prep, Question, Attempt, Asset } from "@prisma/client"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { useState } from "react"
+
+import { deletePrep } from "@/actions/preps"
+import AttemptFlow from "@/components/attempt/AttemptFlow"
+import ShareModal from "@/components/ShareModal"
+import StudyTabs from "@/components/StudyTabs"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getApiKey, estimateCost, formatCost } from "@/lib/apiKey"
+import { disciplineFromEnum, disciplineToEnum } from "@/lib/disciplineMapping"
+import { formatDate } from "@/lib/format"
+import { useUrlParams } from "@/lib/urlState"
+import type { Concept } from "@/types/pipeline"
+import { parseStudyTab, type StudyTab, type Page } from "@/types/prep"
+import type { FlashcardContent } from "@/types/questions"
+
+import GenerationPanel from "./GenerationPanel"
+import PageSection from "./PageSection"
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ interface Props {
   questions: Question[]
   attempts: Attempt[]
   assets: Asset[]
-  runSummary: import('@/repositories/pipelineRepository').PartialRunSummary | null
+  runSummary: import("@/repositories/pipelineRepository").PartialRunSummary | null
   concepts: Concept[]
 }
 
@@ -43,31 +45,40 @@ export default function PrepPage({
   const router = useRouter()
   const { searchParams, set: setUrlParams } = useUrlParams()
 
-  const [prep, setPrep] = useState<Prep>(initialPrep)
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions)
-  const [activeAttempt, setActiveAttempt] = useState<StudyTab | null>(null)
-  const [showShareModal, setShowShareModal] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [ prep, setPrep ] = useState<Prep>(initialPrep)
+  const [ prevInitialPrep, setPrevInitialPrep ] = useState(initialPrep)
+  if (initialPrep !== prevInitialPrep) {
+    setPrevInitialPrep(initialPrep)
+    setPrep(initialPrep)
+  }
 
-  useEffect(() => setPrep(initialPrep), [initialPrep])
-  useEffect(() => setQuestions(initialQuestions), [initialQuestions])
+  const [ questions, setQuestions ] = useState<Question[]>(initialQuestions)
+  const [ prevInitialQuestions, setPrevInitialQuestions ] = useState(initialQuestions)
+  if (initialQuestions !== prevInitialQuestions) {
+    setPrevInitialQuestions(initialQuestions)
+    setQuestions(initialQuestions)
+  }
+
+  const [ activeAttempt, setActiveAttempt ] = useState<StudyTab | null>(null)
+  const [ showShareModal, setShowShareModal ] = useState(false)
+  const [ showDeleteConfirm, setShowDeleteConfirm ] = useState(false)
+  const [ deleting, setDeleting ] = useState(false)
 
   const { data: session } = useSession()
   const userId = session?.user.id ?? null
 
-  const tab = parseStudyTab(searchParams.get('tab'))
+  const tab = parseStudyTab(searchParams.get("tab"))
   function setTab(next: StudyTab) { setUrlParams({ tab: next }) }
 
   const pages = (prep.pages as unknown as Page[]) ?? []
   const hasQuestions = questions.length > 0
-  const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as unknown as FlashcardContent)
-  const studyQuestions = questions.filter(q => q.type !== 'flashcard')
+  const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
+  const studyQuestions = questions.filter(q => q.type !== "flashcard")
 
   async function handleDelete() {
     setDeleting(true)
     await deletePrep(prep.id)
-    router.push('/preps')
+    router.push("/preps")
   }
 
   function handleExitAttempt() {
@@ -75,7 +86,7 @@ export default function PrepPage({
     router.refresh()
   }
 
-  if (activeAttempt && (activeAttempt === 'quiz' || activeAttempt === 'test') && userId) {
+  if (activeAttempt && (activeAttempt === "quiz" || activeAttempt === "test") && userId) {
     return (
       <div className="flex min-h-screen flex-col">
         <header className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -108,7 +119,7 @@ export default function PrepPage({
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
+              {deleting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -121,7 +132,7 @@ export default function PrepPage({
         <div className="flex items-center gap-4">
           {prep.userId === userId && hasQuestions && (
             <Button size="sm" onClick={() => setShowShareModal(true)}>
-              {prep.visibility === 'private' ? 'Share' : 'Shared'}
+              {prep.visibility === "private" ? "Share" : "Shared"}
             </Button>
           )}
           {prep.userId === userId && (
@@ -137,8 +148,8 @@ export default function PrepPage({
         <ShareModal
           prepId={prep.id}
           concepts={concepts}
-          apiKey={getApiKey()?.key ?? ''}
-          model={getApiKey()?.model ?? 'gpt-5-nano'}
+          apiKey={getApiKey()?.key ?? ""}
+          model={getApiKey()?.model ?? "gpt-5-nano"}
           initialVisibility={prep.visibility}
           initialGrade={prep.grade}
           initialDiscipline={disciplineFromEnum(prep.discipline)}
@@ -174,7 +185,7 @@ export default function PrepPage({
         <GenerationPanel
           prepId={prep.id}
           pages={pages}
-          language={prep.language ?? 'en'}
+          language={prep.language ?? "en"}
           prepTitle={prep.title}
           initialRunSummary={runSummary}
           hasQuestions={hasQuestions}

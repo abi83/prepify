@@ -1,29 +1,30 @@
-'use client'
+"use client"
 
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import type { Prep, Question } from '@prisma/client'
-import type { Page } from '@/types/prep'
-import type { PipelineProgressEvent } from '@/types/pipeline'
-import { getApiKey } from '@/lib/apiKey'
-import { runPipeline, TextTooLongError } from '@/lib/pipeline'
-import { BYOK_TEXT_HARD_LIMIT } from '@/lib/config'
-import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from '@/lib/generationConfig'
-import type { GenerationConfig } from '@/lib/generationConfig'
-import type { QuestionType } from '@/types/questions'
-import { getExistingRunSummary } from '@/actions/pipeline'
-import type { PartialRunSummary } from '@/repositories/pipelineRepository'
-import { insertQuestions } from '@/actions/questions'
-import { getMyPrep, updatePrep } from '@/actions/preps'
-import { generateAndSaveAssets } from '@/lib/assetGeneration'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from './GenerationChecklist'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import type { Prep, Question } from "@prisma/client"
+import { useRouter } from "next/navigation"
+import { useState, useRef } from "react"
 
+import { getExistingRunSummary } from "@/actions/pipeline"
+import { getMyPrep, updatePrep } from "@/actions/preps"
+import { insertQuestions } from "@/actions/questions"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { getApiKey } from "@/lib/apiKey"
+import { generateAndSaveAssets } from "@/lib/assetGeneration"
+import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import type { GenerationConfig } from "@/lib/generationConfig"
+import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
+import { runPipeline, TextTooLongError } from "@/lib/pipeline"
+import { cn } from "@/lib/utils"
+import type { PartialRunSummary } from "@/repositories/pipelineRepository"
+import type { PipelineProgressEvent } from "@/types/pipeline"
+import type { Page } from "@/types/prep"
+import type { QuestionType } from "@/types/questions"
+
+import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
 
 interface Props {
   prepId: string
@@ -47,18 +48,18 @@ export default function GenerationPanel({
   onComplete,
 }: Props) {
   const router = useRouter()
-  const [genPhase, setGenPhase] = useState<GenPhase>('idle')
-  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgressEvent | null>(null)
-  const [craftProgress, setCraftProgress] = useState<{ done: number; total: number } | null>(null)
-  const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null)
-  const [titleReady, setTitleReady] = useState(false)
-  const [runSummary, setRunSummary] = useState<PartialRunSummary | null>(initialRunSummary)
-  const [localConfig, setLocalConfig] = useState<GenerationConfig>(() => getGenerationConfig())
-  const [genConfigOpen, setGenConfigOpen] = useState(false)
-  const [genMs, setGenMs] = useState(0)
-  const [totalTokens, setTotalTokens] = useState(0)
-  const [genError, setGenError] = useState<string | null>(null)
-  const [textTooLong, setTextTooLong] = useState<{ length: number } | null>(null)
+  const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
+  const [ pipelineProgress, setPipelineProgress ] = useState<PipelineProgressEvent | null>(null)
+  const [ craftProgress, setCraftProgress ] = useState<{ done: number; total: number } | null>(null)
+  const [ reviewProgress, setReviewProgress ] = useState<{ done: number; total: number } | null>(null)
+  const [ titleReady, setTitleReady ] = useState(false)
+  const [ runSummary, setRunSummary ] = useState<PartialRunSummary | null>(initialRunSummary)
+  const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
+  const [ genConfigOpen, setGenConfigOpen ] = useState(false)
+  const [ genMs, setGenMs ] = useState(0)
+  const [ totalTokens, setTotalTokens ] = useState(0)
+  const [ genError, setGenError ] = useState<string | null>(null)
+  const [ textTooLong, setTextTooLong ] = useState<{ length: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
 
@@ -71,7 +72,7 @@ export default function GenerationPanel({
     setLocalConfig(prev => {
       const already = prev.enabledTypes.includes(type)
       if (already && prev.enabledTypes.length === 1) return prev
-      return { ...prev, enabledTypes: already ? prev.enabledTypes.filter(t => t !== type) : [...prev.enabledTypes, type] }
+      return { ...prev, enabledTypes: already ? prev.enabledTypes.filter(t => t !== type) : [ ...prev.enabledTypes, type ] }
     })
   }
 
@@ -84,7 +85,7 @@ export default function GenerationPanel({
     setTitleReady(false)
     abortRef.current = new AbortController()
     genStartRef.current = performance.now()
-    setGenPhase('running')
+    setGenPhase("running")
 
     try {
       const result = await runPipeline({
@@ -98,8 +99,8 @@ export default function GenerationPanel({
         signal: abortRef.current.signal,
         onProgress: (event) => {
           setPipelineProgress(event)
-          if (event.stage === 'crafting') setCraftProgress({ done: event.done, total: event.total })
-          if (event.stage === 'reviewing') setReviewProgress({ done: event.done, total: event.total })
+          if (event.stage === "crafting") setCraftProgress({ done: event.done, total: event.total })
+          if (event.stage === "reviewing") setReviewProgress({ done: event.done, total: event.total })
         },
         onMetaReady: (title, description) => {
           void updatePrep(prepId, { title, description })
@@ -120,17 +121,17 @@ export default function GenerationPanel({
 
       setGenMs(elapsed)
       setTotalTokens(result.totalTokens)
-      setGenPhase('done')
+      setGenPhase("done")
       await refreshRunSummary()
       router.refresh()
     } catch (e: unknown) {
       if (e instanceof TextTooLongError) {
         setTextTooLong({ length: e.length })
-        setGenPhase('idle')
+        setGenPhase("idle")
         return
       }
-      if ((e as Error).name !== 'AbortError') setGenError((e as Error).message)
-      setGenPhase('idle')
+      if ((e as Error).name !== "AbortError") setGenError((e as Error).message)
+      setGenPhase("idle")
       await refreshRunSummary()
     }
   }
@@ -155,10 +156,10 @@ export default function GenerationPanel({
     await runGeneration(truncated)
   }
 
-  const isRunning = genPhase === 'running'
+  const isRunning = genPhase === "running"
   const hasPartialRun = runSummary !== null
 
-  if (hasQuestions && genPhase === 'idle') return null
+  if (hasQuestions && genPhase === "idle") return null
 
   const checklistRows = isRunning
     ? rowsFromProgress(pipelineProgress, craftProgress, reviewProgress, titleReady)
@@ -195,7 +196,7 @@ export default function GenerationPanel({
                   <Button variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button>
                 ) : (
                   <Button onClick={handleGenerate}>
-                    {hasPartialRun && runSummary.completedSlots > 0 ? 'Resume generation' : 'Start generation'}
+                    {hasPartialRun && runSummary.completedSlots > 0 ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
@@ -211,12 +212,12 @@ export default function GenerationPanel({
                 >
                   <span className="flex-1">
                     {localConfig.questionCount} questions
-                    {' · '}
+                    {" · "}
                     {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
-                      ? 'All types'
-                      : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(', ')}
+                      ? "All types"
+                      : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(", ")}
                   </span>
-                  <span className="text-xs opacity-60">{genConfigOpen ? '▲' : '▼'}</span>
+                  <span className="text-xs opacity-60">{genConfigOpen ? "▲" : "▼"}</span>
                 </button>
 
                 {genConfigOpen && (
@@ -244,7 +245,7 @@ export default function GenerationPanel({
                           const checked = localConfig.enabledTypes.includes(type)
                           const isOnly = checked && localConfig.enabledTypes.length === 1
                           return (
-                            <Label key={type} className={cn('gap-1.5 text-sm font-normal', isOnly && 'cursor-not-allowed opacity-50')}>
+                            <Label key={type} className={cn("gap-1.5 text-sm font-normal", isOnly && "cursor-not-allowed opacity-50")}>
                               <Checkbox checked={checked} disabled={isOnly} onCheckedChange={() => toggleLocalType(type)} />
                               {TYPE_LABELS[type]}
                             </Label>
@@ -265,13 +266,13 @@ export default function GenerationPanel({
       {genError && (
         <div className="flex items-center gap-3 rounded-sm border border-error bg-error/10 px-4 py-3 text-sm text-error">
           <strong>Error:</strong> {genError}
-          <Button variant="link" className="ml-auto h-auto p-0 text-xs text-error underline" onClick={() => { setGenError(null); setGenPhase('idle') }}>
+          <Button variant="link" className="ml-auto h-auto p-0 text-xs text-error underline" onClick={() => { setGenError(null); setGenPhase("idle") }}>
             Retry
           </Button>
         </div>
       )}
 
-      {genPhase === 'done' && totalTokens > 0 && (
+      {genPhase === "done" && totalTokens > 0 && (
         <div className="text-xs text-muted-foreground">
           Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
         </div>

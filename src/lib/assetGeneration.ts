@@ -1,8 +1,9 @@
-import type { Question } from '@prisma/client'
-import type { AssetHint } from '../types/questions'
-import { routeAsset, type ActiveAssetHint } from './agents/assets/assetRouter'
-import { insertAsset } from '../actions/assets'
-import { incrementPrepTokens } from '../actions/preps'
+import type { Question } from "@prisma/client"
+
+import { insertAsset } from "../actions/assets"
+import { incrementPrepTokens } from "../actions/preps"
+import type { AssetHint } from "../types/questions"
+import { routeAsset, type ActiveAssetHint } from "./agents/assets/assetRouter"
 
 function extractAssetHint(question: Question): AssetHint | null {
   const content = question.content as Record<string, unknown>
@@ -41,7 +42,7 @@ export async function generateAndSaveAssets(
           void incrementPrepTokens(prepId, result.metrics.total_tokens)
         }
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') {
+        if ((e as Error).name !== "AbortError") {
           console.warn(`[assets] failed to generate asset for question ${q.id}:`, e)
         }
       }

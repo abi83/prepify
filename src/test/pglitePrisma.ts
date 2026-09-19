@@ -1,10 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { PGlite } from '@electric-sql/pglite'
-import { PrismaPGlite } from 'pglite-prisma-adapter'
-import { PrismaClient } from '@prisma/client'
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
-const MIGRATIONS_DIR = join(process.cwd(), 'prisma', 'migrations')
+import { PGlite } from "@electric-sql/pglite"
+import { PrismaClient } from "@prisma/client"
+import { PrismaPGlite } from "pglite-prisma-adapter"
+
+const MIGRATIONS_DIR = join(process.cwd(), "prisma", "migrations")
 
 /** Spins up a fresh in-memory Postgres (via PGlite) with all committed migrations applied. */
 export async function createPglitePrisma(): Promise<PrismaClient> {
@@ -15,7 +16,7 @@ export async function createPglitePrisma(): Promise<PrismaClient> {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   for (const dir of migrationDirs) {
-    const sql = readFileSync(join(MIGRATIONS_DIR, dir.name, 'migration.sql'), 'utf-8')
+    const sql = readFileSync(join(MIGRATIONS_DIR, dir.name, "migration.sql"), "utf-8")
     await client.exec(sql)
   }
 

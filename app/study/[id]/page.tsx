@@ -1,14 +1,16 @@
-import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
-import StudyPage from './StudyPage'
-import { ErrorState } from '@/components/ErrorState'
-import { getSharedPrep } from '@/actions/preps'
-import { listSharedQuestions } from '@/actions/questions'
-import { listSharedAssets } from '@/actions/assets'
-import { NotFoundError, ForbiddenError } from '@/repositories/errors'
+import type { Metadata } from "next"
+import { notFound } from "next/navigation"
+
+import { listSharedAssets } from "@/actions/assets"
+import { getSharedPrep } from "@/actions/preps"
+import { listSharedQuestions } from "@/actions/questions"
+import { ErrorState } from "@/components/ErrorState"
+import { NotFoundError, ForbiddenError } from "@/repositories/errors"
+
+import StudyPage from "./StudyPage"
 
 // Data changes per-user-action and there's no DB access at build time — always render per-request.
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -21,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       openGraph: { title: prep.title, description },
     }
   } catch {
-    return { title: 'Study' }
+    return { title: "Study" }
   }
 }
 

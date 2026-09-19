@@ -1,5 +1,5 @@
-import type { SingleChoiceContent } from '../../types/questions'
-import { badgeClassName, explanationClassName, optionClassName } from './optionStyles'
+import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
+import type { SingleChoiceContent } from "../../types/questions"
 
 interface Props {
   content: SingleChoiceContent
@@ -8,7 +8,7 @@ interface Props {
   onChange?: (id: string) => void
 }
 
-const LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
+const LABELS = [ "A", "B", "C", "D", "E", "F" ]
 
 export default function SingleChoiceQuestion({ content, selected, isReview, onChange }: Props) {
   return (

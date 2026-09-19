@@ -1,16 +1,18 @@
-import type { Metadata } from 'next'
-import CatalogPage from './CatalogPage'
-import { listCatalog } from '@/actions/preps'
+import type { Metadata } from "next"
+
+import { listCatalog } from "@/actions/preps"
+
+import CatalogPage from "./CatalogPage"
 
 // Data changes per-user-action and there's no DB access at build time — always render per-request.
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: 'Study Catalog',
-  description: 'Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.',
+  title: "Study Catalog",
+  description: "Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.",
   openGraph: {
-    title: 'Study Catalog',
-    description: 'Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.',
+    title: "Study Catalog",
+    description: "Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.",
   },
 }
 

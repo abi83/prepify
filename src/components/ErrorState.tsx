@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react"
 
 /** Shared shell for a full-page error/empty state: a message, centered, with an optional action below it. */
 export function ErrorState({ message, action }: { message: string; action?: ReactNode }) {

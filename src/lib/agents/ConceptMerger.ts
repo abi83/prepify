@@ -1,6 +1,7 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../agent'
-import type { Concept } from '../../types/pipeline'
+import { z } from "zod"
+
+import type { Concept } from "../../types/pipeline"
+import { runAgent, AgentResult } from "../agent"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
 
@@ -34,10 +35,10 @@ export async function runConceptMerger(
 
   const nameSet = new Set(concepts.map(c => c.name))
   const payload = concepts.map(c => ({ name: c.name, importance: c.importance }))
-  const langInstruction = language !== 'en' ? `\nRespond in the same language as the concept names (${language}).` : ''
+  const langInstruction = language !== "en" ? `\nRespond in the same language as the concept names (${language}).` : ""
 
   const result = await runAgent({
-    name: 'ConceptMerger',
+    name: "ConceptMerger",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: JSON.stringify(payload) },
     schema: mergerResponseSchema,
@@ -46,7 +47,7 @@ export async function runConceptMerger(
     signal,
   })
 
-  const conceptByName = new Map(concepts.map(c => [c.name, c]))
+  const conceptByName = new Map(concepts.map(c => [ c.name, c ]))
 
   const merged: Concept[] = result.output.groups.flatMap(group => {
     const members = group.flatMap(name => {
@@ -54,10 +55,10 @@ export async function runConceptMerger(
         console.warn(`[ConceptMerger] unmatched name in response, skipping: "${name}"`)
         return []
       }
-      return [conceptByName.get(name)!]
+      return [ conceptByName.get(name)! ]
     })
     if (members.length === 0) return []
-    return [members.reduce((best, c) => (c.importance > best.importance ? c : best), members[0])]
+    return [ members.reduce((best, c) => (c.importance > best.importance ? c : best), members[0]) ]
   })
 
   return { output: merged, metrics: result.metrics }

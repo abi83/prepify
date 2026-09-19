@@ -1,8 +1,9 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import type { VisualElement, Page } from '@/types/prep'
-import { Button } from '@/components/ui/button'
+import { useState } from "react"
+
+import { Button } from "@/components/ui/button"
+import type { VisualElement, Page } from "@/types/prep"
 
 function VisualElementItem({ el }: { el: VisualElement }) {
   return (
@@ -20,14 +21,14 @@ function VisualElementItem({ el }: { el: VisualElement }) {
 }
 
 export default function PageSection({ page }: { page: Page }) {
-  const [open, setOpen] = useState(false)
+  const [ open, setOpen ] = useState(false)
   const hasVisuals = page.visual_elements.length > 0
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Page {page.page}</span>
         <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setOpen(v => !v)}>
-          {open ? 'Collapse' : 'Expand'}
+          {open ? "Collapse" : "Expand"}
         </Button>
       </div>
       {open && (

@@ -1,8 +1,9 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
-import { fillTheGapContentSchema } from '../../../types/questions'
-import type { FillTheGapContent } from '../../../types/questions'
-import type { QuestionTask } from '../../../types/pipeline'
+import { z } from "zod"
+
+import type { QuestionTask } from "../../../types/pipeline"
+import { fillTheGapContentSchema } from "../../../types/questions"
+import type { FillTheGapContent } from "../../../types/questions"
+import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({ content: fillTheGapContentSchema })
 
@@ -34,17 +35,17 @@ ASSET HINT: Decide if a visual asset would significantly improve this question.
 
 Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
-function formatConcepts(concepts: QuestionTask['concepts']): string {
+function formatConcepts(concepts: QuestionTask["concepts"]): string {
   if (concepts.length === 1) {
     const c = concepts[0]
-    const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join('\n') : '- (none listed)'
+    const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
     return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
   }
-  return `Concepts to assess (connect or contrast them in your question):\n\n` +
+  return "Concepts to assess (connect or contrast them in your question):\n\n" +
     concepts.map((c, i) => {
-      const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join('\n') : '- (none listed)'
+      const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
       return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
-    }).join('\n\n')
+    }).join("\n\n")
 }
 
 export async function runFillTheGapBuilder(
@@ -53,10 +54,10 @@ export async function runFillTheGapBuilder(
   model: string,
   language: string,
   signal?: AbortSignal,
-): Promise<AgentResult<{ type: 'fill_the_gap'; content: FillTheGapContent }>> {
-  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
+): Promise<AgentResult<{ type: "fill_the_gap"; content: FillTheGapContent }>> {
+  const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
-    name: 'FillTheGapBuilder',
+    name: "FillTheGapBuilder",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: formatConcepts(task.concepts) },
     schema: responseSchema,
@@ -64,5 +65,5 @@ export async function runFillTheGapBuilder(
     model,
     signal,
   })
-  return { output: { type: 'fill_the_gap', content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "fill_the_gap", content: result.output.content }, metrics: result.metrics }
 }

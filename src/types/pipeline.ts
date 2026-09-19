@@ -1,5 +1,6 @@
-import { z } from 'zod'
-import type { QuestionType } from './questions'
+import { z } from "zod"
+
+import type { QuestionType } from "./questions"
 
 export const conceptSchema = z.object({
   name: z.string().min(3).max(80),
@@ -20,8 +21,8 @@ export interface QuestionTask {
 }
 
 export type PipelineProgressEvent =
-  | { stage: 'concepts' }
-  | { stage: 'resuming'; done: number; total: number }
-  | { stage: 'crafting'; done: number; total: number }
-  | { stage: 'reviewing'; done: number; total: number }
-  | { stage: 'done' }
+  | { stage: "concepts" }
+  | { stage: "resuming"; done: number; total: number }
+  | { stage: "crafting"; done: number; total: number }
+  | { stage: "reviewing"; done: number; total: number }
+  | { stage: "done" }

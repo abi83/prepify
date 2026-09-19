@@ -1,5 +1,5 @@
-import type { MultipleChoiceContent } from '../../types/questions'
-import { badgeClassName, explanationClassName, optionClassName } from './optionStyles'
+import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
+import type { MultipleChoiceContent } from "../../types/questions"
 
 interface Props {
   content: MultipleChoiceContent
@@ -8,7 +8,7 @@ interface Props {
   onChange?: (ids: string[]) => void
 }
 
-const LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
+const LABELS = [ "A", "B", "C", "D", "E", "F" ]
 
 export default function MultipleChoiceQuestion({ content, selected, isReview, onChange }: Props) {
   const correctCount = content.answers.filter(a => a.is_correct).length
@@ -18,7 +18,7 @@ export default function MultipleChoiceQuestion({ content, selected, isReview, on
     if (selected.includes(id)) {
       onChange(selected.filter(s => s !== id))
     } else if (selected.length < correctCount) {
-      onChange([...selected, id])
+      onChange([ ...selected, id ])
     }
   }
 

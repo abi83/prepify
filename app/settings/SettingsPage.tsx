@@ -1,48 +1,44 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import OpenAI from 'openai'
-import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from '@/lib/apiKey'
-import type { ModelId } from '@/lib/apiKey'
-import { estimateCost, formatCost } from '@/lib/apiKey'
+import { useRouter, useSearchParams } from "next/navigation"
+import OpenAI from "openai"
+import { useState, useEffect } from "react"
+
+import { getTotalTokens } from "@/actions/preps"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { estimateCost, formatCost } from "@/lib/apiKey"
+import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from "@/lib/apiKey"
+import type { ModelId } from "@/lib/apiKey"
+import type { GenerationConfig } from "@/lib/generationConfig"
 import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, TYPE_LABELS,
-} from '@/lib/generationConfig'
-import type { GenerationConfig } from '@/lib/generationConfig'
-import type { QuestionType } from '@/types/questions'
-import { getTotalTokens } from '@/actions/preps'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+} from "@/lib/generationConfig"
+import { cn } from "@/lib/utils"
+import type { QuestionType } from "@/types/questions"
 
-type TestState = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'error'
+type TestState = "idle" | "testing" | "ok" | "invalid_key" | "error"
 
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const returnTo = searchParams.get('returnTo') ?? '/preps'
+  const returnTo = searchParams.get("returnTo") ?? "/preps"
 
-  const [keyValue, setKeyValue] = useState('')
-  const [model, setModel] = useState<ModelId>('gpt-5-nano')
-  const [saved, setSaved] = useState(false)
-  const [testState, setTestState] = useState<TestState>('idle')
-  const [totalTokens, setTotalTokens] = useState(0)
+  const [ keyValue, setKeyValue ] = useState(() => getApiKey()?.key ?? "")
+  const [ model, setModel ] = useState<ModelId>(() => getApiKey()?.model ?? "gpt-5-nano")
+  const [ saved, setSaved ] = useState(false)
+  const [ testState, setTestState ] = useState<TestState>("idle")
+  const [ totalTokens, setTotalTokens ] = useState(0)
 
-  const [genConfig, setGenConfig] = useState<GenerationConfig>(() => getGenerationConfig())
-  const [genConfigSaved, setGenConfigSaved] = useState(false)
+  const [ genConfig, setGenConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
+  const [ genConfigSaved, setGenConfigSaved ] = useState(false)
 
   useEffect(() => {
-    const existing = getApiKey()
-    if (existing) {
-      setKeyValue(existing.key)
-      setModel(existing.model)
-    }
-      getTotalTokens().then(setTotalTokens)
+    getTotalTokens().then(setTotalTokens)
   }, [])
 
   function handleGenConfigSave() {
@@ -59,7 +55,7 @@ export default function SettingsPage() {
         ...prev,
         enabledTypes: already
           ? prev.enabledTypes.filter(t => t !== type)
-          : [...prev.enabledTypes, type],
+          : [ ...prev.enabledTypes, type ],
       }
     })
   }
@@ -68,7 +64,7 @@ export default function SettingsPage() {
     if (!keyValue.trim()) return
     setApiKey(keyValue.trim(), model)
     setSaved(true)
-    setTestState('idle')
+    setTestState("idle")
     setTimeout(() => {
       setSaved(false)
       router.push(returnTo)
@@ -77,24 +73,24 @@ export default function SettingsPage() {
 
   function handleClear() {
     clearApiKey()
-    setKeyValue('')
-    setModel('gpt-5-nano')
+    setKeyValue("")
+    setModel("gpt-5-nano")
     setSaved(false)
-    setTestState('idle')
+    setTestState("idle")
   }
 
   async function handleTestConnection() {
     if (!keyValue.trim()) return
-    setTestState('testing')
+    setTestState("testing")
     try {
       const client = new OpenAI({ apiKey: keyValue.trim(), dangerouslyAllowBrowser: true })
       await client.models.list()
-      setTestState('ok')
+      setTestState("ok")
     } catch (err) {
       if (err instanceof OpenAI.APIError && (err.status === 401 || err.status === 403)) {
-        setTestState('invalid_key')
+        setTestState("invalid_key")
       } else {
-        setTestState('error')
+        setTestState("error")
       }
     }
   }
@@ -113,7 +109,7 @@ export default function SettingsPage() {
         <section className="flex flex-col gap-4">
           <h2 className="text-base font-bold tracking-tight">OpenAI API Key</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Your key is stored only in this browser and never sent to our servers.{' '}
+            Your key is stored only in this browser and never sent to our servers.{" "}
             <a
               href="https://platform.openai.com/api-keys"
               target="_blank"
@@ -130,8 +126,8 @@ export default function SettingsPage() {
               type="password"
               placeholder="sk-..."
               value={keyValue}
-              onChange={e => { setKeyValue(e.target.value); setSaved(false); setTestState('idle') }}
-              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              onChange={e => { setKeyValue(e.target.value); setSaved(false); setTestState("idle") }}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
               autoComplete="off"
             />
           </div>
@@ -152,14 +148,14 @@ export default function SettingsPage() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <Button onClick={handleSave} disabled={!keyValue.trim()}>
-              {saved ? '✓ Saved' : 'Save'}
+              {saved ? "✓ Saved" : "Save"}
             </Button>
             <Button
               variant="outline"
               onClick={handleTestConnection}
-              disabled={!keyValue.trim() || testState === 'testing'}
+              disabled={!keyValue.trim() || testState === "testing"}
             >
-              {testState === 'testing' ? 'Testing…' : 'Test connection'}
+              {testState === "testing" ? "Testing…" : "Test connection"}
             </Button>
             {hasKey && (
               <Button variant="link" className="ml-auto h-auto p-0 text-error" onClick={handleClear}>
@@ -168,13 +164,13 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {testState === 'ok' && (
+          {testState === "ok" && (
             <p className="text-sm font-medium text-success">✓ Connection successful</p>
           )}
-          {testState === 'invalid_key' && (
+          {testState === "invalid_key" && (
             <p className="text-sm text-error">Invalid API key — check your key and try again.</p>
           )}
-          {testState === 'error' && (
+          {testState === "error" && (
             <p className="text-sm text-error">Connection failed — check your internet connection.</p>
           )}
         </section>
@@ -208,7 +204,7 @@ export default function SettingsPage() {
                 return (
                   <Label
                     key={type}
-                    className={cn('gap-1.5 text-sm font-normal', isOnly && 'cursor-not-allowed opacity-50')}
+                    className={cn("gap-1.5 text-sm font-normal", isOnly && "cursor-not-allowed opacity-50")}
                   >
                     <Checkbox
                       checked={genConfig.enabledTypes.includes(type)}
@@ -224,7 +220,7 @@ export default function SettingsPage() {
 
           <div className="flex items-center gap-2.5">
             <Button onClick={handleGenConfigSave}>
-              {genConfigSaved ? '✓ Saved' : 'Save defaults'}
+              {genConfigSaved ? "✓ Saved" : "Save defaults"}
             </Button>
           </div>
         </section>

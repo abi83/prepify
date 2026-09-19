@@ -1,8 +1,9 @@
-import { Prisma } from '@prisma/client'
-import { prisma } from '../lib/prisma'
-import type { Concept, QuestionTask } from '../types/pipeline'
-import type { GeneratedQuestion } from '../types/questions'
-import { ForbiddenError, NotFoundError } from './errors'
+import { Prisma } from "@prisma/client"
+
+import { ForbiddenError, NotFoundError } from "./errors"
+import { prisma } from "../lib/prisma"
+import type { Concept, QuestionTask } from "../types/pipeline"
+import type { GeneratedQuestion } from "../types/questions"
 
 async function assertOwnsPrep(userId: string, prepId: string): Promise<void> {
   const prep = await prisma.prep.findUnique({ where: { id: prepId } })
@@ -30,12 +31,12 @@ export async function loadOrCreateRun(userId: string, prepId: string): Promise<P
 
   const existing = await prisma.pipelineRun.findUnique({
     where: { prepId },
-    include: { questions: { orderBy: { taskIndex: 'asc' } } },
+    include: { questions: { orderBy: { taskIndex: "asc" } } },
   })
 
   if (existing) {
     const questionSlots = new Map<number, GeneratedQuestion | null>(
-      existing.questions.map(q => [q.taskIndex, q.question as GeneratedQuestion | null])
+      existing.questions.map(q => [ q.taskIndex, q.question as GeneratedQuestion | null ])
     )
     return {
       runId: existing.id,
@@ -91,8 +92,8 @@ export async function deleteRun(userId: string, prepId: string): Promise<void> {
 
 export interface PartialRunSummary {
   hasConcepts: boolean
-  totalTasks: number      // 0 until task list is built
-  completedSlots: number  // non-null question slots (craft+review both done)
+  totalTasks: number // 0 until task list is built
+  completedSlots: number // non-null question slots (craft+review both done)
 }
 
 export async function getConcepts(userId: string, prepId: string): Promise<Concept[] | null> {

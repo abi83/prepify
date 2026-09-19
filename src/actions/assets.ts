@@ -1,8 +1,9 @@
-'use server'
+"use server"
 
-import type { Asset } from '@prisma/client'
-import { requireUserId } from '../lib/currentUser'
-import * as assetRepository from '../repositories/assetRepository'
+import type { Asset } from "@prisma/client"
+
+import { requireUserId } from "../lib/currentUser"
+import * as assetRepository from "../repositories/assetRepository"
 
 export async function listMyAssets(questionIds: string[]): Promise<Asset[]> {
   return assetRepository.listByQuestionIds(await requireUserId(), questionIds)

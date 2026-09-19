@@ -1,6 +1,6 @@
-import OpenAI from 'openai'
-import { zodResponseFormat } from 'openai/helpers/zod'
-import { ZodSchema } from 'zod'
+import OpenAI from "openai"
+import { zodResponseFormat } from "openai/helpers/zod"
+import { ZodSchema } from "zod"
 
 export interface AgentMetrics {
   latency_ms: number
@@ -38,10 +38,10 @@ function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.
   if (!images?.length) return textContent
   return [
     ...images.map(img => ({
-      type: 'image_url' as const,
-      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: 'high' as const },
+      type: "image_url" as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
     })),
-    { type: 'text' as const, text: textContent },
+    { type: "text" as const, text: textContent },
   ]
 }
 
@@ -66,7 +66,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, apiKey, model = 'gpt-5-nano', signal } = config
+  const { name, systemPrompt, userContent, schema, apiKey, model = "gpt-5-nano", signal } = config
 
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
@@ -80,11 +80,11 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         {
           model,
           messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: buildUserContent(userContent) },
+            { role: "system", content: systemPrompt },
+            { role: "user", content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
-          service_tier: 'flex',
+          service_tier: "flex",
         },
         { signal }
       )
@@ -92,7 +92,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const latency_ms = Math.round(performance.now() - t0)
       const usage = response.usage
 
-      const rawText = response.choices[0]?.message?.content ?? ''
+      const rawText = response.choices[0]?.message?.content ?? ""
       const parsed = JSON.parse(rawText)
 
       // Zod validation — model is constrained to match the schema via Structured Outputs,
@@ -106,14 +106,14 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         total_tokens: usage?.total_tokens ?? 0,
       }
 
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== "production") {
         console.log(`[agent:${name}]`, metrics)
       }
 
       return { output: validated, metrics }
     } catch (err) {
       lastError = err
-      if (isNonRetryable(err) || (err instanceof Error && err.name === 'AbortError')) {
+      if (isNonRetryable(err) || (err instanceof Error && err.name === "AbortError")) {
         throw err
       }
       if (attempt < MAX_ATTEMPTS) {

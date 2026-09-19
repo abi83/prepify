@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Prisma } from '@prisma/client'
-import type { Page } from '../types/prep'
-import type { VisualElementOutput } from '../lib/agents/OcrAgent'
-import { runOcrAgent } from '../lib/agents/OcrAgent'
-import { getApiKey } from '../lib/apiKey'
-import { BYOK_TEXT_HARD_LIMIT } from '../lib/config'
-import { listMyPreps, createPrep } from '../actions/preps'
-import { cn } from '@/lib/utils'
-import { Button } from './ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
+import type { Prisma } from "@prisma/client"
+import { useEffect, useRef, useState } from "react"
+
+import { cn } from "@/lib/utils"
+
+import { listMyPreps, createPrep } from "../actions/preps"
+import type { VisualElementOutput } from "../lib/agents/OcrAgent"
+import { runOcrAgent } from "../lib/agents/OcrAgent"
+import { getApiKey } from "../lib/apiKey"
+import { BYOK_TEXT_HARD_LIMIT } from "../lib/config"
+import type { Page } from "../types/prep"
+import { Button } from "./ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
 
 const MAX_IMAGES = 10
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -18,17 +20,17 @@ type Props = {
   onDone: (prepId: string) => void
 }
 
-type Phase = 'collect' | 'ocr' | 'saving' | 'error'
+type Phase = "collect" | "ocr" | "saving" | "error"
 
 async function extractTextFromImage(file: File, apiKey: string, model: string): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onload = () => resolve((reader.result as string).split(",")[1])
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
 
-  const { output } = await runOcrAgent([{ base64, mimeType: file.type }], apiKey, model)
+  const { output } = await runOcrAgent([ { base64, mimeType: file.type } ], apiKey, model)
   return { text: output.text, language: output.language, visual_elements: output.visual_elements }
 }
 
@@ -36,17 +38,20 @@ export default function UploadModal({ onClose, onDone }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
-  const [files, setFiles] = useState<File[]>([])
-  const [previews, setPreviews] = useState<string[]>([])
-  const [phase, setPhase] = useState<Phase>('collect')
+  const [ files, setFiles ] = useState<File[]>([])
+  const [ previews, setPreviews ] = useState<string[]>([])
+  const [ phase, setPhase ] = useState<Phase>("collect")
 
   useEffect(() => {
+    // Object URLs are an external resource that must be created and
+    // revoked in lockstep with `files` — not derivable during render.
     const urls = files.map(f => URL.createObjectURL(f))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviews(urls)
     return () => urls.forEach(u => URL.revokeObjectURL(u))
-  }, [files])
-  const [ocrProgress, setOcrProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
-  const [errorMsg, setErrorMsg] = useState('')
+  }, [ files ])
+  const [ ocrProgress, setOcrProgress ] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
+  const [ errorMsg, setErrorMsg ] = useState("")
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return
@@ -63,12 +68,12 @@ export default function UploadModal({ onClose, onDone }: Props) {
     }
 
     if (oversized.length) {
-      setPhase('error')
-      setErrorMsg(`${oversized.join(', ')} ${oversized.length === 1 ? 'exceeds' : 'exceed'} the 5 MB limit. Please use smaller images.`)
+      setPhase("error")
+      setErrorMsg(`${oversized.join(", ")} ${oversized.length === 1 ? "exceeds" : "exceed"} the 5 MB limit. Please use smaller images.`)
       return
     }
 
-    setFiles(prev => [...prev, ...validFiles].slice(0, MAX_IMAGES))
+    setFiles(prev => [ ...prev, ...validFiles ].slice(0, MAX_IMAGES))
   }
 
   function removeFile(index: number) {
@@ -80,12 +85,12 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
     const config = getApiKey()
     if (!config) {
-      setPhase('error')
-      setErrorMsg('No API key configured. Please set one in Settings.')
+      setPhase("error")
+      setErrorMsg("No API key configured. Please set one in Settings.")
       return
     }
 
-    setPhase('ocr')
+    setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
 
     let results: { text: string; language: string; visual_elements: VisualElementOutput[] }[]
@@ -98,12 +103,12 @@ export default function UploadModal({ onClose, onDone }: Props) {
         })
       )
     } catch (err) {
-      setPhase('error')
-      const msg = err instanceof Error ? err.message : ''
+      setPhase("error")
+      const msg = err instanceof Error ? err.message : ""
       setErrorMsg(
-        msg.startsWith('low_confidence')
-          ? 'One of the images is too blurry or dark to read reliably. Please replace it with a clearer photo.'
-          : 'OCR failed. Please try again.'
+        msg.startsWith("low_confidence")
+          ? "One of the images is too blurry or dark to read reliably. Please replace it with a clearer photo."
+          : "OCR failed. Please try again."
       )
       return
     }
@@ -114,23 +119,23 @@ export default function UploadModal({ onClose, onDone }: Props) {
       visual_elements: r.visual_elements,
     }))
 
-    const combinedText = pages.map(p => p.text).join('\n\n')
+    const combinedText = pages.map(p => p.text).join("\n\n")
 
     if (!combinedText.trim()) {
-      setPhase('error')
-      setErrorMsg('No text detected in any image. Please try clearer photos.')
+      setPhase("error")
+      setErrorMsg("No text detected in any image. Please try clearer photos.")
       return
     }
 
     if (combinedText.length > BYOK_TEXT_HARD_LIMIT) {
-      setPhase('error')
+      setPhase("error")
       setErrorMsg(`Extracted text exceeds the ${(BYOK_TEXT_HARD_LIMIT / 1000).toFixed(0)} 000 character limit. Please use fewer pages.`)
       return
     }
 
-    const language = results[0]?.language ?? 'en'
+    const language = results[0]?.language ?? "en"
 
-    setPhase('saving')
+    setPhase("saving")
 
     try {
       const existing = await listMyPreps()
@@ -139,12 +144,12 @@ export default function UploadModal({ onClose, onDone }: Props) {
       const prep = await createPrep({ title, pages: pages as unknown as Prisma.InputJsonValue, language })
       onDone(prep.id)
     } catch {
-      setPhase('error')
-      setErrorMsg('Failed to save. Please try again.')
+      setPhase("error")
+      setErrorMsg("Failed to save. Please try again.")
     }
   }
 
-  const isWorking = phase === 'ocr' || phase === 'saving'
+  const isWorking = phase === "ocr" || phase === "saving"
   const canAddMore = files.length < MAX_IMAGES
 
   return (
@@ -159,7 +164,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
           <DialogDescription className="sr-only">Upload photos of textbook pages to create a new prep.</DialogDescription>
         </DialogHeader>
 
-        {phase === 'collect' && (
+        {phase === "collect" && (
           <>
             {files.length === 0 ? (
               <div
@@ -176,7 +181,8 @@ export default function UploadModal({ onClose, onDone }: Props) {
               <>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2.5">
                   {files.map((_, i) => (
-                    <div key={i} className="relative overflow-hidden rounded-sm border border-border bg-muted" style={{ aspectRatio: '3 / 4' }}>
+                    <div key={i} className="relative overflow-hidden rounded-sm border border-border bg-muted" style={{ aspectRatio: "3 / 4" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL preview, not optimizable by next/image */}
                       <img src={previews[i]} alt={`Page ${i + 1}`} className="block h-full w-full object-cover" />
                       <button
                         className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/55 p-0 text-[0.65rem] text-white hover:bg-black/80"
@@ -220,33 +226,33 @@ export default function UploadModal({ onClose, onDone }: Props) {
               type="file"
               accept="image/*"
               multiple
-              style={{ display: 'none' }}
-              onChange={e => { addFiles(e.target.files); e.target.value = '' }}
+              style={{ display: "none" }}
+              onChange={e => { addFiles(e.target.files); e.target.value = "" }}
             />
             <input
               ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
-              style={{ display: 'none' }}
-              onChange={e => { addFiles(e.target.files); e.target.value = '' }}
+              style={{ display: "none" }}
+              onChange={e => { addFiles(e.target.files); e.target.value = "" }}
             />
           </>
         )}
 
-        {(phase === 'ocr' || phase === 'saving') && (
+        {(phase === "ocr" || phase === "saving") && (
           <div className="flex flex-col gap-3 py-4">
             <div className="text-sm text-muted-foreground">
-              {phase === 'ocr'
+              {phase === "ocr"
                 ? `Recognising image ${ocrProgress.done + 1} of ${ocrProgress.total}…`
-                : 'Saving your prep…'}
+                : "Saving your prep…"}
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
                 style={{
-                  width: phase === 'saving'
-                    ? '100%'
+                  width: phase === "saving"
+                    ? "100%"
                     : `${ocrProgress.total > 0 ? (ocrProgress.done / ocrProgress.total) * 100 : 0}%`,
                 }}
               />
@@ -254,10 +260,10 @@ export default function UploadModal({ onClose, onDone }: Props) {
           </div>
         )}
 
-        {phase === 'error' && (
-          <div className={cn('flex flex-col items-center gap-4 py-4 text-center text-error')}>
+        {phase === "error" && (
+          <div className={cn("flex flex-col items-center gap-4 py-4 text-center text-error")}>
             <p>{errorMsg}</p>
-            <Button variant="secondary" onClick={() => { setPhase('collect'); setErrorMsg('') }}>
+            <Button variant="secondary" onClick={() => { setPhase("collect"); setErrorMsg("") }}>
               Try again
             </Button>
           </div>

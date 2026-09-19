@@ -1,15 +1,16 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { useSession } from 'next-auth/react'
-import type { Prep, Question, Asset } from '@prisma/client'
-import { parseStudyTab, type StudyTab } from '@/types/prep'
-import { useUrlParams } from '@/lib/urlState'
-import type { FlashcardContent } from '@/types/questions'
-import StudyTabs from '@/components/StudyTabs'
-import AttemptFlow from '@/components/attempt/AttemptFlow'
-import { Button } from '@/components/ui/button'
+import type { Prep, Question, Asset } from "@prisma/client"
+import Link from "next/link"
+import { useSession } from "next-auth/react"
+import { useState } from "react"
+
+import AttemptFlow from "@/components/attempt/AttemptFlow"
+import StudyTabs from "@/components/StudyTabs"
+import { Button } from "@/components/ui/button"
+import { useUrlParams } from "@/lib/urlState"
+import { parseStudyTab, type StudyTab } from "@/types/prep"
+import type { FlashcardContent } from "@/types/questions"
 
 interface Props {
   prep: Prep
@@ -20,8 +21,8 @@ interface Props {
 export default function StudyPage({ prep, questions, assets }: Props) {
   const { searchParams, set: setUrlParams } = useUrlParams()
 
-  const tab = parseStudyTab(searchParams.get('tab'))
-  const [activeAttempt, setActiveAttempt] = useState<'quiz' | 'test' | null>(null)
+  const tab = parseStudyTab(searchParams.get("tab"))
+  const [ activeAttempt, setActiveAttempt ] = useState<"quiz" | "test" | null>(null)
   const { data: session } = useSession()
   const userId = session?.user.id ?? null
 
@@ -29,8 +30,8 @@ export default function StudyPage({ prep, questions, assets }: Props) {
     setUrlParams({ tab: next })
   }
 
-  const flashcards = questions.filter(q => q.type === 'flashcard').map(q => q.content as unknown as FlashcardContent)
-  const studyQuestions = questions.filter(q => q.type !== 'flashcard')
+  const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
+  const studyQuestions = questions.filter(q => q.type !== "flashcard")
 
   if (activeAttempt) {
     return (

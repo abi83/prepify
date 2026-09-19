@@ -1,13 +1,14 @@
-import { Prisma, type Prep, type PrepDiscipline, type PrepVisibility } from '@prisma/client'
-import { prisma } from '../lib/prisma'
-import { ForbiddenError, NotFoundError } from './errors'
+import { Prisma, type Prep, type PrepDiscipline, type PrepVisibility } from "@prisma/client"
+
+import { ForbiddenError, NotFoundError } from "./errors"
+import { prisma } from "../lib/prisma"
 
 export function isReadableBy(prep: Prep, userId: string | null): boolean {
-  return prep.userId === userId || prep.visibility !== 'private'
+  return prep.userId === userId || prep.visibility !== "private"
 }
 
 export async function listOwnedPreps(userId: string): Promise<Prep[]> {
-  return prisma.prep.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } })
+  return prisma.prep.findMany({ where: { userId }, orderBy: { createdAt: "desc" } })
 }
 
 export interface CatalogEntry extends Prep {
@@ -16,8 +17,8 @@ export interface CatalogEntry extends Prep {
 
 export async function listPublicCatalog(): Promise<CatalogEntry[]> {
   const preps = await prisma.prep.findMany({
-    where: { visibility: 'public' },
-    orderBy: { createdAt: 'desc' },
+    where: { visibility: "public" },
+    orderBy: { createdAt: "desc" },
     include: { _count: { select: { questions: true } } },
   })
   return preps.map(({ _count, ...prep }) => ({ ...prep, questionCount: _count.questions }))

@@ -1,6 +1,7 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../agent'
-import type { Concept } from '../../types/pipeline'
+import { z } from "zod"
+
+import type { Concept } from "../../types/pipeline"
+import { runAgent, AgentResult } from "../agent"
 
 const prepNameSchema = z.object({
   title: z.string(),
@@ -33,12 +34,12 @@ export async function runPrepNamer(
     .sort((a, b) => b.importance - a.importance)
     .slice(0, 8)
     .map(c => `- ${c.name} (importance: ${c.importance.toFixed(2)})`)
-    .join('\n')
+    .join("\n")
 
-  const langInstruction = language !== 'en' ? `\nRespond in ${language}.` : ''
+  const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
 
   return runAgent({
-    name: 'PrepNamer',
+    name: "PrepNamer",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepNameSchema,

@@ -1,6 +1,7 @@
-import type { FillTheGapContent } from '../../types/questions'
-import { cn } from '@/lib/utils'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { cn } from "@/lib/utils"
+
+import type { FillTheGapContent } from "../../types/questions"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 
 interface Props {
   content: FillTheGapContent
@@ -21,7 +22,7 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
 
   function handleChange(gapIndex: number, answerId: string) {
     if (isReview || !onChange) return
-    const next = [...selected]
+    const next = [ ...selected ]
     next[gapIndex] = answerId
     const valid = gaps.every((_, i) => !!next[i])
     onChange(next, valid)
@@ -38,14 +39,14 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
     const gapNumber = parseInt(match[1])
     const gapIndex = gapNumber - 1
     const gap = gaps.find(g => g.index === gapNumber)
-    const currentValue = selected[gapIndex] || ''
+    const currentValue = selected[gapIndex] || ""
 
     let isCorrect = false
     if (isReview && gap) {
       isCorrect = currentValue === gap.correct_answer_id
 
       if (gap.explanation) {
-        const correctLabel = content.answers.find(a => a.id === gap.correct_answer_id)?.label ?? ''
+        const correctLabel = content.answers.find(a => a.id === gap.correct_answer_id)?.label ?? ""
         reviewExplanations.push({ gapIndex, correct: isCorrect, explanation: gap.explanation, correctLabel })
       }
     }
@@ -60,8 +61,8 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
         <SelectTrigger
           size="sm"
           className={cn(
-            'mx-1 inline-flex min-w-[130px] align-middle',
-            isReview && (isCorrect ? 'border-success bg-success/10' : 'border-error bg-error/10'),
+            "mx-1 inline-flex min-w-[130px] align-middle",
+            isReview && (isCorrect ? "border-success bg-success/10" : "border-error bg-error/10"),
           )}
         >
           <SelectValue placeholder="___" />
@@ -83,15 +84,15 @@ export default function FillTheGapQuestion({ content, selected, isReview, onChan
   return (
     <div className="flex flex-col gap-3">
       <span className="text-xs text-muted-foreground">
-        Fill {gaps.length} gap{gaps.length !== 1 ? 's' : ''} — select from the dropdowns
+        Fill {gaps.length} gap{gaps.length !== 1 ? "s" : ""} — select from the dropdowns
       </span>
       <p className="text-base leading-[2.6]">{rendered}</p>
       {isReview && reviewExplanations.map(({ gapIndex, correct, explanation, correctLabel }) => (
         <div
           key={gapIndex}
           className={cn(
-            'rounded-sm border-l-[3px] bg-muted px-3 py-2 text-sm text-muted-foreground',
-            correct ? 'border-l-success text-success' : 'border-l-error',
+            "rounded-sm border-l-[3px] bg-muted px-3 py-2 text-sm text-muted-foreground",
+            correct ? "border-l-success text-success" : "border-l-error",
           )}
         >
           {!correct && correctLabel && <strong>Correct: {correctLabel}. </strong>}

@@ -1,26 +1,27 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../agent'
-import type { Concept } from '../../types/pipeline'
+import { z } from "zod"
+
+import type { Concept } from "../../types/pipeline"
+import { runAgent, AgentResult } from "../agent"
 
 export const DISCIPLINES = [
-  'History',
-  'Geography',
-  'Literature',
-  'Social Studies',
-  'Economics',
-  'Philosophy/Ethics',
-  'Biology',
-  'Chemistry',
-  'Physics',
-  'Mathematics',
-  'Computer Science',
-  'English',
-  'French',
-  'German',
-  'Spanish',
-  'Italian',
-  'Latin',
-  'Russian',
+  "History",
+  "Geography",
+  "Literature",
+  "Social Studies",
+  "Economics",
+  "Philosophy/Ethics",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Mathematics",
+  "Computer Science",
+  "English",
+  "French",
+  "German",
+  "Spanish",
+  "Italian",
+  "Latin",
+  "Russian",
 ] as const
 
 export type Discipline = (typeof DISCIPLINES)[number]
@@ -63,10 +64,10 @@ export async function runPrepLabeler(
     .sort((a, b) => b.importance - a.importance)
     .slice(0, 12)
     .map(c => `- ${c.name} (importance: ${c.importance.toFixed(2)}): ${c.description}`)
-    .join('\n')
+    .join("\n")
 
   return runAgent({
-    name: 'PrepLabeler',
+    name: "PrepLabeler",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepLabelSchema,

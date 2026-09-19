@@ -1,20 +1,21 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import type { Prep, PrepVisibility } from '@prisma/client'
-import { signOut as authSignOut } from 'next-auth/react'
-import { SettingsIcon, XIcon } from 'lucide-react'
-import { formatDate } from '@/lib/format'
-import { deletePrep } from '@/actions/preps'
-import UploadModal from '@/components/UploadModal'
-import { Button } from '@/components/ui/button'
+import type { Prep, PrepVisibility } from "@prisma/client"
+import { SettingsIcon, XIcon } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { signOut as authSignOut } from "next-auth/react"
+import { useState } from "react"
+
+import { deletePrep } from "@/actions/preps"
+import { Button } from "@/components/ui/button"
+import UploadModal from "@/components/UploadModal"
+import { formatDate } from "@/lib/format"
 
 const VISIBILITY_STYLES: Record<PrepVisibility, string> = {
-  private: 'bg-muted text-muted-foreground',
-  link: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  public: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  private: "bg-muted text-muted-foreground",
+  link: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  public: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
 }
 
 function VisibilityBadge({ visibility }: { visibility: PrepVisibility }) {
@@ -30,13 +31,13 @@ interface Props {
 }
 
 export default function MyPreps({ preps }: Props) {
-  const [showUpload, setShowUpload] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [ showUpload, setShowUpload ] = useState(false)
+  const [ confirmDeleteId, setConfirmDeleteId ] = useState<string | null>(null)
+  const [ deleting, setDeleting ] = useState(false)
   const router = useRouter()
 
   async function signOut() {
-    await authSignOut({ redirectTo: '/' })
+    await authSignOut({ redirectTo: "/" })
   }
 
   function handleDone(prepId: string) {
@@ -112,7 +113,7 @@ export default function MyPreps({ preps }: Props) {
                       onClick={() => handleDelete(prep.id)}
                       disabled={deleting}
                     >
-                      {deleting ? '…' : 'Yes'}
+                      {deleting ? "…" : "Yes"}
                     </Button>
                     <Button
                       variant="outline"

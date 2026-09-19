@@ -1,15 +1,17 @@
-import { useState } from 'react'
-import type { FlashcardContent } from '../../types/questions'
-import { cn } from '@/lib/utils'
-import { Button } from '../ui/button'
+import { useState } from "react"
+
+import { cn } from "@/lib/utils"
+
+import type { FlashcardContent } from "../../types/questions"
+import { Button } from "../ui/button"
 
 interface Props {
   cards: FlashcardContent[]
 }
 
 export default function FlashCard({ cards }: Props) {
-  const [index, setIndex] = useState(0)
-  const [flipped, setFlipped] = useState(false)
+  const [ index, setIndex ] = useState(0)
+  const [ flipped, setFlipped ] = useState(false)
 
   const card = cards[index]
   const total = cards.length
@@ -27,13 +29,13 @@ export default function FlashCard({ cards }: Props) {
 
       <div
         className="w-full max-w-[560px] cursor-pointer [perspective:1000px]"
-        style={{ aspectRatio: '3 / 2' }}
+        style={{ aspectRatio: "3 / 2" }}
         onClick={() => setFlipped(f => !f)}
       >
         <div
           className={cn(
-            'relative h-full w-full transition-transform duration-500 ease-in-out [transform-style:preserve-3d]',
-            flipped && '[transform:rotateY(180deg)]',
+            "relative h-full w-full transition-transform duration-500 ease-in-out [transform-style:preserve-3d]",
+            flipped && "[transform:rotateY(180deg)]",
           )}
         >
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-background p-8 text-center [backface-visibility:hidden]">

@@ -1,7 +1,8 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
+import { z } from "zod"
 
-const diagramTypeSchema = z.enum(['flowchart', 'graph'])
+import { runAgent, AgentResult } from "../../agent"
+
+const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
 const responseSchema = z.object({
   type: diagramTypeSchema,
@@ -31,7 +32,7 @@ flowchart TD
 
 Return JSON: { "type": "flowchart", "dsl": "flowchart TD\\n  ..." }`
 
-const beautifulMermaidEsm = 'https://esm.sh/beautiful-mermaid@1.1.3'
+const beautifulMermaidEsm = "https://esm.sh/beautiful-mermaid@1.1.3"
 
 export async function runDiagramAgent(
   description: string,
@@ -40,7 +41,7 @@ export async function runDiagramAgent(
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
-    name: 'DiagramAgent',
+    name: "DiagramAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
     schema: responseSchema,
@@ -55,9 +56,9 @@ export async function runDiagramAgent(
 
 function buildDiagramBlob(dsl: string): string {
   const escapedDsl = dsl
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$')
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\$/g, "\\$")
 
   return `<!DOCTYPE html>
 <html>

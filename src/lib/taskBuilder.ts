@@ -2,12 +2,12 @@
  * Pure functions for building the question task list from extracted concepts.
  * No external dependencies — safe to unit-test in isolation.
  */
-import type { Concept, QuestionTask } from '../types/pipeline'
-import type { QuestionType } from '../types/questions'
+import type { Concept, QuestionTask } from "../types/pipeline"
+import type { QuestionType } from "../types/questions"
 
 /** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
 export function buildTypePool(count: number, enabledTypes: QuestionType[]): QuestionType[] {
-  if (enabledTypes.length === 0) throw new Error('At least one question type must be enabled')
+  if (enabledTypes.length === 0) throw new Error("At least one question type must be enabled")
   const base = Math.floor(count / enabledTypes.length)
   const extra = count % enabledTypes.length
   const pool: QuestionType[] = []
@@ -19,10 +19,10 @@ export function buildTypePool(count: number, enabledTypes: QuestionType[]): Ques
 }
 
 export function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
+  const a = [ ...arr ]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
+    ;[ a[i], a[j] ] = [ a[j], a[i] ]
   }
   return a
 }
@@ -53,11 +53,11 @@ export function buildQuestionTasks(
   concepts: Concept[],
   config: { questionCount: number; enabledTypes: QuestionType[] },
 ): QuestionTask[] {
-  if (concepts.length === 0) throw new Error('No concepts to build tasks from')
+  if (concepts.length === 0) throw new Error("No concepts to build tasks from")
 
   const { questionCount: count, enabledTypes } = config
 
-  const sorted = [...concepts].sort((a, b) => b.importance - a.importance)
+  const sorted = [ ...concepts ].sort((a, b) => b.importance - a.importance)
   const types = shuffle(buildTypePool(count, enabledTypes))
 
   // Build slot-size pool: 50% single, 40% double, 10% triple
@@ -83,11 +83,11 @@ export function buildQuestionTasks(
 
     for (let s = 0; s < size; s++) {
       const capped = new Set(
-        [...conceptCounts.entries()]
-          .filter(([, n]) => n >= MAX_PER_CONCEPT)
-          .map(([name]) => name)
+        [ ...conceptCounts.entries() ]
+          .filter(([ , n ]) => n >= MAX_PER_CONCEPT)
+          .map(([ name ]) => name)
       )
-      const exclude = new Set([...capped, ...slotExclude])
+      const exclude = new Set([ ...capped, ...slotExclude ])
       const concept = weightedPick(sorted, exclude)
       slotConcepts.push(concept)
       slotExclude.add(concept.name)
@@ -117,7 +117,7 @@ export function buildQuestionTasks(
     })
 
     if (replaceIdx >= 0) {
-      tasks[replaceIdx] = { concepts: [top], type: tasks[replaceIdx].type }
+      tasks[replaceIdx] = { concepts: [ top ], type: tasks[replaceIdx].type }
     }
   }
 

@@ -1,11 +1,12 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../agent'
-import type { AgentImage } from '../agent'
-import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '../config'
-import type { SupportedLanguage } from '../config'
+import { z } from "zod"
+
+import { runAgent, AgentResult } from "../agent"
+import type { AgentImage } from "../agent"
+import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "../config"
+import type { SupportedLanguage } from "../config"
 
 const visualElementSchema = z.object({
-  type: z.enum(['diagram', 'formula', 'table', 'chart', 'molecule', 'image']),
+  type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
   description: z.string(),
   content: z.string(),
   caption: z.string().nullable(),
@@ -21,12 +22,12 @@ const ocrSchema = z.object({
   visual_elements: z.array(visualElementSchema),
 })
 
-export type OcrOutput = Omit<z.infer<typeof ocrSchema>, 'language'> & { language: SupportedLanguage }
+export type OcrOutput = Omit<z.infer<typeof ocrSchema>, "language"> & { language: SupportedLanguage }
 export type VisualElementOutput = z.infer<typeof visualElementSchema>
 
-const SUPPORTED_LANGUAGE_NAMES = SUPPORTED_LANGUAGES.map(l => LANGUAGE_LABELS[l]).join(', ')
+const SUPPORTED_LANGUAGE_NAMES = SUPPORTED_LANGUAGES.map(l => LANGUAGE_LABELS[l]).join(", ")
 
-const SYSTEM_PROMPT = `You are an OCR agent. Extract all text and visual elements from the textbook page image provided.`
+const SYSTEM_PROMPT = "You are an OCR agent. Extract all text and visual elements from the textbook page image provided."
 
 const USER_PROMPT = `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
 
@@ -55,7 +56,7 @@ export async function runOcrAgent(
   model: string,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
-    name: 'ocr',
+    name: "ocr",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: USER_PROMPT, images },
     schema: ocrSchema,

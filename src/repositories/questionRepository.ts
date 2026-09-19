@@ -1,11 +1,12 @@
-import { Prisma, type Question } from '@prisma/client'
-import { prisma } from '../lib/prisma'
-import { ForbiddenError } from './errors'
-import { getPrep } from './prepRepository'
+import { Prisma, type Question } from "@prisma/client"
+
+import { ForbiddenError } from "./errors"
+import { getPrep } from "./prepRepository"
+import { prisma } from "../lib/prisma"
 
 export async function listByPrep(userId: string | null, prepId: string): Promise<Question[]> {
   await getPrep(userId, prepId) // throws NotFoundError/ForbiddenError if not readable
-  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: 'asc' } })
+  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
 }
 
 export interface CreateQuestionInput {
@@ -20,5 +21,5 @@ export async function insertMany(userId: string, prepId: string, questions: Crea
   await prisma.question.createMany({
     data: questions.map(q => ({ prepId, type: q.type, content: q.content })),
   })
-  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: 'asc' } })
+  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
 }

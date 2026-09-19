@@ -1,31 +1,32 @@
-import type { Metadata } from 'next'
-import { Inter, Sora } from 'next/font/google'
-import { SessionProvider } from 'next-auth/react'
-import ThemeToggle from '@/components/ThemeToggle'
-import { cn } from '@/lib/utils'
-import '@/index.css'
+import type { Metadata } from "next"
+import { Inter, Sora } from "next/font/google"
+import { SessionProvider } from "next-auth/react"
+
+import ThemeToggle from "@/components/ThemeToggle"
+import { cn } from "@/lib/utils"
+import "@/index.css"
 
 const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
-  variable: '--font-inter',
+  subsets: [ "latin" ],
+  weight: [ "400", "500", "600", "700" ],
+  display: "swap",
+  variable: "--font-inter",
 })
 
 const sora = Sora({
-  subsets: ['latin'],
-  weight: ['600', '700'],
-  display: 'swap',
-  variable: '--font-sora',
+  subsets: [ "latin" ],
+  weight: [ "600", "700" ],
+  display: "swap",
+  variable: "--font-sora",
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.AUTH_URL ?? 'http://localhost:3000'),
-  title: { default: 'Prepify', template: '%s | Prepify' },
-  description: 'Turn any textbook page into a personal exam',
+  metadataBase: new URL(process.env.AUTH_URL ?? "http://localhost:3000"),
+  title: { default: "Prepify", template: "%s | Prepify" },
+  description: "Turn any textbook page into a personal exam",
   openGraph: {
-    siteName: 'Prepify',
-    type: 'website',
+    siteName: "Prepify",
+    type: "website",
   },
 }
 

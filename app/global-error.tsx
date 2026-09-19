@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { useEffect } from 'react'
-import '@/index.css'
+import { useEffect } from "react"
+import "@/index.css"
 
 // Only fires when the root layout itself throws — the nearest error.tsx can't catch that,
 // since it renders inside the layout. Kept dependency-free (no shared components) since this
@@ -15,7 +15,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error.digest ? `[${error.digest}]` : error.message, error)
-  }, [error])
+  }, [ error ])
 
   return (
     <html lang="en" className="dark">

@@ -1,5 +1,6 @@
-import { z } from 'zod'
-import { runAgent, AgentResult } from '../../agent'
+import { z } from "zod"
+
+import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({
   molecules: z.array(z.object({
@@ -20,7 +21,7 @@ Rules:
 
 Return JSON: { "molecules": [{ "name": "...", "smiles": "..." }] }`
 
-const smilesDrawerJs = 'https://unpkg.com/smiles-drawer@1.1.23/dist/smiles-drawer.min.js'
+const smilesDrawerJs = "https://unpkg.com/smiles-drawer@1.1.23/dist/smiles-drawer.min.js"
 
 export async function runMoleculeAgent(
   description: string,
@@ -29,7 +30,7 @@ export async function runMoleculeAgent(
   signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
-    name: 'MoleculeAgent',
+    name: "MoleculeAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate SMILES for: ${description}` },
     schema: responseSchema,

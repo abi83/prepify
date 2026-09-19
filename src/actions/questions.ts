@@ -1,10 +1,11 @@
-'use server'
+"use server"
 
-import type { Question } from '@prisma/client'
-import { revalidatePath } from 'next/cache'
-import { requireUserId } from '../lib/currentUser'
-import * as questionRepository from '../repositories/questionRepository'
-import type { CreateQuestionInput } from '../repositories/questionRepository'
+import type { Question } from "@prisma/client"
+import { revalidatePath } from "next/cache"
+
+import { requireUserId } from "../lib/currentUser"
+import * as questionRepository from "../repositories/questionRepository"
+import type { CreateQuestionInput } from "../repositories/questionRepository"
 
 export async function listMyQuestions(prepId: string): Promise<Question[]> {
   return questionRepository.listByPrep(await requireUserId(), prepId)

@@ -1,8 +1,8 @@
-import { runAgent, AgentResult } from '../agent'
-import { conceptsResponseSchema } from '../../types/pipeline'
-import type { Concept } from '../../types/pipeline'
-import { CHUNK_SIZE } from '../config'
-import type { Page } from '../../types/prep'
+import { conceptsResponseSchema } from "../../types/pipeline"
+import type { Concept } from "../../types/pipeline"
+import type { Page } from "../../types/prep"
+import { runAgent, AgentResult } from "../agent"
+import { CHUNK_SIZE } from "../config"
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 
@@ -52,23 +52,23 @@ export interface ConceptExtractorResult extends AgentResult<Concept[]> {
 }
 
 function serializePage(page: Page): string {
-  const parts = [`=== Page ${page.page} ===\n${page.text}`]
+  const parts = [ `=== Page ${page.page} ===\n${page.text}` ]
   if (page.visual_elements.length > 0) {
     const visuals = page.visual_elements.map((el, i) => {
-      const lines = [`[Visual ${i + 1}] Type: ${el.type}`, `Description: ${el.description}`]
+      const lines = [ `[Visual ${i + 1}] Type: ${el.type}`, `Description: ${el.description}` ]
       if (el.content) lines.push(`Content: ${el.content}`)
       if (el.caption) lines.push(`Caption: ${el.caption}`)
       if (el.context) lines.push(`Referenced by: ${el.context}`)
-      return lines.join('\n')
+      return lines.join("\n")
     })
-    parts.push(`--- Visual Elements ---\n${visuals.join('\n\n')}`)
+    parts.push(`--- Visual Elements ---\n${visuals.join("\n\n")}`)
   }
-  return parts.join('\n\n')
+  return parts.join("\n\n")
 }
 
 function chunkPages(pages: Page[], chunkSize: number): string[] {
   const chunks: string[] = []
-  let current = ''
+  let current = ""
 
   for (const page of pages) {
     const serialized = serializePage(page)
@@ -76,12 +76,12 @@ function chunkPages(pages: Page[], chunkSize: number): string[] {
       chunks.push(current)
       current = serialized
     } else {
-      current = current.length > 0 ? current + '\n\n' + serialized : serialized
+      current = current.length > 0 ? current + "\n\n" + serialized : serialized
     }
   }
 
   if (current.length > 0) chunks.push(current)
-  return chunks.length > 0 ? chunks : ['']
+  return chunks.length > 0 ? chunks : [ "" ]
 }
 
 export async function runConceptExtractor(
@@ -92,14 +92,14 @@ export async function runConceptExtractor(
   signal?: AbortSignal,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
-  const langInstruction = language !== 'en' ? `\nRespond in the same language as the source text (${language}).` : ''
+  const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
 
   let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
   const allConcepts: Concept[] = []
 
   for (const chunk of chunks) {
     const result = await runAgent({
-      name: 'ConceptExtractor',
+      name: "ConceptExtractor",
       systemPrompt: SYSTEM_PROMPT + langInstruction,
       userContent: { textContent: `Source text:\n\n${chunk}` },
       schema: conceptsResponseSchema,
