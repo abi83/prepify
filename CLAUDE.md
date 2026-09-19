@@ -1,17 +1,11 @@
 # Prepify — Claude Instructions
 
 ## Project Overview
-Prepify is a Next.js (App Router) + TypeScript app backed by Auth.js (auth) and Neon Postgres via Prisma (data).
+Prepify is a Next.js (App Router) + TypeScript app backed by Auth.js (Google OAuth) and Neon Postgres via Prisma, styled with Tailwind + shadcn/ui.
 Users upload textbook photos, OCR extracts text, and the app generates study quizzes via a multi-agent LLM pipeline.
-API keys are BYOK — users supply their own OpenAI key stored in localStorage; the OpenAI-calling pipeline stays entirely client-side.
+API keys are BYOK, stored in localStorage. The pipeline is moving to run client- or server-side — see epic [#46](https://github.com/abi83/prepify/issues/46).
+Runs on GCP Cloud Run — infra details in `terraform/`.
 Page/component structure and data-flow conventions: see [Coding Guidelines](#coding-guidelines) below.
-
-## Tech Stack
-- Next.js (App Router, TypeScript)
-- Auth.js (Google OAuth)
-- Neon Postgres + Prisma (data layer)
-- Tailwind CSS + shadcn/ui
-- OpenAI API (LLM pipeline)
 
 ## Coding Guidelines
 
@@ -35,15 +29,6 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 - A comparison between options is a table: options as columns (or rows), criteria as the other axis, one fact per cell, and an explicit winner per criterion. Prose describing each option in turn is not a comparison table even if it's formatted as one.
 - Cut qualifying clauses and hedges that don't change what a reader does with the sentence.
 - PR bodies use exactly three sections — **What changed** / **Before merging** / **After merging** — and nothing else; rationale belongs on the linked issue. A **Notes** section is for genuine exceptions, not routine. Full convention on the wiki's Contributing page.
-
-## Environment
-Copy `.env.example` to `.env.local`:
-- `DATABASE_URL_POOLING` — pooled Neon connection string, as the `app_runtime` role (DML only, no DDL — migrations always go through `DATABASE_URL_DIRECT`)
-- `DATABASE_URL_DIRECT` — direct Neon connection string (running migrations only)
-- `AUTH_SECRET` — Auth.js JWT signing secret (generate with `npx auth secret`)
-- `AUTH_GOOGLE_CLIENT_ID` / `AUTH_GOOGLE_CLIENT_SECRET` — Google OAuth client credentials, passed explicitly to Auth.js's Google provider
-
----
 
 ## Database Migrations
 
@@ -100,10 +85,5 @@ The GitHub wiki (separate repo, cloned locally at `../prepify.wiki`) is a high-l
 ---
 
 ## Development
-
-```bash
-npm install
-npm run dev
-```
 
 Before pushing, run the same checks CI gates on: `npm test` and `npm run build`. Lint/typecheck aren't wired into CI yet — testing strategy beyond that is a placeholder pending #78.
