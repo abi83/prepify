@@ -58,5 +58,5 @@ export async function runFlashcardBuilder(
     model,
     signal,
   })
-  return { output: { type: "flashcard", content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "flashcard", content: result.output.content }, meta: result.meta }
 }

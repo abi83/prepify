@@ -69,5 +69,5 @@ export async function runMultipleChoiceBuilder(
     model,
     signal,
   })
-  return { output: { type: "multiple_choice", content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "multiple_choice", content: result.output.content }, meta: result.meta }
 }

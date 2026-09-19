@@ -10,7 +10,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { estimateCost, formatCost } from "@/lib/apiKey"
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from "@/lib/apiKey"
 import type { ModelId } from "@/lib/apiKey"
 import type { GenerationConfig } from "@/lib/generationConfig"
@@ -18,6 +17,7 @@ import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from "@/lib/generationConfig"
+import { estimateCost, formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
 import type { QuestionType } from "@/types/questions"
 

@@ -106,6 +106,31 @@ model PipelineQuestion {
   @@unique([runId, taskIndex])
 }
 
+enum GenerationEntityType {
+  prep
+  question
+}
+
+// Polymorphic (entityType + entityId) rather than per-entity FKs: usage/cost needs to
+// aggregate across an entity's own generation calls today, and across related entities
+// (e.g. total cost for a Prep across all its Questions) once that reporting lands (#31).
+model GenerationMeta {
+  id               String               @id @default(uuid())
+  entityType       GenerationEntityType
+  entityId         String
+  model            String
+  tier             String
+  promptTokens     Int
+  cachedTokens     Int
+  completionTokens Int
+  costUsd          Float
+  toolCalls        Int
+  executionMs      Int
+  generatedAt      DateTime             @default(now())
+
+  @@index([entityType, entityId])
+}
+
 model Asset {
   id         String   @id @default(uuid())
   questionId String
