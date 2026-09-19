@@ -19,7 +19,7 @@ export default defineConfig({
     exclude: [ "**/node_modules/**", "**/.claude/worktrees/**" ],
     coverage: {
       provider: "v8",
-      include: [ "src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}" ],
+      include: [ "src/**/*.{ts,tsx}" ],
       exclude: [ "src/test/**", "src/**/*.d.ts" ],
       reporter: [ "text", "html" ],
     },
