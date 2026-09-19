@@ -182,6 +182,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2.5">
                   {files.map((_, i) => (
                     <div key={i} className="relative overflow-hidden rounded-sm border border-border bg-muted" style={{ aspectRatio: "3 / 4" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL preview, not optimizable by next/image */}
                       <img src={previews[i]} alt={`Page ${i + 1}`} className="block h-full w-full object-cover" />
                       <button
                         className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/55 p-0 text-[0.65rem] text-white hover:bg-black/80"

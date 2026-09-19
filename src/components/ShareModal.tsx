@@ -75,6 +75,8 @@ export default function ShareModal({
     })
 
     return () => ac.abort()
+    // Runs once on mount only — deps captured are the mount-time values on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleConfirm() {
