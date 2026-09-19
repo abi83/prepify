@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/abi83/prepify/compare/v1.1.0...v1.2.0) (2026-09-19)
+
+
+### Features
+
+* bake runtime version into image, expose via /api/healthz ([#189](https://github.com/abi83/prepify/issues/189)) ([a0227e4](https://github.com/abi83/prepify/commit/a0227e48e9faa97c4dfab15604ba31931446df95))
+* redirect www.prepify.cc to the bare domain ([#188](https://github.com/abi83/prepify/issues/188)) ([1cebec7](https://github.com/abi83/prepify/commit/1cebec7e775b6be5dcda4549dccbf09a1f67ef97))
+* separate least-privilege app_runtime DB role from migration owner ([#190](https://github.com/abi83/prepify/issues/190)) ([90e7a85](https://github.com/abi83/prepify/commit/90e7a858e84cbda149f3276f24665603ca8f6d72)), closes [#91](https://github.com/abi83/prepify/issues/91)
+
+
+### Bug Fixes
+
+* pin all deps to exact versions, add npm audit CI gate ([#204](https://github.com/abi83/prepify/issues/204)) ([718f483](https://github.com/abi83/prepify/commit/718f483c9a05bf5d08675caa3e2f73e0e7b2b491))
+* resolve --font-body to a real CSS var, not the Tailwind theme alias ([#192](https://github.com/abi83/prepify/issues/192)) ([424f7b9](https://github.com/abi83/prepify/commit/424f7b96f9c742af830c72649b79b6c89eda65d1))
+* tag releases as vX.Y.Z, not &lt;package&gt;-vX.Y.Z ([#186](https://github.com/abi83/prepify/issues/186)) ([de3a37a](https://github.com/abi83/prepify/commit/de3a37ac6fefa84476608c01ed23ad1e920a8068))
+
 ## [1.1.0](https://github.com/abi83/prepify/compare/prepify-v1.0.0...prepify-v1.1.0) (2026-09-18)
 
 
