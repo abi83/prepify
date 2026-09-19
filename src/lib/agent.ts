@@ -2,16 +2,41 @@ import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
 import { ZodSchema } from "zod"
 
-export interface AgentMetrics {
-  latency_ms: number
-  prompt_tokens: number
-  completion_tokens: number
-  total_tokens: number
+import { computeCost } from "./pricing"
+
+/**
+ * App-shaped usage/cost data for one agent call — never OpenAI's raw `usage` object.
+ * This is what gets persisted as a `GenerationMeta` row (see src/types/generationMeta.ts)
+ * and what callers use for progress/cost display. Nothing downstream of `runAgent`
+ * should read an OpenAI response shape directly.
+ */
+export interface AgentMeta {
+  model: string
+  tier: string
+  promptTokens: number
+  cachedTokens: number
+  completionTokens: number
+  totalTokens: number
+  costUsd: number
+  toolCalls: number
+  executionMs: number
 }
 
 export interface AgentResult<T> {
   output: T
-  metrics: AgentMetrics
+  meta: AgentMeta
+}
+
+export const EMPTY_AGENT_META: AgentMeta = {
+  model: "",
+  tier: "",
+  promptTokens: 0,
+  cachedTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  costUsd: 0,
+  toolCalls: 0,
+  executionMs: 0,
 }
 
 export interface AgentImage {
@@ -46,6 +71,7 @@ function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.
 }
 
 const MAX_ATTEMPTS = 3
+const SERVICE_TIER = "flex"
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -84,33 +110,43 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
             { role: "user", content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
-          service_tier: "flex",
+          service_tier: SERVICE_TIER,
         },
         { signal }
       )
 
-      const latency_ms = Math.round(performance.now() - t0)
+      const executionMs = Math.round(performance.now() - t0)
       const usage = response.usage
+      const message = response.choices[0]?.message
 
-      const rawText = response.choices[0]?.message?.content ?? ""
+      const rawText = message?.content ?? ""
       const parsed = JSON.parse(rawText)
 
       // Zod validation — model is constrained to match the schema via Structured Outputs,
       // so this is a cheap type-safety assertion rather than a real fallback path.
       const validated = schema.parse(parsed)
 
-      const metrics: AgentMetrics = {
-        latency_ms,
-        prompt_tokens: usage?.prompt_tokens ?? 0,
-        completion_tokens: usage?.completion_tokens ?? 0,
-        total_tokens: usage?.total_tokens ?? 0,
+      const promptTokens = usage?.prompt_tokens ?? 0
+      const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0
+      const completionTokens = usage?.completion_tokens ?? 0
+
+      const meta: AgentMeta = {
+        model,
+        tier: SERVICE_TIER,
+        promptTokens,
+        cachedTokens,
+        completionTokens,
+        totalTokens: usage?.total_tokens ?? promptTokens + completionTokens,
+        costUsd: computeCost({ promptTokens, cachedTokens, completionTokens }, model),
+        toolCalls: message?.tool_calls?.length ?? 0,
+        executionMs,
       }
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[agent:${name}]`, metrics)
+        console.log(`[agent:${name}]`, meta)
       }
 
-      return { output: validated, metrics }
+      return { output: validated, meta }
     } catch (err) {
       lastError = err
       if (isNonRetryable(err) || (err instanceof Error && err.name === "AbortError")) {

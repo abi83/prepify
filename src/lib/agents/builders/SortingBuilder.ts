@@ -65,5 +65,5 @@ export async function runSortingBuilder(
     model,
     signal,
   })
-  return { output: { type: "sorting", content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "sorting", content: result.output.content }, meta: result.meta }
 }

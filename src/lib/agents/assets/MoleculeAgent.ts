@@ -40,7 +40,7 @@ export async function runMoleculeAgent(
   })
 
   const blob = buildMoleculeBlob(result.output.molecules)
-  return { output: blob, metrics: result.metrics }
+  return { output: blob, meta: result.meta }
 }
 
 function buildMoleculeBlob(molecules: { name: string; smiles: string }[]): string {

@@ -1,7 +1,7 @@
 import { conceptsResponseSchema } from "../../types/pipeline"
 import type { Concept } from "../../types/pipeline"
 import type { Page } from "../../types/prep"
-import { runAgent, AgentResult } from "../agent"
+import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "../agent"
 import { CHUNK_SIZE } from "../config"
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
@@ -94,7 +94,7 @@ export async function runConceptExtractor(
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
 
-  let totalTokens = { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+  let meta: AgentMeta = EMPTY_AGENT_META
   const allConcepts: Concept[] = []
 
   for (const chunk of chunks) {
@@ -109,13 +109,18 @@ export async function runConceptExtractor(
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
     allConcepts.push(...filtered)
-    totalTokens = {
-      latency_ms: totalTokens.latency_ms + result.metrics.latency_ms,
-      prompt_tokens: totalTokens.prompt_tokens + result.metrics.prompt_tokens,
-      completion_tokens: totalTokens.completion_tokens + result.metrics.completion_tokens,
-      total_tokens: totalTokens.total_tokens + result.metrics.total_tokens,
+    meta = {
+      model: result.meta.model,
+      tier: result.meta.tier,
+      promptTokens: meta.promptTokens + result.meta.promptTokens,
+      cachedTokens: meta.cachedTokens + result.meta.cachedTokens,
+      completionTokens: meta.completionTokens + result.meta.completionTokens,
+      totalTokens: meta.totalTokens + result.meta.totalTokens,
+      costUsd: meta.costUsd + result.meta.costUsd,
+      toolCalls: meta.toolCalls + result.meta.toolCalls,
+      executionMs: meta.executionMs + result.meta.executionMs,
     }
   }
 
-  return { output: allConcepts, metrics: totalTokens, chunkCount: chunks.length }
+  return { output: allConcepts, meta, chunkCount: chunks.length }
 }

@@ -65,5 +65,5 @@ export async function runFillTheGapBuilder(
     model,
     signal,
   })
-  return { output: { type: "fill_the_gap", content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "fill_the_gap", content: result.output.content }, meta: result.meta }
 }

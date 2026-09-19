@@ -14,7 +14,7 @@ vi.mock("../../lib/agents/PrepLabeler", async () => {
     ...actual,
     runPrepLabeler: vi.fn().mockResolvedValue({
       output: { grade: 9, discipline: "Biology", confidence: 0.9 },
-      metrics: { latency_ms: 100, prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 },
+      meta: { model: "gpt-5-nano", tier: "flex", promptTokens: 50, cachedTokens: 0, completionTokens: 20, totalTokens: 70, costUsd: 0.0001, toolCalls: 0, executionMs: 100 },
     }),
   }
 })

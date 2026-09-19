@@ -110,7 +110,11 @@ export default function GenerationPanel({
       })
 
       const elapsed = Math.round(performance.now() - genStartRef.current)
-      const savedQuestions = await insertQuestions(prepId, result.questions.map(q => ({ type: q.type, content: q.content })))
+      const savedQuestions = await insertQuestions(
+        prepId,
+        result.questions.map(q => ({ type: q.type, content: q.content })),
+        result.questionMeta,
+      )
 
       if (savedQuestions.length > 0) {
         void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, abortRef.current?.signal)

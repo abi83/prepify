@@ -1,4 +1,5 @@
-import type { AgentResult } from "./agent"
+import type { AgentMeta, AgentResult } from "./agent"
+import { recordGenerationMeta } from "../actions/generationMeta"
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -84,6 +85,10 @@ export interface PipelineResult {
   prepTitle: string | null
   prepDescription: string | null
   totalTokens: number
+  /** Build/review/asset-agent meta for each question in `questions`, same order — not yet
+   *  persisted as GenerationMeta because the Question doesn't exist until the caller
+   *  inserts it (see questionRepository.insertMany). */
+  questionMeta: AgentMeta[][]
 }
 
 export interface PipelineConfig {
@@ -122,17 +127,19 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: "concepts" })
-    const { output, metrics, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
-    totalTokens += metrics.total_tokens
-    void incrementPrepTokens(prepId, metrics.total_tokens)
+    const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
+    totalTokens += meta.totalTokens
+    void incrementPrepTokens(prepId, meta.totalTokens)
+    void recordGenerationMeta("prep", prepId, meta)
 
     // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
     // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
       ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
-        totalTokens += r.metrics.total_tokens
-        void incrementPrepTokens(prepId, r.metrics.total_tokens)
+        totalTokens += r.meta.totalTokens
+        void incrementPrepTokens(prepId, r.meta.totalTokens)
+        void recordGenerationMeta("prep", prepId, r.meta)
         return r.output
       })
       : deduped
@@ -178,8 +185,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     .then(r => {
       prepTitle = r.output.title
       prepDescription = r.output.description
-      totalTokens += r.metrics.total_tokens
-      void incrementPrepTokens(prepId, r.metrics.total_tokens)
+      totalTokens += r.meta.totalTokens
+      void incrementPrepTokens(prepId, r.meta.totalTokens)
+      void recordGenerationMeta("prep", prepId, r.meta)
       onMetaReady?.(r.output.title, r.output.description)
     })
     .catch(() => null)
@@ -198,30 +206,40 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let craftDone = resumedCount
   let reviewDone = resumedCount
 
+  // Build/review meta isn't a GenerationMeta row yet — the Question this slot becomes
+  // doesn't exist until the caller inserts it (see questionRepository.insertMany), so
+  // it's buffered here and returned alongside `questions`, same order, for the caller
+  // to persist once real Question ids exist.
+  const slotMeta = new Map<number, AgentMeta[]>()
+
   onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
   const settled = await withConcurrency(
     missingIndices.map((taskIdx) => async () => {
       const task = tasks[taskIdx]
+      const metas: AgentMeta[] = []
 
       // Build
       const buildResult = await BUILDERS[task.type](task, apiKey, model, language, signal)
-      totalTokens += buildResult.metrics.total_tokens
-      void incrementPrepTokens(prepId, buildResult.metrics.total_tokens)
+      totalTokens += buildResult.meta.totalTokens
+      void incrementPrepTokens(prepId, buildResult.meta.totalTokens)
+      metas.push(buildResult.meta)
       craftDone++
       onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
       const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
-      totalTokens += reviewed.metrics.total_tokens
-      void incrementPrepTokens(prepId, reviewed.metrics.total_tokens)
+      totalTokens += reviewed.meta.totalTokens
+      void incrementPrepTokens(prepId, reviewed.meta.totalTokens)
+      metas.push(reviewed.meta)
 
       let question: GeneratedQuestion
       if (reviewed.output.question === null) {
         // Retry build once on reviewer rejection
         const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
-        totalTokens += retry.metrics.total_tokens
-        void incrementPrepTokens(prepId, retry.metrics.total_tokens)
+        totalTokens += retry.meta.totalTokens
+        void incrementPrepTokens(prepId, retry.meta.totalTokens)
+        metas.push(retry.meta)
         question = retry.output
       } else {
         question = reviewed.output.question
@@ -230,6 +248,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       // Persist before marking in-memory — if save throws the slot stays null in DB
       await saveQuestionSlot(runId, taskIdx, question)
       builtQuestions.set(taskIdx, question)
+      slotMeta.set(taskIdx, metas)
       reviewDone++
       onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
     }),
@@ -246,9 +265,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   onProgress({ stage: "done" })
 
   // Assemble in task order — only slots that completed successfully
-  const questions = tasks
-    .map((_, i) => builtQuestions.get(i))
-    .filter((q): q is GeneratedQuestion => q != null)
+  const doneIndices = tasks.map((_, i) => i).filter(i => builtQuestions.has(i))
+  const questions = doneIndices.map(i => builtQuestions.get(i)!)
+  const questionMeta = doneIndices.map(i => slotMeta.get(i) ?? [])
 
-  return { questions, prepTitle, prepDescription, totalTokens }
+  return { questions, prepTitle, prepDescription, totalTokens, questionMeta }
 }
