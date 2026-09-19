@@ -65,7 +65,7 @@ For every ticket/feature, in order:
 ### TODO/FIXME comments
 A comment marking deliberately temporary or incomplete state (a placeholder, a workaround standing in for real work) needs a ticket link, not just a description — an untracked TODO never gets picked up:
 
-```
+```example
 # TODO(#123): replace with the real container image once the deploy pipeline exists
 ```
 
