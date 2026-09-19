@@ -6,20 +6,20 @@ import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "../config"
 import type { SupportedLanguage } from "../config"
 
 const visualElementSchema = z.object({
-    type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
-    description: z.string(),
-    content: z.string(),
-    caption: z.string().nullable(),
-    context: z.string().nullable(),
-    confidence: z.number().min(0).max(1),
+  type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
+  description: z.string(),
+  content: z.string(),
+  caption: z.string().nullable(),
+  context: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
 })
 
 // Free ISO 639-1 detection — any 2-letter code. Supported-language check happens after parse.
 const ocrSchema = z.object({
-    text: z.string(),
-    confidence: z.number().min(0).max(1),
-    language: z.string().regex(/^[a-z]{2}$/),
-    visual_elements: z.array(visualElementSchema),
+  text: z.string(),
+  confidence: z.number().min(0).max(1),
+  language: z.string().regex(/^[a-z]{2}$/),
+  visual_elements: z.array(visualElementSchema),
 })
 
 export type OcrOutput = Omit<z.infer<typeof ocrSchema>, "language"> & { language: SupportedLanguage }
@@ -45,37 +45,37 @@ const MIN_PAGE_CONFIDENCE = 0.5
 const MIN_ELEMENT_CONFIDENCE = 0.6
 
 function assertSupportedLanguage(code: string): asserts code is SupportedLanguage {
-    if (!(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
-        throw new Error(`unsupported_language:${code}. Supported languages: ${SUPPORTED_LANGUAGE_NAMES}`)
-    }
+  if (!(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
+    throw new Error(`unsupported_language:${code}. Supported languages: ${SUPPORTED_LANGUAGE_NAMES}`)
+  }
 }
 
 export async function runOcrAgent(
-    images: AgentImage[],
-    apiKey: string,
-    model: string,
+  images: AgentImage[],
+  apiKey: string,
+  model: string,
 ): Promise<AgentResult<OcrOutput>> {
-    const result = await runAgent({
-        name: "ocr",
-        systemPrompt: SYSTEM_PROMPT,
-        userContent: { textContent: USER_PROMPT, images },
-        schema: ocrSchema,
-        apiKey,
-        model,
-    })
+  const result = await runAgent({
+    name: "ocr",
+    systemPrompt: SYSTEM_PROMPT,
+    userContent: { textContent: USER_PROMPT, images },
+    schema: ocrSchema,
+    apiKey,
+    model,
+  })
 
-    if (result.output.confidence < MIN_PAGE_CONFIDENCE) {
-        throw new Error(`low_confidence:${result.output.confidence}`)
-    }
+  if (result.output.confidence < MIN_PAGE_CONFIDENCE) {
+    throw new Error(`low_confidence:${result.output.confidence}`)
+  }
 
-    assertSupportedLanguage(result.output.language)
+  assertSupportedLanguage(result.output.language)
 
-    return {
-        ...result,
-        output: {
-            ...result.output,
-            language: result.output.language,
-            visual_elements: result.output.visual_elements.filter(e => e.confidence >= MIN_ELEMENT_CONFIDENCE),
-        },
-    }
+  return {
+    ...result,
+    output: {
+      ...result.output,
+      language: result.output.language,
+      visual_elements: result.output.visual_elements.filter(e => e.confidence >= MIN_ELEMENT_CONFIDENCE),
+    },
+  }
 }

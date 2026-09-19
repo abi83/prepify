@@ -9,20 +9,20 @@ type NextAuthInstance = ReturnType<typeof NextAuth>
 let _instance: NextAuthInstance | undefined
 
 function getInstance(): NextAuthInstance {
-    return (_instance ??= NextAuth({
-        providers: [
-            Google({
-                clientId: config.AUTH_GOOGLE_CLIENT_ID,
-                clientSecret: config.AUTH_GOOGLE_CLIENT_SECRET,
-            }),
-        ],
-        session: { strategy: "jwt" },
-        trustHost: true,
-        callbacks: {
-            jwt: jwtCallback,
-            session: sessionCallback,
-        },
-    }))
+  return (_instance ??= NextAuth({
+    providers: [
+      Google({
+        clientId: config.AUTH_GOOGLE_CLIENT_ID,
+        clientSecret: config.AUTH_GOOGLE_CLIENT_SECRET,
+      }),
+    ],
+    session: { strategy: "jwt" },
+    trustHost: true,
+    callbacks: {
+      jwt: jwtCallback,
+      session: sessionCallback,
+    },
+  }))
 }
 
 type AnyFn = (...args: any[]) => any

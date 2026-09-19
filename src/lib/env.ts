@@ -4,25 +4,25 @@ import { z } from "zod"
 // straight from .env) and deliberately excluded — requiring it here would fail boot in any
 // environment that doesn't run migrations.
 const envSchema = z.object({
-    DATABASE_URL_POOLING: z.string().min(1),
-    AUTH_SECRET: z.string().min(1),
-    AUTH_GOOGLE_CLIENT_ID: z.string().min(1),
-    AUTH_GOOGLE_CLIENT_SECRET: z.string().min(1),
+  DATABASE_URL_POOLING: z.string().min(1),
+  AUTH_SECRET: z.string().min(1),
+  AUTH_GOOGLE_CLIENT_ID: z.string().min(1),
+  AUTH_GOOGLE_CLIENT_SECRET: z.string().min(1),
 })
 
 class Config {
   private _data: z.infer<typeof envSchema> | undefined
 
   private get data() {
-      if (!this._data) {
-          const parsed = envSchema.safeParse(process.env)
-          if (!parsed.success) {
-              const missing = parsed.error.issues.map(issue => issue.path.join(".")).join(", ")
-              throw new Error(`Invalid environment configuration — missing or empty: ${missing}`)
-          }
-          this._data = parsed.data
+    if (!this._data) {
+      const parsed = envSchema.safeParse(process.env)
+      if (!parsed.success) {
+        const missing = parsed.error.issues.map(issue => issue.path.join(".")).join(", ")
+        throw new Error(`Invalid environment configuration — missing or empty: ${missing}`)
       }
-      return this._data
+      this._data = parsed.data
+    }
+    return this._data
   }
 
   get DATABASE_URL_POOLING() { return this.data.DATABASE_URL_POOLING }

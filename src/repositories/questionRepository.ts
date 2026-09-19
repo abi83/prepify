@@ -5,8 +5,8 @@ import { getPrep } from "./prepRepository"
 import { prisma } from "../lib/prisma"
 
 export async function listByPrep(userId: string | null, prepId: string): Promise<Question[]> {
-    await getPrep(userId, prepId) // throws NotFoundError/ForbiddenError if not readable
-    return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
+  await getPrep(userId, prepId) // throws NotFoundError/ForbiddenError if not readable
+  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
 }
 
 export interface CreateQuestionInput {
@@ -15,11 +15,11 @@ export interface CreateQuestionInput {
 }
 
 export async function insertMany(userId: string, prepId: string, questions: CreateQuestionInput[]): Promise<Question[]> {
-    const prep = await getPrep(userId, prepId)
-    if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${userId}`)
+  const prep = await getPrep(userId, prepId)
+  if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${userId}`)
 
-    await prisma.question.createMany({
-        data: questions.map(q => ({ prepId, type: q.type, content: q.content })),
-    })
-    return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
+  await prisma.question.createMany({
+    data: questions.map(q => ({ prepId, type: q.type, content: q.content })),
+  })
+  return prisma.question.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
 }

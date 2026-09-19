@@ -15,7 +15,7 @@ export interface AnswerState {
 }
 
 export function emptyAnswer(): AnswerState {
-    return { single: null, multi: [], fill: [], sort: [] }
+  return { single: null, multi: [], fill: [], sort: [] }
 }
 
 interface Props {
@@ -27,66 +27,66 @@ interface Props {
 }
 
 export default function QuestionBody({ question, answer, isReview, asset, onChange }: Props) {
-    const assetEl = asset ? <AssetFrame blob={asset.blob} /> : null
+  const assetEl = asset ? <AssetFrame blob={asset.blob} /> : null
 
-    switch (question.type) {
-        case "flashcard":
-            // Flashcards don't render in the attempt flow — handled separately in Cards tab
-            return null
+  switch (question.type) {
+  case "flashcard":
+    // Flashcards don't render in the attempt flow — handled separately in Cards tab
+    return null
 
-        case "single_choice":
-            return (
-                <>
-                    {assetEl}
-                    <SingleChoiceQuestion
-                        content={question.content as unknown as SingleChoiceContent}
-                        selected={answer.single}
-                        isReview={isReview}
-                        onChange={id => onChange?.({ ...answer, single: id })}
-                    />
-                </>
-            )
+  case "single_choice":
+    return (
+      <>
+        {assetEl}
+        <SingleChoiceQuestion
+          content={question.content as unknown as SingleChoiceContent}
+          selected={answer.single}
+          isReview={isReview}
+          onChange={id => onChange?.({ ...answer, single: id })}
+        />
+      </>
+    )
 
-        case "multiple_choice":
-            return (
-                <>
-                    {assetEl}
-                    <MultipleChoiceQuestion
-                        content={question.content as unknown as MultipleChoiceContent}
-                        selected={answer.multi}
-                        isReview={isReview}
-                        onChange={ids => onChange?.({ ...answer, multi: ids })}
-                    />
-                </>
-            )
+  case "multiple_choice":
+    return (
+      <>
+        {assetEl}
+        <MultipleChoiceQuestion
+          content={question.content as unknown as MultipleChoiceContent}
+          selected={answer.multi}
+          isReview={isReview}
+          onChange={ids => onChange?.({ ...answer, multi: ids })}
+        />
+      </>
+    )
 
-        case "fill_the_gap":
-            return (
-                <>
-                    {assetEl}
-                    <FillTheGapQuestion
-                        content={question.content as unknown as FillTheGapContent}
-                        selected={answer.fill}
-                        isReview={isReview}
-                        onChange={(fills) => onChange?.({ ...answer, fill: fills })}
-                    />
-                </>
-            )
+  case "fill_the_gap":
+    return (
+      <>
+        {assetEl}
+        <FillTheGapQuestion
+          content={question.content as unknown as FillTheGapContent}
+          selected={answer.fill}
+          isReview={isReview}
+          onChange={(fills) => onChange?.({ ...answer, fill: fills })}
+        />
+      </>
+    )
 
-        case "sorting":
-            return (
-                <>
-                    {assetEl}
-                    <SortingQuestion
-                        content={question.content as unknown as SortingContent}
-                        selected={answer.sort}
-                        isReview={isReview}
-                        onChange={(order) => onChange?.({ ...answer, sort: order })}
-                    />
-                </>
-            )
+  case "sorting":
+    return (
+      <>
+        {assetEl}
+        <SortingQuestion
+          content={question.content as unknown as SortingContent}
+          selected={answer.sort}
+          isReview={isReview}
+          onChange={(order) => onChange?.({ ...answer, sort: order })}
+        />
+      </>
+    )
 
-        default:
-            return null
-    }
+  default:
+    return null
+  }
 }

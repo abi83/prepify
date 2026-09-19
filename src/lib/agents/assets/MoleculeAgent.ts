@@ -3,10 +3,10 @@ import { z } from "zod"
 import { runAgent, AgentResult } from "../../agent"
 
 const responseSchema = z.object({
-    molecules: z.array(z.object({
-        name: z.string(),
-        smiles: z.string(),
-    })).min(1).max(6),
+  molecules: z.array(z.object({
+    name: z.string(),
+    smiles: z.string(),
+  })).min(1).max(6),
 })
 
 const SYSTEM_PROMPT = `You are a chemistry expert generating SMILES strings for structural molecule diagrams.
@@ -24,29 +24,29 @@ Return JSON: { "molecules": [{ "name": "...", "smiles": "..." }] }`
 const smilesDrawerJs = "https://unpkg.com/smiles-drawer@1.1.23/dist/smiles-drawer.min.js"
 
 export async function runMoleculeAgent(
-    description: string,
-    apiKey: string,
-    model: string,
-    signal?: AbortSignal,
+  description: string,
+  apiKey: string,
+  model: string,
+  signal?: AbortSignal,
 ): Promise<AgentResult<string>> {
-    const result = await runAgent({
-        name: "MoleculeAgent",
-        systemPrompt: SYSTEM_PROMPT,
-        userContent: { textContent: `Generate SMILES for: ${description}` },
-        schema: responseSchema,
-        apiKey,
-        model,
-        signal,
-    })
+  const result = await runAgent({
+    name: "MoleculeAgent",
+    systemPrompt: SYSTEM_PROMPT,
+    userContent: { textContent: `Generate SMILES for: ${description}` },
+    schema: responseSchema,
+    apiKey,
+    model,
+    signal,
+  })
 
-    const blob = buildMoleculeBlob(result.output.molecules)
-    return { output: blob, metrics: result.metrics }
+  const blob = buildMoleculeBlob(result.output.molecules)
+  return { output: blob, metrics: result.metrics }
 }
 
 function buildMoleculeBlob(molecules: { name: string; smiles: string }[]): string {
-    const moleculesJson = JSON.stringify(molecules)
+  const moleculesJson = JSON.stringify(molecules)
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">

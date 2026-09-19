@@ -17,48 +17,48 @@ import PrepPage from "./PrepPage"
 export const dynamic = "force-dynamic"
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+  const { id } = await params
 
-    const session = await auth()
-    if (!session) redirect("/")
+  const session = await auth()
+  if (!session) redirect("/")
 
-    let prep
-    try {
-        prep = await getMyPrep(id)
-    } catch (e) {
-        if (e instanceof NotFoundError) notFound()
-        if (e instanceof ForbiddenError) {
-            return (
-                <ErrorState
-                    message="You don't have access to this prep."
-                    action={
-                        <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
-                            <Link href="/preps">← My Preps</Link>
-                        </Button>
-                    }
-                />
-            )
-        }
-        throw e
-    }
-
-    const [ questions, attempts, runSummary, concepts ] = await Promise.all([
-        listMyQuestions(id),
-        listMyAttempts(id),
-        getExistingRunSummary(id),
-        getConcepts(id),
-    ])
-
-    const assets = questions.length > 0 ? await listMyAssets(questions.map(q => q.id)) : []
-
-    return (
-        <PrepPage
-            prep={prep}
-            questions={questions}
-            attempts={attempts}
-            assets={assets}
-            runSummary={runSummary}
-            concepts={concepts ?? []}
+  let prep
+  try {
+    prep = await getMyPrep(id)
+  } catch (e) {
+    if (e instanceof NotFoundError) notFound()
+    if (e instanceof ForbiddenError) {
+      return (
+        <ErrorState
+          message="You don't have access to this prep."
+          action={
+            <Button variant="link" className="h-auto p-0 text-muted-foreground" asChild>
+              <Link href="/preps">← My Preps</Link>
+            </Button>
+          }
         />
-    )
+      )
+    }
+    throw e
+  }
+
+  const [ questions, attempts, runSummary, concepts ] = await Promise.all([
+    listMyQuestions(id),
+    listMyAttempts(id),
+    getExistingRunSummary(id),
+    getConcepts(id),
+  ])
+
+  const assets = questions.length > 0 ? await listMyAssets(questions.map(q => q.id)) : []
+
+  return (
+    <PrepPage
+      prep={prep}
+      questions={questions}
+      attempts={attempts}
+      assets={assets}
+      runSummary={runSummary}
+      concepts={concepts ?? []}
+    />
+  )
 }

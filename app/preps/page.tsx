@@ -9,9 +9,9 @@ import MyPreps from "./MyPreps"
 export const dynamic = "force-dynamic"
 
 export default async function Page() {
-    const session = await auth()
-    if (!session) redirect("/")
+  const session = await auth()
+  if (!session) redirect("/")
 
-    const preps = await listMyPreps()
-    return <MyPreps preps={preps} />
+  const preps = await listMyPreps()
+  return <MyPreps preps={preps} />
 }

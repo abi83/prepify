@@ -13,34 +13,34 @@ import StudyPage from "./StudyPage"
 export const dynamic = "force-dynamic"
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-    const { id } = await params
-    try {
-        const prep = await getSharedPrep(id)
-        const description = prep.description || `Study ${prep.title} with flashcards, quizzes, and tests.`
-        return {
-            title: prep.title,
-            description,
-            openGraph: { title: prep.title, description },
-        }
-    } catch {
-        return { title: "Study" }
+  const { id } = await params
+  try {
+    const prep = await getSharedPrep(id)
+    const description = prep.description || `Study ${prep.title} with flashcards, quizzes, and tests.`
+    return {
+      title: prep.title,
+      description,
+      openGraph: { title: prep.title, description },
     }
+  } catch {
+    return { title: "Study" }
+  }
 }
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+  const { id } = await params
 
-    let prep
-    try {
-        prep = await getSharedPrep(id)
-    } catch (e) {
-        if (e instanceof NotFoundError) notFound()
-        if (e instanceof ForbiddenError) return <ErrorState message="This prep is private." />
-        throw e
-    }
+  let prep
+  try {
+    prep = await getSharedPrep(id)
+  } catch (e) {
+    if (e instanceof NotFoundError) notFound()
+    if (e instanceof ForbiddenError) return <ErrorState message="This prep is private." />
+    throw e
+  }
 
-    const questions = await listSharedQuestions(id)
-    const assets = questions.length > 0 ? await listSharedAssets(questions.map(q => q.id)) : []
+  const questions = await listSharedQuestions(id)
+  const assets = questions.length > 0 ? await listSharedAssets(questions.map(q => q.id)) : []
 
-    return <StudyPage prep={prep} questions={questions} assets={assets} />
+  return <StudyPage prep={prep} questions={questions} assets={assets} />
 }

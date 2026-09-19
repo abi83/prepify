@@ -40,34 +40,34 @@ VALIDATION (internal before output):
 Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
 function formatConcepts(concepts: QuestionTask["concepts"]): string {
-    if (concepts.length === 1) {
-        const c = concepts[0]
-        const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
-        return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
-    }
-    return "Concepts to assess (connect or contrast them in your question):\n\n" +
+  if (concepts.length === 1) {
+    const c = concepts[0]
+    const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
+    return `Concept to assess:\nName: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
+  }
+  return "Concepts to assess (connect or contrast them in your question):\n\n" +
     concepts.map((c, i) => {
-        const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
-        return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
+      const mis = c.misconceptions.length > 0 ? c.misconceptions.map(m => `- ${m}`).join("\n") : "- (none listed)"
+      return `Concept ${i + 1}: ${c.name}\nDescription: ${c.description}\nCommon misconceptions:\n${mis}`
     }).join("\n\n")
 }
 
 export async function runMultipleChoiceBuilder(
-    task: QuestionTask,
-    apiKey: string,
-    model: string,
-    language: string,
-    signal?: AbortSignal,
+  task: QuestionTask,
+  apiKey: string,
+  model: string,
+  language: string,
+  signal?: AbortSignal,
 ): Promise<AgentResult<{ type: "multiple_choice"; content: MultipleChoiceContent }>> {
-    const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
-    const result = await runAgent({
-        name: "MultipleChoiceBuilder",
-        systemPrompt: SYSTEM_PROMPT + langInstruction,
-        userContent: { textContent: formatConcepts(task.concepts) },
-        schema: responseSchema,
-        apiKey,
-        model,
-        signal,
-    })
-    return { output: { type: "multiple_choice", content: result.output.content }, metrics: result.metrics }
+  const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
+  const result = await runAgent({
+    name: "MultipleChoiceBuilder",
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
+    userContent: { textContent: formatConcepts(task.concepts) },
+    schema: responseSchema,
+    apiKey,
+    model,
+    signal,
+  })
+  return { output: { type: "multiple_choice", content: result.output.content }, metrics: result.metrics }
 }

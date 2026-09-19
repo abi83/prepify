@@ -4,36 +4,36 @@ import type { Concept } from "../../types/pipeline"
 import { runAgent, AgentResult } from "../agent"
 
 export const DISCIPLINES = [
-    "History",
-    "Geography",
-    "Literature",
-    "Social Studies",
-    "Economics",
-    "Philosophy/Ethics",
-    "Biology",
-    "Chemistry",
-    "Physics",
-    "Mathematics",
-    "Computer Science",
-    "English",
-    "French",
-    "German",
-    "Spanish",
-    "Italian",
-    "Latin",
-    "Russian",
+  "History",
+  "Geography",
+  "Literature",
+  "Social Studies",
+  "Economics",
+  "Philosophy/Ethics",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Mathematics",
+  "Computer Science",
+  "English",
+  "French",
+  "German",
+  "Spanish",
+  "Italian",
+  "Latin",
+  "Russian",
 ] as const
 
 export type Discipline = (typeof DISCIPLINES)[number]
 
 export function isDiscipline(value: string): value is Discipline {
-    return DISCIPLINES.some(d => d === value)
+  return DISCIPLINES.some(d => d === value)
 }
 
 export const prepLabelSchema = z.object({
-    grade: z.number().int().min(1).max(13).nullable(),
-    discipline: z.enum(DISCIPLINES).nullable(),
-    confidence: z.number().min(0).max(1),
+  grade: z.number().int().min(1).max(13).nullable(),
+  discipline: z.enum(DISCIPLINES).nullable(),
+  confidence: z.number().min(0).max(1),
 })
 
 export type PrepLabel = z.infer<typeof prepLabelSchema>
@@ -55,24 +55,24 @@ Rules:
 Return JSON: { "grade": <integer 1–13 or null>, "discipline": <discipline string or null>, "confidence": <float 0.0–1.0> }`
 
 export async function runPrepLabeler(
-    concepts: Concept[],
-    apiKey: string,
-    model: string,
-    signal?: AbortSignal,
+  concepts: Concept[],
+  apiKey: string,
+  model: string,
+  signal?: AbortSignal,
 ): Promise<AgentResult<PrepLabel>> {
-    const conceptList = concepts
-        .sort((a, b) => b.importance - a.importance)
-        .slice(0, 12)
-        .map(c => `- ${c.name} (importance: ${c.importance.toFixed(2)}): ${c.description}`)
-        .join("\n")
+  const conceptList = concepts
+    .sort((a, b) => b.importance - a.importance)
+    .slice(0, 12)
+    .map(c => `- ${c.name} (importance: ${c.importance.toFixed(2)}): ${c.description}`)
+    .join("\n")
 
-    return runAgent({
-        name: "PrepLabeler",
-        systemPrompt: SYSTEM_PROMPT,
-        userContent: { textContent: `Concepts:\n${conceptList}` },
-        schema: prepLabelSchema,
-        apiKey,
-        model,
-        signal,
-    })
+  return runAgent({
+    name: "PrepLabeler",
+    systemPrompt: SYSTEM_PROMPT,
+    userContent: { textContent: `Concepts:\n${conceptList}` },
+    schema: prepLabelSchema,
+    apiKey,
+    model,
+    signal,
+  })
 }

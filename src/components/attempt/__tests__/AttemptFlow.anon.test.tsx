@@ -6,100 +6,100 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const insertAttemptMock = vi.fn().mockResolvedValue({})
 
 vi.mock("../../../actions/attempts", () => ({
-    insertAttempt: (...args: unknown[]) => insertAttemptMock(...args),
+  insertAttempt: (...args: unknown[]) => insertAttemptMock(...args),
 }))
 
 import AttemptFlow from "../AttemptFlow"
 
 const singleQ: Question = {
-    id: "q1", prepId: "p1", createdAt: new Date(0), type: "single_choice",
-    content: {
-        question: "What is 2+2?", rationale: "",
-        asset_hint: { needed: false, type: null, description: null },
-        answers: [
-            { id: "a", text: "4", is_correct: true, explanation: "" },
-            { id: "b", text: "5", is_correct: false, explanation: "" },
-        ],
-    },
+  id: "q1", prepId: "p1", createdAt: new Date(0), type: "single_choice",
+  content: {
+    question: "What is 2+2?", rationale: "",
+    asset_hint: { needed: false, type: null, description: null },
+    answers: [
+      { id: "a", text: "4", is_correct: true, explanation: "" },
+      { id: "b", text: "5", is_correct: false, explanation: "" },
+    ],
+  },
 }
 
 async function runThroughAttempt(userId: string | null, mode: "quiz" | "test") {
-    const user = userEvent.setup()
-    const onExit = vi.fn()
+  const user = userEvent.setup()
+  const onExit = vi.fn()
 
-    render(
-        <AttemptFlow
-            questions={[ singleQ ]}
-            assets={[]}
-            mode={mode}
-            prepId="prep-1"
-            userId={userId}
-            onExit={onExit}
-        />,
-    )
+  render(
+    <AttemptFlow
+      questions={[ singleQ ]}
+      assets={[]}
+      mode={mode}
+      prepId="prep-1"
+      userId={userId}
+      onExit={onExit}
+    />,
+  )
 
-    // Answers render as buttons; the answer text is inside a span within the button.
-    // Click the span containing the answer text — userEvent will bubble up to the button.
-    const optionText = await screen.findByText("4")
-    await user.click(optionText)
+  // Answers render as buttons; the answer text is inside a span within the button.
+  // Click the span containing the answer text — userEvent will bubble up to the button.
+  const optionText = await screen.findByText("4")
+  await user.click(optionText)
 
-    if (mode === "quiz") {
-        await user.click(screen.getByRole("button", { name: /submit answer/i }))
-        // After submitting, the last question shows Finish
-        await waitFor(() => screen.getByRole("button", { name: /finish/i }))
-        await user.click(screen.getByRole("button", { name: /finish/i }))
-    } else {
-        await waitFor(() => screen.getByRole("button", { name: /submit test/i }))
-        await user.click(screen.getByRole("button", { name: /submit test/i }))
-    }
+  if (mode === "quiz") {
+    await user.click(screen.getByRole("button", { name: /submit answer/i }))
+    // After submitting, the last question shows Finish
+    await waitFor(() => screen.getByRole("button", { name: /finish/i }))
+    await user.click(screen.getByRole("button", { name: /finish/i }))
+  } else {
+    await waitFor(() => screen.getByRole("button", { name: /submit test/i }))
+    await user.click(screen.getByRole("button", { name: /submit test/i }))
+  }
 
-    // Confirm dialog
-    await waitFor(() => screen.getByRole("button", { name: /confirm/i }))
-    await user.click(screen.getByRole("button", { name: /confirm/i }))
+  // Confirm dialog
+  await waitFor(() => screen.getByRole("button", { name: /confirm/i }))
+  await user.click(screen.getByRole("button", { name: /confirm/i }))
 }
 
 beforeEach(() => {
-    insertAttemptMock.mockClear()
+  insertAttemptMock.mockClear()
 })
 
 describe("AttemptFlow — attempt saving", () => {
-    it("saves attempt when userId is provided", async () => {
-        await runThroughAttempt("user-123", "quiz")
-        await waitFor(() => {
-            expect(insertAttemptMock).toHaveBeenCalledWith("prep-1", "quiz", expect.any(Number), expect.any(Number))
-        })
+  it("saves attempt when userId is provided", async () => {
+    await runThroughAttempt("user-123", "quiz")
+    await waitFor(() => {
+      expect(insertAttemptMock).toHaveBeenCalledWith("prep-1", "quiz", expect.any(Number), expect.any(Number))
     })
+  })
 
-    it("skips DB insert when userId is null", async () => {
-        await runThroughAttempt(null, "quiz")
-        await waitFor(() => screen.getByText(/quiz complete/i))
-        expect(insertAttemptMock).not.toHaveBeenCalled()
-    })
+  it("skips DB insert when userId is null", async () => {
+    await runThroughAttempt(null, "quiz")
+    await waitFor(() => screen.getByText(/quiz complete/i))
+    expect(insertAttemptMock).not.toHaveBeenCalled()
+  })
 
-    it("shows score screen after finalize regardless of userId", async () => {
-        await runThroughAttempt(null, "test")
-        await waitFor(() => {
-            expect(screen.getByText(/test complete/i)).toBeInTheDocument()
-        })
+  it("shows score screen after finalize regardless of userId", async () => {
+    await runThroughAttempt(null, "test")
+    await waitFor(() => {
+      expect(screen.getByText(/test complete/i)).toBeInTheDocument()
     })
+  })
 
-    it("shows sign-in hint in quiz confirm dialog when anonymous", async () => {
-        const user = userEvent.setup()
-        render(
-            <AttemptFlow
-                questions={[ singleQ ]}
-                assets={[]}
-                mode="quiz"
-                prepId="prep-1"
-                userId={null}
-                onExit={vi.fn()}
-            />,
-        )
-        await user.click(screen.getByText("4"))
-        await user.click(screen.getByRole("button", { name: /submit answer/i }))
-        await user.click(screen.getByRole("button", { name: /finish/i }))
-        await waitFor(() => {
-            expect(screen.getByText(/sign in to save/i)).toBeInTheDocument()
-        })
+  it("shows sign-in hint in quiz confirm dialog when anonymous", async () => {
+    const user = userEvent.setup()
+    render(
+      <AttemptFlow
+        questions={[ singleQ ]}
+        assets={[]}
+        mode="quiz"
+        prepId="prep-1"
+        userId={null}
+        onExit={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByText("4"))
+    await user.click(screen.getByRole("button", { name: /submit answer/i }))
+    await user.click(screen.getByRole("button", { name: /finish/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/sign in to save/i)).toBeInTheDocument()
     })
+  })
 })

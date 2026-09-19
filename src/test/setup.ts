@@ -10,21 +10,21 @@ vi.mock("next/server", () => ({ NextRequest: class NextRequest {} }))
 // Radix primitives (Dialog, Select) call pointer-capture and layout APIs jsdom
 // doesn't implement.
 if (!Element.prototype.hasPointerCapture) {
-    Element.prototype.hasPointerCapture = () => false
+  Element.prototype.hasPointerCapture = () => false
 }
 if (!Element.prototype.setPointerCapture) {
-    Element.prototype.setPointerCapture = () => {}
+  Element.prototype.setPointerCapture = () => {}
 }
 if (!Element.prototype.releasePointerCapture) {
-    Element.prototype.releasePointerCapture = () => {}
+  Element.prototype.releasePointerCapture = () => {}
 }
 if (!Element.prototype.scrollIntoView) {
-    Element.prototype.scrollIntoView = () => {}
+  Element.prototype.scrollIntoView = () => {}
 }
 if (!("ResizeObserver" in globalThis)) {
-    globalThis.ResizeObserver = class ResizeObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-    }
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
 }
