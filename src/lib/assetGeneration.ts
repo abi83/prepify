@@ -42,7 +42,7 @@ export async function generateAndSaveAssets(
         if (result.meta.totalTokens > 0) {
           void incrementPrepTokens(prepId, result.meta.totalTokens)
         }
-        void recordGenerationMeta("question", q.id, result.meta)
+        void recordGenerationMeta("question", q.id, result.meta).catch(e => console.warn("[assets] failed to record GenerationMeta:", e))
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           console.warn(`[assets] failed to generate asset for question ${q.id}:`, e)

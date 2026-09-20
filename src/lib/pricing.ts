@@ -30,9 +30,10 @@ export interface TokenUsage {
 
 /**
  * Cost for a single agent call, from real per-type token counts.
- * Cached tokens aren't priced separately yet (no per-model cached rate available) —
- * they're billed at the standard input rate, so this is a conservative estimate.
+ * `promptTokens` is OpenAI's cache-inclusive input total — `cachedTokens` is a subset of
+ * it, not additional to it. There's no separate (cheaper) cached rate available per model
+ * yet, so cached tokens are billed at the standard input rate, already covered by promptTokens.
  */
 export function computeCost(usage: TokenUsage, model: string): number {
-  return estimateCost(usage.promptTokens + usage.cachedTokens, usage.completionTokens, model)
+  return estimateCost(usage.promptTokens, usage.completionTokens, model)
 }

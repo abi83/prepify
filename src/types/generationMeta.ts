@@ -1,7 +1,9 @@
+import type { GenerationEntityType } from "@prisma/client"
+
 import type { AgentMeta } from "../lib/agent"
 
-/** Entities #194 covers today. Concepts get their own type once #48 makes them first-class. */
-export type GenerationEntityType = "prep" | "question"
+/** Entities #194 covers today. Concepts get their own value once #48 makes them first-class. */
+export type { GenerationEntityType }
 
 /** One row of `GenerationMeta` — the polymorphic per-call usage/cost record for an entity. */
 export interface GenerationMetaRecord {

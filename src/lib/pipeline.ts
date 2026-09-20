@@ -130,7 +130,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
     totalTokens += meta.totalTokens
     void incrementPrepTokens(prepId, meta.totalTokens)
-    void recordGenerationMeta("prep", prepId, meta)
+    void recordGenerationMeta("prep", prepId, meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
 
     // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
     // Skip merger on single-chunk runs — there's nothing to merge across.
@@ -139,7 +139,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
         totalTokens += r.meta.totalTokens
         void incrementPrepTokens(prepId, r.meta.totalTokens)
-        void recordGenerationMeta("prep", prepId, r.meta)
+        void recordGenerationMeta("prep", prepId, r.meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
         return r.output
       })
       : deduped
@@ -187,7 +187,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       prepDescription = r.output.description
       totalTokens += r.meta.totalTokens
       void incrementPrepTokens(prepId, r.meta.totalTokens)
-      void recordGenerationMeta("prep", prepId, r.meta)
+      void recordGenerationMeta("prep", prepId, r.meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
       onMetaReady?.(r.output.title, r.output.description)
     })
     .catch(() => null)
@@ -210,6 +210,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   // doesn't exist until the caller inserts it (see questionRepository.insertMany), so
   // it's buffered here and returned alongside `questions`, same order, for the caller
   // to persist once real Question ids exist.
+  // Known gap: slots restored from a crashed run (`builtQuestions` seeded from
+  // `state.questionSlots` above) never populate this map, so their real, already-billed
+  // build/review cost is never recorded as GenerationMeta. Fixing that needs meta to be
+  // persisted alongside `saveQuestionSlot` during the run rather than buffered in memory.
   const slotMeta = new Map<number, AgentMeta[]>()
 
   onProgress({ stage: "crafting", done: craftDone, total: tasks.length })

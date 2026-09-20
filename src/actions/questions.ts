@@ -19,7 +19,7 @@ export async function listSharedQuestions(prepId: string): Promise<Question[]> {
 export async function insertQuestions(
   prepId: string,
   questions: CreateQuestionInput[],
-  questionMeta?: AgentMeta[][],
+  questionMeta: AgentMeta[][],
 ): Promise<Question[]> {
   const saved = await questionRepository.insertMany(await requireUserId(), prepId, questions, questionMeta)
   revalidatePath(`/preps/${prepId}`)
