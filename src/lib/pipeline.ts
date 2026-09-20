@@ -166,17 +166,15 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
   }
 
-  // Populate already-built questions from stored slots
-  const builtQuestions = new Map<number, GeneratedQuestion>(
+  // Populate already-built slots (question + its build/review meta) from storage.
+  // Kept as one map, not two in lockstep, so a slot's question and meta can't desync.
+  const slots = new Map<number, { question: GeneratedQuestion; meta: AgentMeta[] }>(
     [ ...state.questionSlots.entries() ]
       .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
+      .map(([ i, question ]) => [ i, { question, meta: state.slotMeta.get(i) ?? [] } ])
   )
 
-  // Meta for slots resumed from a prior run, keyed the same way as slotMeta below —
-  // persisted by saveQuestionSlot at build time so a crash mid-run doesn't lose it.
-  const slotMeta = new Map<number, AgentMeta[]>(state.slotMeta)
-
-  const resumedCount = builtQuestions.size
+  const resumedCount = slots.size
   if (resumedCount > 0) {
     onProgress({ stage: "resuming", done: resumedCount, total: tasks.length })
   }
@@ -205,7 +203,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   // Counters increment per-question (not per-batch) so crafting and reviewing
   // progress advance concurrently as soon as each individual step finishes.
   // JS is single-threaded so shared-counter increments between awaits are safe.
-  const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
+  const missingIndices = tasks.map((_, i) => i).filter(i => !slots.has(i))
 
   let craftDone = resumedCount
   let reviewDone = resumedCount
@@ -251,8 +249,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
       // Persist before marking in-memory — if save throws the slot stays null in DB
       await saveQuestionSlot(runId, taskIdx, question, metas)
-      builtQuestions.set(taskIdx, question)
-      slotMeta.set(taskIdx, metas)
+      slots.set(taskIdx, { question, meta: metas })
       reviewDone++
       onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
     }),
@@ -269,9 +266,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   onProgress({ stage: "done" })
 
   // Assemble in task order — only slots that completed successfully
-  const doneIndices = tasks.map((_, i) => i).filter(i => builtQuestions.has(i))
-  const questions = doneIndices.map(i => builtQuestions.get(i)!)
-  const questionMeta = doneIndices.map(i => slotMeta.get(i) ?? [])
+  const doneIndices = tasks.map((_, i) => i).filter(i => slots.has(i))
+  const questions = doneIndices.map(i => slots.get(i)!.question)
+  const questionMeta = doneIndices.map(i => slots.get(i)!.meta)
 
   return { questions, prepTitle, prepDescription, totalTokens, questionMeta }
 }

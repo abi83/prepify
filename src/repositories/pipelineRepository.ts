@@ -41,8 +41,19 @@ export async function loadOrCreateRun(userId: string, prepId: string): Promise<P
     const questionSlots = new Map<number, GeneratedQuestion | null>(
       existing.questions.map(q => [ q.taskIndex, q.question as GeneratedQuestion | null ])
     )
+    // `meta` is `null` for a slot not yet built, and also (unrecoverably) for a slot built
+    // and saved by a pre-migration `saveQuestionSlot` that didn't persist meta at all — both
+    // read back as "no meta". A non-null, non-array value is neither of those: it means the
+    // column holds something `saveQuestionSlot` never wrote, so fail fast instead of silently
+    // treating corrupt data as empty.
     const slotMeta = new Map<number, AgentMeta[]>(
-      existing.questions.map(q => [ q.taskIndex, (q.meta as AgentMeta[] | null) ?? [] ])
+      existing.questions.map(q => {
+        if (q.meta === null) return [ q.taskIndex, [] ] as const
+        if (!Array.isArray(q.meta)) {
+          throw new Error(`PipelineQuestion ${q.id} has non-array meta: ${JSON.stringify(q.meta)}`)
+        }
+        return [ q.taskIndex, q.meta as unknown as AgentMeta[] ] as const
+      })
     )
     return {
       runId: existing.id,
