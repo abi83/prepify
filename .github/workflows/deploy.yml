@@ -86,6 +86,54 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+  # Same skip switch as `test`. Fails if prisma/schema.prisma changed without a
+  # matching migration file — the actual gap that let #194 merge and deploy
+  # without one. Uses a disposable Postgres service container as the shadow DB;
+  # never touches the real (Neon) dev/prod databases.
+  check-migrations:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prepify_migrate_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check schema.prisma has a matching migration
+        env:
+          SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/prepify_migrate_check
+        run: |
+          set +e
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema ./prisma/schema.prisma \
+            --exit-code --script
+          status=$?
+          set -e
+          if [ "$status" -eq 2 ]; then
+            echo "::error::prisma/schema.prisma has changes with no matching migration (diff above). Generate one against a disposable Postgres (see CLAUDE.md's Database Migrations section) and commit it."
+            exit 1
+          elif [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+
   # Same skip switch as `test`. Kept a separate check so a green/red build
   # signal is distinct from tests — the coding pipeline gates the reviewer
   # on both (#134).
@@ -106,12 +154,13 @@ jobs:
         run: npm run build
 
   deploy-dev:
-    needs: [audit, lint, test, build]
+    needs: [audit, lint, test, build, check-migrations]
     if: |
       (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (needs['check-migrations'].result == 'success' || needs['check-migrations'].result == 'skipped') &&
       (
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'workflow_dispatch' && inputs.tag == '')
@@ -159,12 +208,13 @@ jobs:
 
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
-    needs: [audit, lint, test, build]
+    needs: [audit, lint, test, build, check-migrations]
     if: |
       (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (needs['check-migrations'].result == 'success' || needs['check-migrations'].result == 'skipped') &&
       (
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
         (github.event_name == 'workflow_dispatch' && inputs.tag != '')
