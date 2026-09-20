@@ -38,7 +38,7 @@ export async function runFormulaAgent(
 
   const { latex, is_chemical } = result.output
   const blob = buildFormulaBlob(latex, is_chemical)
-  return { output: blob, metrics: result.metrics }
+  return { output: blob, meta: result.meta }
 }
 
 function buildFormulaBlob(latex: string, isChemical: boolean): string {

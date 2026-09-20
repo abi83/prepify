@@ -38,6 +38,18 @@ describe("insertMany", () => {
       questionRepository.insertMany(OTHER, prep.id, [ { type: "flashcard", content: {} } ])
     ).rejects.toThrow(ForbiddenError)
   })
+
+  it("fails fast when questionMeta length doesn't match questions length", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    await expect(
+      questionRepository.insertMany(
+        OWNER,
+        prep.id,
+        [ { type: "flashcard", content: {} }, { type: "flashcard", content: {} } ],
+        [ [] ],
+      )
+    ).rejects.toThrow(/questionMeta length/)
+  })
 })
 
 describe("listByPrep", () => {

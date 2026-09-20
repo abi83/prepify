@@ -66,5 +66,5 @@ export async function runSingleChoiceBuilder(
     model,
     signal,
   })
-  return { output: { type: "single_choice", content: result.output.content }, metrics: result.metrics }
+  return { output: { type: "single_choice", content: result.output.content }, meta: result.meta }
 }

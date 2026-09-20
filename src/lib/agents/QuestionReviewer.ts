@@ -3,7 +3,7 @@ import { z } from "zod"
 import type { Concept } from "../../types/pipeline"
 import { generatedQuestionSchema } from "../../types/questions"
 import type { GeneratedQuestion } from "../../types/questions"
-import { runAgent, AgentResult } from "../agent"
+import { runAgent, AgentResult, EMPTY_AGENT_META } from "../agent"
 
 const reviewerResponseSchema = z.object({
   question: generatedQuestionSchema.nullable(),
@@ -59,7 +59,7 @@ export async function runQuestionReviewer(
     // Reviewer failed — pass the original question through rather than losing it
     return {
       output: { question },
-      metrics: { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      meta: EMPTY_AGENT_META,
     }
   }
 }

@@ -51,7 +51,7 @@ export async function runDiagramAgent(
   })
 
   const blob = buildDiagramBlob(result.output.dsl)
-  return { output: blob, metrics: result.metrics }
+  return { output: blob, meta: result.meta }
 }
 
 function buildDiagramBlob(dsl: string): string {

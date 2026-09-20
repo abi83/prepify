@@ -3,6 +3,7 @@ import { runFormulaAgent } from "./FormulaAgent"
 import { runMoleculeAgent } from "./MoleculeAgent"
 import type { AssetHint, AssetType } from "../../../types/questions"
 import type { AgentResult } from "../../agent"
+import { EMPTY_AGENT_META } from "../../agent"
 
 export interface AssetOutput {
   type: AssetType
@@ -20,19 +21,19 @@ export async function routeAsset(
   switch (hint.type) {
   case "formula": {
     const r = await runFormulaAgent(hint.description, apiKey, model, signal)
-    return { output: { type: "formula", blob: r.output }, metrics: r.metrics }
+    return { output: { type: "formula", blob: r.output }, meta: r.meta }
   }
   case "molecule": {
     const r = await runMoleculeAgent(hint.description, apiKey, model, signal)
-    return { output: { type: "molecule", blob: r.output }, metrics: r.metrics }
+    return { output: { type: "molecule", blob: r.output }, meta: r.meta }
   }
   case "diagram": {
     const r = await runDiagramAgent(hint.description, apiKey, model, signal)
-    return { output: { type: "diagram", blob: r.output }, metrics: r.metrics }
+    return { output: { type: "diagram", blob: r.output }, meta: r.meta }
   }
   case "table":
   case "svg":
     // Not yet implemented — skip silently
-    return { output: { type: hint.type, blob: "" }, metrics: { latency_ms: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }
+    return { output: { type: hint.type, blob: "" }, meta: EMPTY_AGENT_META }
   }
 }
