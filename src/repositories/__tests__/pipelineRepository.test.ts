@@ -52,10 +52,16 @@ describe("run progression", () => {
     let summary = await pipelineRepository.getExistingRunSummary(OWNER, prep.id)
     expect(summary).toEqual({ hasConcepts: true, totalTasks: 2, completedSlots: 0 })
 
-    await pipelineRepository.saveQuestionSlot(OWNER, runId, 0, {
-      type: "flashcard",
-      content: { front: "Q", back: "A", back_explanation: "", asset_hint: { needed: false, type: null, description: null } },
-    })
+    await pipelineRepository.saveQuestionSlot(
+      OWNER,
+      runId,
+      0,
+      {
+        type: "flashcard",
+        content: { front: "Q", back: "A", back_explanation: "", asset_hint: { needed: false, type: null, description: null } },
+      },
+      [ { model: "test-model", tier: "flash", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.01, toolCalls: 0, executionMs: 100 } ],
+    )
 
     summary = await pipelineRepository.getExistingRunSummary(OWNER, prep.id)
     expect(summary?.completedSlots).toBe(1)
@@ -64,6 +70,8 @@ describe("run progression", () => {
     expect(reloaded.concepts).toEqual([ concept ])
     expect(reloaded.questionSlots.get(0)).not.toBeNull()
     expect(reloaded.questionSlots.get(1)).toBeNull()
+    expect(reloaded.slotMeta.get(0)).toHaveLength(1)
+    expect(reloaded.slotMeta.get(1)).toEqual([])
   })
 })
 

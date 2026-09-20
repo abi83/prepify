@@ -1,5 +1,6 @@
 "use server"
 
+import type { AgentMeta } from "../lib/agent"
 import { requireUserId } from "../lib/currentUser"
 import * as pipelineRepository from "../repositories/pipelineRepository"
 import type { PartialRunSummary, PipelineRunState } from "../repositories/pipelineRepository"
@@ -18,8 +19,13 @@ export async function saveQuestionTasksAndInitSlots(runId: string, tasks: Questi
   await pipelineRepository.saveQuestionTasksAndInitSlots(await requireUserId(), runId, tasks)
 }
 
-export async function saveQuestionSlot(runId: string, taskIndex: number, question: GeneratedQuestion): Promise<void> {
-  await pipelineRepository.saveQuestionSlot(await requireUserId(), runId, taskIndex, question)
+export async function saveQuestionSlot(
+  runId: string,
+  taskIndex: number,
+  question: GeneratedQuestion,
+  meta: AgentMeta[],
+): Promise<void> {
+  await pipelineRepository.saveQuestionSlot(await requireUserId(), runId, taskIndex, question, meta)
 }
 
 export async function deleteRun(prepId: string): Promise<void> {

@@ -172,6 +172,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
   )
 
+  // Meta for slots resumed from a prior run, keyed the same way as slotMeta below —
+  // persisted by saveQuestionSlot at build time so a crash mid-run doesn't lose it.
+  const slotMeta = new Map<number, AgentMeta[]>(state.slotMeta)
+
   const resumedCount = builtQuestions.size
   if (resumedCount > 0) {
     onProgress({ stage: "resuming", done: resumedCount, total: tasks.length })
@@ -208,13 +212,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Build/review meta isn't a GenerationMeta row yet — the Question this slot becomes
   // doesn't exist until the caller inserts it (see questionRepository.insertMany), so
-  // it's buffered here and returned alongside `questions`, same order, for the caller
-  // to persist once real Question ids exist.
-  // Known gap: slots restored from a crashed run (`builtQuestions` seeded from
-  // `state.questionSlots` above) never populate this map, so their real, already-billed
-  // build/review cost is never recorded as GenerationMeta. Fixing that needs meta to be
-  // persisted alongside `saveQuestionSlot` during the run rather than buffered in memory.
-  const slotMeta = new Map<number, AgentMeta[]>()
+  // it's returned alongside `questions`, same order, for the caller to persist once
+  // real Question ids exist. Resumed slots (seeded above from `state.slotMeta`) carry
+  // their meta from the run that originally built them, read back via saveQuestionSlot.
 
   onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
@@ -250,7 +250,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       }
 
       // Persist before marking in-memory — if save throws the slot stays null in DB
-      await saveQuestionSlot(runId, taskIdx, question)
+      await saveQuestionSlot(runId, taskIdx, question, metas)
       builtQuestions.set(taskIdx, question)
       slotMeta.set(taskIdx, metas)
       reviewDone++
