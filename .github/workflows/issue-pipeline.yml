@@ -29,6 +29,7 @@ permissions:
 
 jobs:
   pipeline:
+    name: Run issue pipeline
     uses: abi83/interns/.github/workflows/issue-pipeline.yml@v0.1.0
     secrets: inherit
     with:
