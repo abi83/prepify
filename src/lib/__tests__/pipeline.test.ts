@@ -38,10 +38,10 @@ vi.mock("../agents/builders/SortingBuilder", () => ({ runSortingBuilder: vi.fn()
 const reviewQuestion = vi.fn()
 vi.mock("../agents/QuestionReviewer", () => ({ runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args) }))
 
-import type { AgentMeta } from "../agent"
-import { runPipeline } from "../pipeline"
 import type { Concept, QuestionTask } from "../../types/pipeline"
 import type { GeneratedQuestion } from "../../types/questions"
+import type { AgentMeta } from "../agent"
+import { runPipeline } from "../pipeline"
 
 function emptyMeta(): AgentMeta {
   return { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 }
