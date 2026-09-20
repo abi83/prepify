@@ -99,6 +99,9 @@ model PipelineQuestion {
   taskIndex Int
   task      Json
   question  Json?
+  // Build/review(/retry) AgentMeta for `question`, same shape as pipeline.ts's in-memory
+  // slotMeta — persisted here so crash-resumed slots keep their GenerationMeta on insert.
+  meta      Json?
   createdAt DateTime @default(now())
 
   run PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)

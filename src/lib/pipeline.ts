@@ -166,13 +166,15 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
   }
 
-  // Populate already-built questions from stored slots
-  const builtQuestions = new Map<number, GeneratedQuestion>(
+  // Populate already-built slots (question + its build/review meta) from storage.
+  // Kept as one map, not two in lockstep, so a slot's question and meta can't desync.
+  const slots = new Map<number, { question: GeneratedQuestion; meta: AgentMeta[] }>(
     [ ...state.questionSlots.entries() ]
       .filter((entry): entry is [number, GeneratedQuestion] => entry[1] !== null)
+      .map(([ i, question ]) => [ i, { question, meta: state.slotMeta.get(i) ?? [] } ])
   )
 
-  const resumedCount = builtQuestions.size
+  const resumedCount = slots.size
   if (resumedCount > 0) {
     onProgress({ stage: "resuming", done: resumedCount, total: tasks.length })
   }
@@ -201,20 +203,16 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   // Counters increment per-question (not per-batch) so crafting and reviewing
   // progress advance concurrently as soon as each individual step finishes.
   // JS is single-threaded so shared-counter increments between awaits are safe.
-  const missingIndices = tasks.map((_, i) => i).filter(i => !builtQuestions.has(i))
+  const missingIndices = tasks.map((_, i) => i).filter(i => !slots.has(i))
 
   let craftDone = resumedCount
   let reviewDone = resumedCount
 
   // Build/review meta isn't a GenerationMeta row yet — the Question this slot becomes
   // doesn't exist until the caller inserts it (see questionRepository.insertMany), so
-  // it's buffered here and returned alongside `questions`, same order, for the caller
-  // to persist once real Question ids exist.
-  // Known gap: slots restored from a crashed run (`builtQuestions` seeded from
-  // `state.questionSlots` above) never populate this map, so their real, already-billed
-  // build/review cost is never recorded as GenerationMeta. Fixing that needs meta to be
-  // persisted alongside `saveQuestionSlot` during the run rather than buffered in memory.
-  const slotMeta = new Map<number, AgentMeta[]>()
+  // it's returned alongside `questions`, same order, for the caller to persist once
+  // real Question ids exist. Resumed slots (seeded above from `state.slotMeta`) carry
+  // their meta from the run that originally built them, read back via saveQuestionSlot.
 
   onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
@@ -250,9 +248,8 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       }
 
       // Persist before marking in-memory — if save throws the slot stays null in DB
-      await saveQuestionSlot(runId, taskIdx, question)
-      builtQuestions.set(taskIdx, question)
-      slotMeta.set(taskIdx, metas)
+      await saveQuestionSlot(runId, taskIdx, question, metas)
+      slots.set(taskIdx, { question, meta: metas })
       reviewDone++
       onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
     }),
@@ -269,9 +266,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   onProgress({ stage: "done" })
 
   // Assemble in task order — only slots that completed successfully
-  const doneIndices = tasks.map((_, i) => i).filter(i => builtQuestions.has(i))
-  const questions = doneIndices.map(i => builtQuestions.get(i)!)
-  const questionMeta = doneIndices.map(i => slotMeta.get(i) ?? [])
+  const doneIndices = tasks.map((_, i) => i).filter(i => slots.has(i))
+  const questions = doneIndices.map(i => slots.get(i)!.question)
+  const questionMeta = doneIndices.map(i => slots.get(i)!.meta)
 
   return { questions, prepTitle, prepDescription, totalTokens, questionMeta }
 }

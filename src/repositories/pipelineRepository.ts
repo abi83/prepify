@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client"
 
 import { ForbiddenError, NotFoundError } from "./errors"
+import type { AgentMeta } from "../lib/agent"
 import { prisma } from "../lib/prisma"
 import type { Concept, QuestionTask } from "../types/pipeline"
 import type { GeneratedQuestion } from "../types/questions"
@@ -24,6 +25,8 @@ export interface PipelineRunState {
   questionTasks: QuestionTask[] | null
   // Map from task index → built question (null means not yet built)
   questionSlots: Map<number, GeneratedQuestion | null>
+  // Map from task index → that slot's build/review(/retry) AgentMeta (empty when not yet built)
+  slotMeta: Map<number, AgentMeta[]>
 }
 
 export async function loadOrCreateRun(userId: string, prepId: string): Promise<PipelineRunState> {
@@ -38,16 +41,31 @@ export async function loadOrCreateRun(userId: string, prepId: string): Promise<P
     const questionSlots = new Map<number, GeneratedQuestion | null>(
       existing.questions.map(q => [ q.taskIndex, q.question as GeneratedQuestion | null ])
     )
+    // `meta` is `null` for a slot not yet built, and also (unrecoverably) for a slot built
+    // and saved by a pre-migration `saveQuestionSlot` that didn't persist meta at all — both
+    // read back as "no meta". A non-null, non-array value is neither of those: it means the
+    // column holds something `saveQuestionSlot` never wrote, so fail fast instead of silently
+    // treating corrupt data as empty.
+    const slotMeta = new Map<number, AgentMeta[]>(
+      existing.questions.map(q => {
+        if (q.meta === null) return [ q.taskIndex, [] ] as const
+        if (!Array.isArray(q.meta)) {
+          throw new Error(`PipelineQuestion ${q.id} has non-array meta: ${JSON.stringify(q.meta)}`)
+        }
+        return [ q.taskIndex, q.meta as unknown as AgentMeta[] ] as const
+      })
+    )
     return {
       runId: existing.id,
       concepts: existing.concepts as Concept[] | null,
       questionTasks: existing.questionTasks as QuestionTask[] | null,
       questionSlots,
+      slotMeta,
     }
   }
 
   const created = await prisma.pipelineRun.create({ data: { prepId } })
-  return { runId: created.id, concepts: null, questionTasks: null, questionSlots: new Map() }
+  return { runId: created.id, concepts: null, questionTasks: null, questionSlots: new Map(), slotMeta: new Map() }
 }
 
 export async function saveConcepts(userId: string, runId: string, concepts: Concept[]): Promise<void> {
@@ -74,11 +92,20 @@ export async function saveQuestionTasksAndInitSlots(userId: string, runId: strin
   })
 }
 
-export async function saveQuestionSlot(userId: string, runId: string, taskIndex: number, question: GeneratedQuestion): Promise<void> {
+export async function saveQuestionSlot(
+  userId: string,
+  runId: string,
+  taskIndex: number,
+  question: GeneratedQuestion,
+  meta: AgentMeta[],
+): Promise<void> {
   await assertOwnsRun(userId, runId)
   await prisma.pipelineQuestion.update({
     where: { runId_taskIndex: { runId, taskIndex } },
-    data: { question: question as unknown as Prisma.InputJsonValue },
+    data: {
+      question: question as unknown as Prisma.InputJsonValue,
+      meta: meta as unknown as Prisma.InputJsonValue,
+    },
   })
 }
 
