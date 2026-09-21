@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("../../actions/generationMeta", () => ({
   recordGenerationMeta: vi.fn().mockResolvedValue(undefined),
@@ -61,6 +61,10 @@ function flashcard(front: string): GeneratedQuestion {
   }
 }
 
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 describe("runPipeline resume", () => {
   it("keeps a resumed slot's persisted meta at its original array position, alongside newly built meta", async () => {
     const resumedQuestion = flashcard("resumed")
@@ -78,7 +82,14 @@ describe("runPipeline resume", () => {
 
     const builtQuestion = flashcard("built")
     buildFlashcard.mockResolvedValue({ output: builtQuestion, meta: builtMeta })
-    reviewQuestion.mockResolvedValue({ output: { question: builtQuestion }, meta: reviewMeta })
+    reviewQuestion.mockResolvedValue({
+      output: {
+        question: builtQuestion,
+        scores: { correctness: 1, conceptAlignment: 1, clarity: 1, cognitiveDemand: 1, distractorQuality: null },
+        passed: true,
+      },
+      meta: reviewMeta,
+    })
 
     const result = await runPipeline({
       prepId: "prep-1",
@@ -94,5 +105,49 @@ describe("runPipeline resume", () => {
       [ builtMeta, reviewMeta ],
     ])
     expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 1, builtQuestion, [ builtMeta, reviewMeta ])
+  })
+})
+
+describe("runPipeline reviewer rejection", () => {
+  it("rebuilds once, unreviewed, when the reviewer's score doesn't pass, and uses the rebuild as-is", async () => {
+    const builtMeta = meta({ model: "build-model" })
+    const reviewMeta = meta({ model: "review-model" })
+    const retryMeta = meta({ model: "retry-model" })
+
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task ],
+      questionSlots: new Map([ [ 0, null ] ]),
+      slotMeta: new Map([ [ 0, [] ] ]),
+    })
+
+    const rejectedQuestion = flashcard("rejected")
+    const retryQuestion = flashcard("retry")
+    buildFlashcard
+      .mockResolvedValueOnce({ output: rejectedQuestion, meta: builtMeta })
+      .mockResolvedValueOnce({ output: retryQuestion, meta: retryMeta })
+    reviewQuestion.mockResolvedValue({
+      output: {
+        question: rejectedQuestion,
+        scores: { correctness: 0.5, conceptAlignment: 0.5, clarity: 0.5, cognitiveDemand: 0.5, distractorQuality: null },
+        passed: false,
+      },
+      meta: reviewMeta,
+    })
+
+    const result = await runPipeline({
+      prepId: "prep-1",
+      pages: [],
+      apiKey: "key",
+      model: "model",
+      onProgress: vi.fn(),
+    })
+
+    expect(buildFlashcard).toHaveBeenCalledTimes(2)
+    expect(reviewQuestion).toHaveBeenCalledTimes(1)
+    expect(result.questions).toEqual([ { ...retryQuestion, difficulty: "easy" } ])
+    expect(result.questionMeta).toEqual([ [ builtMeta, reviewMeta, retryMeta ] ])
+    expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 0, retryQuestion, [ builtMeta, reviewMeta, retryMeta ])
   })
 })
