@@ -235,14 +235,14 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
 
       // Review immediately — no waiting for other slots to finish building
-      const reviewed = await runQuestionReviewer(buildResult.output, task.concepts, apiKey, model, language, signal)
+      const reviewed = await runQuestionReviewer(buildResult.output, task, apiKey, model, language, signal)
       totalTokens += reviewed.meta.totalTokens
       void incrementPrepTokens(prepId, reviewed.meta.totalTokens)
       metas.push(reviewed.meta)
 
       let question: GeneratedQuestion
-      if (reviewed.output.question === null) {
-        // Retry build once on reviewer rejection
+      if (!reviewed.output.passed) {
+        // Retry build once on reviewer rejection — still a single unreviewed retry; #212 replaces this with a reviewed rewrite loop
         const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
         totalTokens += retry.meta.totalTokens
         void incrementPrepTokens(prepId, retry.meta.totalTokens)

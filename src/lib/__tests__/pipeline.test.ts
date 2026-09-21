@@ -78,7 +78,14 @@ describe("runPipeline resume", () => {
 
     const builtQuestion = flashcard("built")
     buildFlashcard.mockResolvedValue({ output: builtQuestion, meta: builtMeta })
-    reviewQuestion.mockResolvedValue({ output: { question: builtQuestion }, meta: reviewMeta })
+    reviewQuestion.mockResolvedValue({
+      output: {
+        question: builtQuestion,
+        scores: { correctness: 1, conceptAlignment: 1, clarity: 1, cognitiveDemand: 1, distractorQuality: null },
+        passed: true,
+      },
+      meta: reviewMeta,
+    })
 
     const result = await runPipeline({
       prepId: "prep-1",

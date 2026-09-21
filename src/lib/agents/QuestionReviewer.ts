@@ -1,32 +1,92 @@
 import { z } from "zod"
 
-import type { Concept } from "../../types/pipeline"
+import type { QuestionTask } from "../../types/pipeline"
 import { generatedQuestionSchema } from "../../types/questions"
-import type { GeneratedQuestion } from "../../types/questions"
+import type { GeneratedQuestion, QuestionType } from "../../types/questions"
 import { runAgent, AgentResult, EMPTY_AGENT_META } from "../agent"
 
-const reviewerResponseSchema = z.object({
-  question: generatedQuestionSchema.nullable(),
+const TYPES_WITH_DISTRACTORS = new Set<QuestionType>([ "single_choice", "multiple_choice", "fill_the_gap" ])
+
+const reviewScoresSchema = z.object({
+  correctness: z.number().min(0).max(1),
+  conceptAlignment: z.number().min(0).max(1),
+  clarity: z.number().min(0).max(1),
+  cognitiveDemand: z.number().min(0).max(1),
+  distractorQuality: z.number().min(0).max(1).nullable(),
 })
 
-const SYSTEM_PROMPT = `You are an expert study question reviewer.
-Review the provided study question and check:
+export type ReviewScores = z.infer<typeof reviewScoresSchema>
 
-1. Clarity: Is the question unambiguous and well-formed? No trailing text corruption?
-2. Correctness: Are the correct answers actually correct?
-3. Quality: Does it test real understanding, not just memorization?
-4. Format integrity:
-   - fill_the_gap: {{gap:N}} markers must match the gaps array exactly
-   - sorting: correct_index must be a permutation of {1,2,3,4}
-   - single_choice: exactly one is_correct=true with 4 answers
-   - multiple_choice: 2-4 correct, 2-3 incorrect, 4-6 total
+const reviewerResponseSchema = z.object({
+  question: generatedQuestionSchema,
+  scores: reviewScoresSchema,
+})
 
-Fix any issues you find. Return the corrected question in the same JSON structure.
-If the question is fundamentally broken (wrong facts, unfixable format), return null.
+export const PASS_THRESHOLD = 0.8
+export const CORRECTNESS_FLOOR = 0.9
 
-Return JSON: { "question": <corrected question object or null> }`
+/** All-1.0 scores used when the reviewer call itself fails — pairs with the fail-open fallback below. */
+const NEUTRAL_PASSING_SCORES: ReviewScores = {
+  correctness: 1,
+  conceptAlignment: 1,
+  clarity: 1,
+  cognitiveDemand: 1,
+  distractorQuality: 1,
+}
 
-function formatConcepts(concepts: Concept[]): string {
+export function passesReview(scores: ReviewScores): boolean {
+  const applicable = [
+    scores.correctness,
+    scores.conceptAlignment,
+    scores.clarity,
+    scores.cognitiveDemand,
+    ...(scores.distractorQuality === null ? [] : [ scores.distractorQuality ]),
+  ]
+  const average = applicable.reduce((a, b) => a + b, 0) / applicable.length
+  return scores.correctness >= CORRECTNESS_FLOOR && average >= PASS_THRESHOLD
+}
+
+const SYSTEM_PROMPT_BASE = `You are an expert study question reviewer.
+Review the provided study question, fix any issues you find (clarity, correctness, format), and score it:
+
+- correctness: Are the correct answer(s) actually correct, and are the distractors actually wrong?
+- conceptAlignment: Does the question actually assess the given concept(s), not something tangential?
+- clarity: Is the question unambiguous and well-formed? No trailing text corruption?
+- cognitiveDemand: Does it test understanding/application at the level the difficulty tier below calls for?
+- distractorQuality: For question types with wrong-answer options, are those options well-constructed for the tier below? Use null for question types with no distractors.
+
+Format integrity (fix these, they are not part of the score):
+- fill_the_gap: {{gap:N}} markers must match the gaps array exactly
+- sorting: correct_index must be a permutation of {1,2,3,4}
+- single_choice: exactly one is_correct=true with 4 answers
+- multiple_choice: 2-4 correct, 2-3 incorrect, 4-6 total
+
+Return the corrected question in the same JSON structure, along with all five scores on a 0-1 scale.
+
+Return JSON: { "question": <corrected question object>, "scores": { "correctness": <0-1>, "conceptAlignment": <0-1>, "clarity": <0-1>, "cognitiveDemand": <0-1>, "distractorQuality": <0-1 or null> } }`
+
+function difficultyRubric(task: QuestionTask): string {
+  const hasDistractors = TYPES_WITH_DISTRACTORS.has(task.type)
+
+  if (task.difficulty === "easy") {
+    return "Difficulty tier: easy (recall).\n" +
+      "- cognitiveDemand: score high for a single recall step — do not penalize simplicity." +
+      (hasDistractors ? "\n- distractorQuality: score high when distractors are clearly, unambiguously wrong." : "")
+  }
+
+  if (task.difficulty === "medium") {
+    return "Difficulty tier: medium (2-step reasoning).\n" +
+      "- cognitiveDemand: expect two linear reasoning steps (interpret the situation, then apply the concept)." +
+      (hasDistractors ? "\n- distractorQuality: expect plausible distractors that fail a stated constraint or misapply the concept." : "")
+  }
+
+  return "Difficulty tier: hard (tricky, with traps).\n" +
+    "- cognitiveDemand: expect multi-step synthesis (interpret, apply, weigh trade-offs, decide)." +
+    (hasDistractors ? "\n- distractorQuality: expect near-miss distractors built from misconceptions, each failing a subtle condition." : "")
+}
+
+function formatConcepts(task: QuestionTask): string {
+  const concepts = task.concepts
   if (concepts.length === 1) {
     const c = concepts[0]
     return `Concept being assessed:\nName: ${c.name}\nDescription: ${c.description}`
@@ -37,28 +97,29 @@ function formatConcepts(concepts: Concept[]): string {
 
 export async function runQuestionReviewer(
   question: GeneratedQuestion,
-  concepts: Concept[],
+  task: QuestionTask,
   apiKey: string,
   model: string,
   language: string,
   signal?: AbortSignal,
-): Promise<AgentResult<{ question: GeneratedQuestion | null }>> {
+): Promise<AgentResult<{ question: GeneratedQuestion; scores: ReviewScores; passed: boolean }>> {
   const langInstruction = language !== "en" ? `\nAll question text must be in ${language}.` : ""
   try {
-    return await runAgent({
+    const result = await runAgent({
       name: "QuestionReviewer",
-      systemPrompt: SYSTEM_PROMPT + langInstruction,
-      userContent: { textContent: `${formatConcepts(concepts)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}` },
+      systemPrompt: `${SYSTEM_PROMPT_BASE}\n\n${difficultyRubric(task)}${langInstruction}`,
+      userContent: { textContent: `${formatConcepts(task)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}` },
       schema: reviewerResponseSchema,
       apiKey,
       model,
       signal,
-    }) as AgentResult<{ question: GeneratedQuestion | null }>
+    }) as AgentResult<{ question: GeneratedQuestion; scores: ReviewScores }>
+    return { output: { ...result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") throw err
     // Reviewer failed — pass the original question through rather than losing it
     return {
-      output: { question },
+      output: { question, scores: NEUTRAL_PASSING_SCORES, passed: true },
       meta: EMPTY_AGENT_META,
     }
   }
