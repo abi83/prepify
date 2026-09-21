@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { difficultyInstructions } from "./difficulty"
+import { rewriteInstructions, type RewriteInput } from "./rewrite"
 import type { QuestionTask } from "../../../types/pipeline"
 import { sortingContentSchema } from "../../../types/questions"
 import type { SortingContent } from "../../../types/questions"
@@ -55,12 +56,13 @@ export async function runSortingBuilder(
   model: string,
   language: string,
   signal?: AbortSignal,
+  rewrite?: RewriteInput,
 ): Promise<AgentResult<{ type: "sorting"; content: SortingContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
     name: "SortingBuilder",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "no-distractors")}` },
+    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "no-distractors")}${rewriteInstructions(rewrite)}` },
     schema: responseSchema,
     apiKey,
     model,

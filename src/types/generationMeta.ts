@@ -17,6 +17,7 @@ export interface GenerationMetaRecord {
   costUsd: number
   toolCalls: number
   executionMs: number
+  wasted: boolean
 }
 
 /** Pure mapping from an agent call's app-shaped meta to a persistable GenerationMeta record. */
@@ -24,6 +25,7 @@ export function toGenerationMeta(
   entityType: GenerationEntityType,
   entityId: string,
   meta: AgentMeta,
+  wasted = false,
 ): GenerationMetaRecord {
   return {
     entityType,
@@ -36,5 +38,6 @@ export function toGenerationMeta(
     costUsd: meta.costUsd,
     toolCalls: meta.toolCalls,
     executionMs: meta.executionMs,
+    wasted,
   }
 }

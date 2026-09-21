@@ -33,14 +33,24 @@ export const singleChoiceContentSchema = z.object({
   answers: z.array(answerSchema).length(4),
   rationale: z.string(),
   asset_hint: assetHintSchema,
-})
+}).refine(
+  ({ answers }) => answers.filter(a => a.is_correct).length === 1,
+  { message: "single_choice must have exactly one is_correct=true answer" }
+)
 
 export const multipleChoiceContentSchema = z.object({
   question: z.string(),
   answers: z.array(answerSchema).min(4).max(6),
   rationale: z.string(),
   asset_hint: assetHintSchema,
-})
+}).refine(
+  ({ answers }) => {
+    const correct = answers.filter(a => a.is_correct).length
+    const incorrect = answers.length - correct
+    return correct >= 2 && correct <= 4 && incorrect >= 2 && incorrect <= 3
+  },
+  { message: "multiple_choice must have 2-4 correct and 2-3 incorrect answers" }
+)
 
 export const fillGapAnswerSchema = z.object({
   id: z.string(),
@@ -87,7 +97,10 @@ export const sortingContentSchema = z.object({
   answers: z.array(sortingAnswerSchema).length(4),
   rationale: z.string(),
   asset_hint: assetHintSchema,
-})
+}).refine(
+  ({ answers }) => new Set(answers.map(a => a.correct_index)).size === 4,
+  { message: "sorting correct_index values must be a permutation of {1,2,3,4}" }
+)
 
 // --- Generated question (builder output, pre-DB) ---
 

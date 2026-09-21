@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 import type { QuestionTask } from "../../types/pipeline"
-import { generatedQuestionSchema } from "../../types/questions"
 import type { GeneratedQuestion, QuestionType } from "../../types/questions"
 import { runAgent, AgentResult } from "../agent"
 
@@ -11,65 +10,79 @@ function hasDistractors(type: QuestionType): boolean {
   return TYPES_WITH_DISTRACTORS.has(type)
 }
 
+const metricSchema = z.object({
+  score: z.number().min(0).max(1),
+  comment: z.string().max(120),
+})
+
 const reviewScoresSchema = z.object({
-  correctness: z.number().min(0).max(1),
-  conceptAlignment: z.number().min(0).max(1),
-  clarity: z.number().min(0).max(1),
-  cognitiveDemand: z.number().min(0).max(1),
-  distractorQuality: z.number().min(0).max(1).nullable(),
+  correctness: metricSchema,
+  conceptAlignment: metricSchema,
+  clarity: metricSchema,
+  cognitiveDemand: metricSchema,
+  distractorQuality: metricSchema.nullable(),
 })
 
 export type ReviewScores = z.infer<typeof reviewScoresSchema>
 
-const reviewerResponseSchema = z.object({
-  question: generatedQuestionSchema,
+const reviewSchema = z.object({
   scores: reviewScoresSchema,
+  comment: z.string().max(200),
 })
 
-export const PASS_THRESHOLD = 0.8
-export const CORRECTNESS_FLOOR = 0.9
+export type Review = z.infer<typeof reviewSchema>
 
-/** Throws if distractorQuality's nullness doesn't match the question type — a schema-unenforceable invariant. */
-export function assertDistractorQualityShape(type: QuestionType, scores: ReviewScores): void {
-  const expectsScore = hasDistractors(type)
-  const gotScore = scores.distractorQuality !== null
-  if (expectsScore !== gotScore) {
-    throw new Error(`QuestionReviewer: distractorQuality must be ${expectsScore ? "a number" : "null"} for type "${type}", got ${scores.distractorQuality}`)
-  }
+/** Each metric must clear its own floor AND the average must clear AVERAGE_FLOOR — uniformly mediocre fails. */
+export const METRIC_FLOOR = 0.7
+export const CORRECTNESS_FLOOR = 0.9
+export const AVERAGE_FLOOR = 0.85
+
+/** distractorQuality must be null exactly for types with no distractors — a schema-unenforceable invariant. */
+export function hasValidDistractorShape(type: QuestionType, scores: ReviewScores): boolean {
+  return hasDistractors(type) === (scores.distractorQuality !== null)
+}
+
+function applicableMetrics(scores: ReviewScores): Array<[ string, number ]> {
+  const metrics: Array<[ string, number ]> = [
+    [ "correctness", scores.correctness.score ],
+    [ "conceptAlignment", scores.conceptAlignment.score ],
+    [ "clarity", scores.clarity.score ],
+    [ "cognitiveDemand", scores.cognitiveDemand.score ],
+  ]
+  if (scores.distractorQuality !== null) metrics.push([ "distractorQuality", scores.distractorQuality.score ])
+  return metrics
 }
 
 export function passesReview(scores: ReviewScores): boolean {
-  const applicable = [
-    scores.correctness,
-    scores.conceptAlignment,
-    scores.clarity,
-    scores.cognitiveDemand,
-    ...(scores.distractorQuality === null ? [] : [ scores.distractorQuality ]),
-  ]
-  const average = applicable.reduce((a, b) => a + b, 0) / applicable.length
-  return scores.correctness >= CORRECTNESS_FLOOR && average >= PASS_THRESHOLD
+  const metrics = applicableMetrics(scores)
+  const belowFloor = metrics.some(([ name, score ]) => score < (name === "correctness" ? CORRECTNESS_FLOOR : METRIC_FLOOR))
+  const average = metrics.reduce((sum, [ , score ]) => sum + score, 0) / metrics.length
+  return !belowFloor && average >= AVERAGE_FLOOR
+}
+
+/** Critique text for a builder rewrite: the global comment plus every metric's score and comment. */
+export function reviewFeedback(review: Review): string {
+  const lines = applicableMetrics(review.scores).map(([ name ]) => {
+    const metric = review.scores[name as keyof ReviewScores]!
+    return `- ${name}: ${metric.score.toFixed(2)} — ${metric.comment}`
+  })
+  return `${review.comment}\n${lines.join("\n")}`
 }
 
 const SYSTEM_PROMPT_BASE = `You are an expert study question reviewer.
-Review the provided study question, fix any issues you find (clarity, correctness, format), and score it:
+Score the provided study question. Do NOT rewrite or correct it — only judge it.
 
+Metrics, each scored 0-1 with a short comment (max 120 chars):
 - correctness: Are the correct answer(s) actually correct, and are the distractors actually wrong?
 - conceptAlignment: Does the question actually assess the given concept(s), not something tangential?
 - clarity: Is the question unambiguous and well-formed? No trailing text corruption?
 - cognitiveDemand: Does it test understanding/application at the level the difficulty tier below calls for?
 - distractorQuality: For question types with wrong-answer options, are those options well-constructed for the tier below? Use null for question types with no distractors.
 
-Format integrity (fix these, they are not part of the score):
-- fill_the_gap: {{gap:N}} markers must match the gaps array exactly
-- sorting: correct_index must be a permutation of {1,2,3,4}
-- single_choice: exactly one is_correct=true with 4 answers
-- multiple_choice: 2-4 correct, 2-3 incorrect, 4-6 total
+Comments must name the concrete problem and what to change, so a writer can fix it. Keep comments on metrics scoring 0.85+ minimal.
+Also give an overall comment (max 200 chars) on the most important change needed.
 
-Score the corrected question you are returning, not the original submission — if you fixed an error, the scores must reflect the fixed version.
-
-Return the corrected question in the same JSON structure, along with all five scores on a 0-1 scale.
-
-Return JSON: { "question": <corrected question object>, "scores": { "correctness": <0-1>, "conceptAlignment": <0-1>, "clarity": <0-1>, "cognitiveDemand": <0-1>, "distractorQuality": <0-1 or null> } }`
+Return JSON: { "scores": { "correctness": {"score": <0-1>, "comment": "..."}, "conceptAlignment": {...}, "clarity": {...}, "cognitiveDemand": {...}, "distractorQuality": {...} or null }, "comment": "..." }`
 
 function difficultyRubric(task: QuestionTask): string {
   const withDistractors = hasDistractors(task.type)
@@ -108,17 +121,19 @@ export async function runQuestionReviewer(
   model: string,
   language: string,
   signal?: AbortSignal,
-): Promise<AgentResult<{ question: GeneratedQuestion; scores: ReviewScores; passed: boolean }>> {
-  const langInstruction = language !== "en" ? `\nAll question text must be in ${language}.` : ""
+): Promise<AgentResult<{ review: Review; passed: boolean }>> {
+  const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({
     name: "QuestionReviewer",
     systemPrompt: `${SYSTEM_PROMPT_BASE}\n\n${difficultyRubric(task)}${langInstruction}`,
     userContent: { textContent: `${formatConcepts(task)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}` },
-    schema: reviewerResponseSchema,
+    schema: reviewSchema.refine(
+      review => hasValidDistractorShape(task.type, review.scores),
+      { message: `distractorQuality must be ${hasDistractors(task.type) ? "a number" : "null"} for type "${task.type}"` },
+    ),
     apiKey,
     model,
     signal,
-  }) as AgentResult<{ question: GeneratedQuestion; scores: ReviewScores }>
-  assertDistractorQualityShape(task.type, result.output.scores)
-  return { output: { ...result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
+  })
+  return { output: { review: result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
 }

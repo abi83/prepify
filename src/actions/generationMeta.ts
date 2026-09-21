@@ -13,7 +13,8 @@ export async function recordGenerationMeta(
   entityType: GenerationEntityType,
   entityId: string,
   meta: AgentMeta,
+  wasted = false,
 ): Promise<void> {
   if (meta.promptTokens + meta.completionTokens + meta.cachedTokens === 0) return
-  await generationMetaRepository.record(toGenerationMeta(entityType, entityId, meta))
+  await generationMetaRepository.record(toGenerationMeta(entityType, entityId, meta, wasted))
 }
