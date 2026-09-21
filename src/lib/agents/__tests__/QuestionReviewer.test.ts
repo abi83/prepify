@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 
-import { passesReview } from "../QuestionReviewer"
+import { assertDistractorQualityShape, passesReview } from "../QuestionReviewer"
 import type { ReviewScores } from "../QuestionReviewer"
 
 function scores(overrides: Partial<ReviewScores> = {}): ReviewScores {
@@ -30,5 +30,23 @@ describe("passesReview", () => {
   it("excludes a null distractorQuality from the average instead of counting it as 0", () => {
     const withNullDistractor = scores({ correctness: 0.9, conceptAlignment: 0.8, clarity: 0.8, cognitiveDemand: 0.8, distractorQuality: null })
     expect(passesReview(withNullDistractor)).toBe(true)
+  })
+})
+
+describe("assertDistractorQualityShape", () => {
+  it("accepts a number for a choice-based type", () => {
+    expect(() => assertDistractorQualityShape("single_choice", scores({ distractorQuality: 0.7 }))).not.toThrow()
+  })
+
+  it("accepts null for a type with no distractors", () => {
+    expect(() => assertDistractorQualityShape("flashcard", scores({ distractorQuality: null }))).not.toThrow()
+  })
+
+  it("throws when a choice-based type gets a null distractorQuality", () => {
+    expect(() => assertDistractorQualityShape("multiple_choice", scores({ distractorQuality: null }))).toThrow()
+  })
+
+  it("throws when a type with no distractors gets a numeric distractorQuality", () => {
+    expect(() => assertDistractorQualityShape("sorting", scores({ distractorQuality: 0.5 }))).toThrow()
   })
 })
