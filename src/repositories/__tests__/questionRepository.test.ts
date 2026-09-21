@@ -43,16 +43,17 @@ describe("insertMany", () => {
   it("lets the owner insert questions", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
     const saved = await questionRepository.insertMany(OWNER, prep.id, [
-      { type: "flashcard", content: { front: "a", back: "b" } },
+      { type: "flashcard", difficulty: "easy", content: { front: "a", back: "b" } },
     ])
     expect(saved).toHaveLength(1)
     expect(saved[0].prepId).toBe(prep.id)
+    expect(saved[0].difficulty).toBe("easy")
   })
 
   it("rejects a non-owner inserting questions", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
     await expect(
-      questionRepository.insertMany(OTHER, prep.id, [ { type: "flashcard", content: {} } ])
+      questionRepository.insertMany(OTHER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
     ).rejects.toThrow(ForbiddenError)
   })
 
@@ -62,7 +63,7 @@ describe("insertMany", () => {
       questionRepository.insertMany(
         OWNER,
         prep.id,
-        [ { type: "flashcard", content: {} }, { type: "flashcard", content: {} } ],
+        [ { type: "flashcard", difficulty: "easy", content: {} }, { type: "flashcard", difficulty: "easy", content: {} } ],
         [ [] ],
       )
     ).rejects.toThrow(/questionMeta length/)
@@ -74,8 +75,8 @@ describe("insertMany", () => {
       OWNER,
       prep.id,
       [
-        { type: "flashcard", content: { front: "a", back: "b" } },
-        { type: "single_choice", content: {} },
+        { type: "flashcard", difficulty: "easy", content: { front: "a", back: "b" } },
+        { type: "single_choice", difficulty: "hard", content: {} },
       ],
       [
         [ meta({ model: "gpt-5-nano" }), meta({ model: "gpt-5-nano" }) ], // build + review
@@ -97,7 +98,7 @@ describe("insertMany", () => {
     const saved = await questionRepository.insertMany(
       OWNER,
       prep.id,
-      [ { type: "flashcard", content: {} } ],
+      [ { type: "flashcard", difficulty: "easy", content: {} } ],
       [ [ meta({ promptTokens: 0, cachedTokens: 0, completionTokens: 0 }) ] ],
     )
 
@@ -109,7 +110,7 @@ describe("insertMany", () => {
 describe("listByPrep", () => {
   it("is visible to the owner", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
-    await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", content: {} } ])
+    await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
     const questions = await questionRepository.listByPrep(OWNER, prep.id)
     expect(questions).toHaveLength(1)
   })
@@ -122,7 +123,7 @@ describe("listByPrep", () => {
   it("is visible to anyone when the parent prep is public", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
     await prepRepository.updatePrep(OWNER, prep.id, { visibility: "public" })
-    await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", content: {} } ])
+    await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
 
     const questions = await questionRepository.listByPrep(null, prep.id)
     expect(questions).toHaveLength(1)

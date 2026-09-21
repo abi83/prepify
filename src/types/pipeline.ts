@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import type { QuestionType } from "./questions"
+import type { Difficulty, QuestionType } from "./questions"
 
 export const conceptSchema = z.object({
   name: z.string().min(3).max(80),
@@ -18,6 +18,7 @@ export type Concept = z.infer<typeof conceptSchema>
 export interface QuestionTask {
   concepts: Concept[]
   type: QuestionType
+  difficulty: Difficulty
 }
 
 export type PipelineProgressEvent =

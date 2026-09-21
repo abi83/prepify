@@ -96,6 +96,7 @@ export default function GenerationPanel({
         language,
         questionCount: localConfig.questionCount,
         enabledTypes: localConfig.enabledTypes,
+        difficultyMix: localConfig.difficultyMix,
         signal: abortRef.current.signal,
         onProgress: (event) => {
           setPipelineProgress(event)
@@ -112,7 +113,7 @@ export default function GenerationPanel({
       const elapsed = Math.round(performance.now() - genStartRef.current)
       const savedQuestions = await insertQuestions(
         prepId,
-        result.questions.map(q => ({ type: q.type, content: q.content })),
+        result.questions.map(q => ({ type: q.type, difficulty: q.difficulty, content: q.content })),
         result.questionMeta,
       )
 

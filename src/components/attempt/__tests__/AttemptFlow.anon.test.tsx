@@ -12,7 +12,7 @@ vi.mock("../../../actions/attempts", () => ({
 import AttemptFlow from "../AttemptFlow"
 
 const singleQ: Question = {
-  id: "q1", prepId: "p1", createdAt: new Date(0), type: "single_choice",
+  id: "q1", prepId: "p1", createdAt: new Date(0), difficulty: null, type: "single_choice",
   content: {
     question: "What is 2+2?", rationale: "",
     asset_hint: { needed: false, type: null, description: null },

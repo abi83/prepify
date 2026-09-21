@@ -112,6 +112,9 @@ export const questionTypeSchema = z.enum([
 
 export type QuestionType = z.infer<typeof questionTypeSchema>
 
+export const difficultySchema = z.enum([ "easy", "medium", "hard" ])
+export type Difficulty = z.infer<typeof difficultySchema>
+
 export type FlashcardContent = z.infer<typeof flashcardContentSchema>
 export type SingleChoiceContent = z.infer<typeof singleChoiceContentSchema>
 export type MultipleChoiceContent = z.infer<typeof multipleChoiceContentSchema>

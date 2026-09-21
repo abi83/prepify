@@ -9,7 +9,7 @@ import {
 import { incrementPrepTokens } from "../actions/preps"
 import type { Concept, QuestionTask, PipelineProgressEvent } from "../types/pipeline"
 import type { Page } from "../types/prep"
-import type { GeneratedQuestion, QuestionType } from "../types/questions"
+import type { Difficulty, GeneratedQuestion, QuestionType } from "../types/questions"
 import { runFillTheGapBuilder } from "./agents/builders/FillTheGapBuilder"
 import { runFlashcardBuilder } from "./agents/builders/FlashcardBuilder"
 import { runMultipleChoiceBuilder } from "./agents/builders/MultipleChoiceBuilder"
@@ -20,7 +20,7 @@ import { runConceptMerger } from "./agents/ConceptMerger"
 import { runPrepNamer } from "./agents/PrepNamer"
 import { runQuestionReviewer } from "./agents/QuestionReviewer"
 import { BYOK_TEXT_HARD_LIMIT } from "./config"
-import { DEFAULT_GEN_CONFIG } from "./generationConfig"
+import { DEFAULT_GEN_CONFIG, type DifficultyMix } from "./generationConfig"
 import { deduplicateExact } from "./mergeConceptLists"
 import { buildQuestionTasks } from "./taskBuilder"
 
@@ -80,8 +80,10 @@ const BUILDERS: Record<QuestionType, BuilderFn> = {
   sorting: runSortingBuilder as BuilderFn,
 }
 
+export type BuiltQuestion = GeneratedQuestion & { difficulty: Difficulty }
+
 export interface PipelineResult {
-  questions: GeneratedQuestion[]
+  questions: BuiltQuestion[]
   prepTitle: string | null
   prepDescription: string | null
   totalTokens: number
@@ -102,6 +104,8 @@ export interface PipelineConfig {
   questionCount?: number
   /** Which question types to include (default: all five types). */
   enabledTypes?: QuestionType[]
+  /** Relative weights per difficulty tier (default 30/40/30). */
+  difficultyMix?: DifficultyMix
   signal?: AbortSignal
   onProgress: (event: PipelineProgressEvent) => void
   /** Called as soon as title+description are ready — fires even if the pipeline is later cancelled. */
@@ -109,7 +113,7 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, signal, onProgress, onMetaReady } = config
+  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, difficultyMix, signal, onProgress, onMetaReady } = config
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -161,6 +165,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     tasks = buildQuestionTasks(concepts, {
       questionCount: questionCount ?? DEFAULT_GEN_CONFIG.questionCount,
       enabledTypes: enabledTypes ?? DEFAULT_GEN_CONFIG.enabledTypes,
+      difficultyMix: difficultyMix ?? DEFAULT_GEN_CONFIG.difficultyMix,
     })
     await saveQuestionTasksAndInitSlots(runId, tasks)
     for (let i = 0; i < tasks.length; i++) state.questionSlots.set(i, null)
@@ -267,7 +272,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Assemble in task order — only slots that completed successfully
   const doneIndices = tasks.map((_, i) => i).filter(i => slots.has(i))
-  const questions = doneIndices.map(i => slots.get(i)!.question)
+  const questions = doneIndices.map(i => ({ ...slots.get(i)!.question, difficulty: tasks[i].difficulty }))
   const questionMeta = doneIndices.map(i => slots.get(i)!.meta)
 
   return { questions, prepTitle, prepDescription, totalTokens, questionMeta }

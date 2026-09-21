@@ -1,4 +1,4 @@
-import type { QuestionType } from "../types/questions"
+import type { Difficulty, QuestionType } from "../types/questions"
 
 const STORAGE_KEY = "prepify_gen_config"
 
@@ -18,20 +18,25 @@ export const TYPE_LABELS: Record<QuestionType, string> = {
   sorting: "Sorting",
 }
 
+/** Relative weights per tier; normalized against the question count. */
+export type DifficultyMix = Record<Difficulty, number>
+
 export interface GenerationConfig {
   questionCount: number
   enabledTypes: QuestionType[]
+  difficultyMix: DifficultyMix
 }
 
 export const DEFAULT_GEN_CONFIG: GenerationConfig = {
   questionCount: 10,
   enabledTypes: [ ...ALL_QUESTION_TYPES ],
+  difficultyMix: { easy: 3, medium: 4, hard: 3 },
 }
 
 export function getGenerationConfig(): GenerationConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ] }
+    if (!raw) return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ], difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix } }
     const parsed = JSON.parse(raw) as Partial<GenerationConfig>
     const count = Number(parsed.questionCount)
     const enabledTypes = Array.isArray(parsed.enabledTypes)
@@ -42,9 +47,10 @@ export function getGenerationConfig(): GenerationConfig {
         ? Math.min(20, Math.max(5, count))
         : DEFAULT_GEN_CONFIG.questionCount,
       enabledTypes: enabledTypes.length > 0 ? enabledTypes : [ ...DEFAULT_GEN_CONFIG.enabledTypes ],
+      difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix },
     }
   } catch {
-    return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ] }
+    return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ], difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix } }
   }
 }
 

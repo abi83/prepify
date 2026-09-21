@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { difficultyInstructions } from "./difficulty"
 import type { QuestionTask } from "../../../types/pipeline"
 import { singleChoiceContentSchema } from "../../../types/questions"
 import type { SingleChoiceContent } from "../../../types/questions"
@@ -60,7 +61,7 @@ export async function runSingleChoiceBuilder(
   const result = await runAgent({
     name: "SingleChoiceBuilder",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: formatConcepts(task.concepts) },
+    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "with-distractors")}` },
     schema: responseSchema,
     apiKey,
     model,

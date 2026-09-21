@@ -47,7 +47,7 @@ model Prep {
   discipline PrepDiscipline?
   language   String?
 
-  description String          @default("")
+  description String @default("")
 
   questions   Question[]
   attempts    Attempt[]
@@ -55,11 +55,13 @@ model Prep {
 }
 
 model Question {
-  id        String   @id @default(uuid())
-  prepId    String
-  type      String
-  content   Json
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  prepId     String
+  type       String
+  // Null only for rows created before difficulty tiers existed.
+  difficulty String?
+  content    Json
+  createdAt  DateTime @default(now())
 
   prep   Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
   assets Asset[]
@@ -80,14 +82,14 @@ model Attempt {
 // Optional, not 1:1 with Prep: created lazily when generation starts
 // (pipelineStore.loadOrCreateRun), not at prep creation.
 model PipelineRun {
-  id        String   @id @default(uuid())
-  prepId    String   @unique
+  id            String   @id @default(uuid())
+  prepId        String   @unique
   // TODO(#41): concepts as first-class citizens may want their own model
   // instead of opaque JSON.
   concepts      Json?
   questionTasks Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
 
   prep      Prep               @relation(fields: [prepId], references: [id], onDelete: Cascade)
   questions PipelineQuestion[]
