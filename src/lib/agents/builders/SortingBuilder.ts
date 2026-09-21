@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { difficultyInstructions } from "./difficulty"
 import type { QuestionTask } from "../../../types/pipeline"
 import { sortingContentSchema } from "../../../types/questions"
 import type { SortingContent } from "../../../types/questions"
@@ -59,7 +60,7 @@ export async function runSortingBuilder(
   const result = await runAgent({
     name: "SortingBuilder",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: formatConcepts(task.concepts) },
+    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "no-distractors")}` },
     schema: responseSchema,
     apiKey,
     model,

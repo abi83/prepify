@@ -58,6 +58,8 @@ model Question {
   id        String   @id @default(uuid())
   prepId    String
   type      String
+  // Null only for rows created before difficulty tiers existed.
+  difficulty String?
   content   Json
   createdAt DateTime @default(now())
 

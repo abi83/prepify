@@ -15,7 +15,7 @@ const OWNER = "user-owner"
 const OTHER = "user-other"
 
 const concept: Concept = { name: "Concept", description: "x".repeat(40), importance: 0.5, misconceptions: [] }
-const task: QuestionTask = { concepts: [ concept ], type: "flashcard" }
+const task: QuestionTask = { concepts: [ concept ], type: "flashcard", difficulty: "easy" }
 
 beforeEach(async () => {
   await prisma.attempt.deleteMany()

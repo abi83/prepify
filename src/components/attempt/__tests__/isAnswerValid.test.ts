@@ -11,7 +11,7 @@ import { isAnswerValid } from "../AttemptFlow"
 const NO_ASSET = { needed: false, type: null, description: null } as const
 
 const singleQ: Question = {
-  id: "q1", prepId: "p1", createdAt: new Date(0), type: "single_choice",
+  id: "q1", prepId: "p1", createdAt: new Date(0), difficulty: null, type: "single_choice",
   content: {
     question: "Q?", rationale: "", asset_hint: NO_ASSET,
     answers: [
@@ -24,7 +24,7 @@ const singleQ: Question = {
 }
 
 const multiQ: Question = {
-  id: "q2", prepId: "p1", createdAt: new Date(0), type: "multiple_choice",
+  id: "q2", prepId: "p1", createdAt: new Date(0), difficulty: null, type: "multiple_choice",
   content: {
     question: "Q?", rationale: "", asset_hint: NO_ASSET,
     answers: [

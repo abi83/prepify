@@ -2,8 +2,18 @@
  * Pure functions for building the question task list from extracted concepts.
  * No external dependencies — safe to unit-test in isolation.
  */
+import type { DifficultyMix } from "./generationConfig"
 import type { Concept, QuestionTask } from "../types/pipeline"
-import type { QuestionType } from "../types/questions"
+import type { Difficulty, QuestionType } from "../types/questions"
+
+const DIFFICULTIES: Difficulty[] = [ "easy", "medium", "hard" ]
+
+/** How many concepts a task of each tier may cover. */
+const CONCEPTS_PER_TIER: Record<Difficulty, number[]> = {
+  easy: [ 1, 2 ],
+  medium: [ 2 ],
+  hard: [ 2, 3 ],
+}
 
 /** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
 export function buildTypePool(count: number, enabledTypes: QuestionType[]): QuestionType[] {
@@ -16,6 +26,27 @@ export function buildTypePool(count: number, enabledTypes: QuestionType[]): Ques
     for (let j = 0; j < n; j++) pool.push(enabledTypes[i])
   }
   return pool
+}
+
+/**
+ * Builds a difficulty pool of exactly `count` items, split by `mix` weights
+ * (largest-remainder rounding, so the total is always `count`).
+ */
+export function buildDifficultyPool(count: number, mix: DifficultyMix): Difficulty[] {
+  const weights = DIFFICULTIES.map(d => mix[d])
+  if (weights.some(w => !Number.isFinite(w) || w < 0)) throw new Error("Difficulty weights must be non-negative numbers")
+  const total = weights.reduce((sum, w) => sum + w, 0)
+  if (total === 0) throw new Error("At least one difficulty weight must be positive")
+
+  const exact = weights.map(w => (w / total) * count)
+  const counts = exact.map(Math.floor)
+  const byRemainder = exact
+    .map((x, i) => ({ i, rem: x - counts[i] }))
+    .sort((a, b) => b.rem - a.rem)
+  const leftover = count - counts.reduce((sum, n) => sum + n, 0)
+  for (let k = 0; k < leftover; k++) counts[byRemainder[k].i]++
+
+  return DIFFICULTIES.flatMap((d, i) => Array<Difficulty>(counts[i]).fill(d))
 }
 
 export function shuffle<T>(arr: T[]): T[] {
@@ -43,32 +74,25 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concep
 }
 
 /**
- * Assigns one question type and 1–3 concepts to each task slot:
- * - builds a type pool from config
- * - 50% single-concept, 40% two-concept, 10% three-concept tasks
+ * Assigns one question type, one difficulty and 1–3 concepts to each task slot:
+ * - builds a type pool and a difficulty pool from config
+ * - concept count comes from the difficulty tier (easy 1–2, medium 2, hard 2–3),
+ *   capped by the number of available concepts
  * - spreads load across concepts weighted by importance
  * - guarantees each of the top-5 concepts appears at least once
  */
 export function buildQuestionTasks(
   concepts: Concept[],
-  config: { questionCount: number; enabledTypes: QuestionType[] },
+  config: { questionCount: number; enabledTypes: QuestionType[]; difficultyMix: DifficultyMix },
 ): QuestionTask[] {
   if (concepts.length === 0) throw new Error("No concepts to build tasks from")
 
-  const { questionCount: count, enabledTypes } = config
+  const { questionCount: count, enabledTypes, difficultyMix } = config
 
   const sorted = [ ...concepts ].sort((a, b) => b.importance - a.importance)
   const types = shuffle(buildTypePool(count, enabledTypes))
 
-  // Build slot-size pool: 50% single, 40% double, 10% triple
-  const singleCount = Math.round(count * 0.5)
-  const tripleCount = Math.max(0, Math.round(count * 0.1))
-  const doubleCount = count - singleCount - tripleCount
-  const slotSizes = shuffle([
-    ...Array<number>(singleCount).fill(1),
-    ...Array<number>(doubleCount).fill(2),
-    ...Array<number>(tripleCount).fill(3),
-  ])
+  const difficulties = shuffle(buildDifficultyPool(count, difficultyMix))
 
   const tasks: QuestionTask[] = []
   const conceptCounts = new Map<string, number>()
@@ -76,7 +100,9 @@ export function buildQuestionTasks(
 
   for (let i = 0; i < types.length; i++) {
     const type = types[i]
-    const size = sorted.length >= 2 ? (slotSizes[i] ?? 1) : 1
+    const difficulty = difficulties[i]
+    const sizes = CONCEPTS_PER_TIER[difficulty].filter(n => n <= sorted.length)
+    const size = sizes.length > 0 ? sizes[Math.floor(Math.random() * sizes.length)] : 1
 
     const slotConcepts: Concept[] = []
     const slotExclude = new Set<string>()
@@ -94,7 +120,7 @@ export function buildQuestionTasks(
       conceptCounts.set(concept.name, (conceptCounts.get(concept.name) ?? 0) + 1)
     }
 
-    tasks.push({ concepts: slotConcepts, type })
+    tasks.push({ concepts: slotConcepts, type, difficulty })
   }
 
   // Coverage pass: ensure top-5 concepts each appear at least once
@@ -117,7 +143,9 @@ export function buildQuestionTasks(
     })
 
     if (replaceIdx >= 0) {
-      tasks[replaceIdx] = { concepts: [ top ], type: tasks[replaceIdx].type }
+      // Swap only the lead concept so the tier's concept count is preserved
+      const replaced = tasks[replaceIdx]
+      tasks[replaceIdx] = { ...replaced, concepts: [ top, ...replaced.concepts.slice(1) ] }
     }
   }
 

@@ -52,7 +52,7 @@ function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
 }
 
 const concept: Concept = { name: "Concept", description: "x".repeat(40), importance: 0.5, misconceptions: [] }
-const task: QuestionTask = { concepts: [ concept ], type: "flashcard" }
+const task: QuestionTask = { concepts: [ concept ], type: "flashcard", difficulty: "easy" }
 
 function flashcard(front: string): GeneratedQuestion {
   return {
@@ -88,7 +88,7 @@ describe("runPipeline resume", () => {
       onProgress: vi.fn(),
     })
 
-    expect(result.questions).toEqual([ resumedQuestion, builtQuestion ])
+    expect(result.questions).toEqual([ { ...resumedQuestion, difficulty: "easy" }, { ...builtQuestion, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([
       [ resumedMeta ],
       [ builtMeta, reviewMeta ],

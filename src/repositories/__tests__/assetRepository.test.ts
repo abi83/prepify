@@ -24,7 +24,7 @@ beforeEach(async () => {
 })
 
 async function makeQuestion(userId: string, prepId: string) {
-  const [ question ] = await questionRepository.insertMany(userId, prepId, [ { type: "flashcard", content: {} } ])
+  const [ question ] = await questionRepository.insertMany(userId, prepId, [ { type: "flashcard", difficulty: "easy", content: {} } ])
   return question
 }
 

@@ -42,7 +42,7 @@ beforeEach(() => {
 describe("StudyPage — loaded with questions", () => {
   const questions: Question[] = [
     {
-      id: "q1", prepId: "test-prep-id", createdAt: new Date(0), type: "single_choice",
+      id: "q1", prepId: "test-prep-id", createdAt: new Date(0), difficulty: null, type: "single_choice",
       content: {
         question: "What is a cell?", rationale: "",
         answers: [
@@ -52,7 +52,7 @@ describe("StudyPage — loaded with questions", () => {
       },
     },
     {
-      id: "q2", prepId: "test-prep-id", createdAt: new Date(0), type: "flashcard",
+      id: "q2", prepId: "test-prep-id", createdAt: new Date(0), difficulty: null, type: "flashcard",
       content: { front: "Cell", back: "Basic unit of life" },
     },
   ]
