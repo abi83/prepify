@@ -33,10 +33,24 @@ export const DEFAULT_GEN_CONFIG: GenerationConfig = {
   difficultyMix: { easy: 3, medium: 4, hard: 3 },
 }
 
+function defaultConfig(): GenerationConfig {
+  return {
+    ...DEFAULT_GEN_CONFIG,
+    enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ],
+    difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix },
+  }
+}
+
+function isValidMix(mix: unknown): mix is DifficultyMix {
+  if (typeof mix !== "object" || mix === null) return false
+  const weights = [ "easy", "medium", "hard" ].map(d => (mix as Record<string, unknown>)[d])
+  return weights.every(w => typeof w === "number" && Number.isFinite(w) && w >= 0) && weights.some(w => (w as number) > 0)
+}
+
 export function getGenerationConfig(): GenerationConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ], difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix } }
+    if (!raw) return defaultConfig()
     const parsed = JSON.parse(raw) as Partial<GenerationConfig>
     const count = Number(parsed.questionCount)
     const enabledTypes = Array.isArray(parsed.enabledTypes)
@@ -47,10 +61,10 @@ export function getGenerationConfig(): GenerationConfig {
         ? Math.min(20, Math.max(5, count))
         : DEFAULT_GEN_CONFIG.questionCount,
       enabledTypes: enabledTypes.length > 0 ? enabledTypes : [ ...DEFAULT_GEN_CONFIG.enabledTypes ],
-      difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix },
+      difficultyMix: isValidMix(parsed.difficultyMix) ? parsed.difficultyMix : { ...DEFAULT_GEN_CONFIG.difficultyMix },
     }
   } catch {
-    return { ...DEFAULT_GEN_CONFIG, enabledTypes: [ ...DEFAULT_GEN_CONFIG.enabledTypes ], difficultyMix: { ...DEFAULT_GEN_CONFIG.difficultyMix } }
+    return defaultConfig()
   }
 }
 
