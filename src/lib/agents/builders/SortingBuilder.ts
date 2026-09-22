@@ -6,6 +6,7 @@ import type { QuestionTask } from "../../../types/pipeline"
 import { sortingContentSchema } from "../../../types/questions"
 import type { SortingContent } from "../../../types/questions"
 import { runAgent, AgentResult } from "../../agent"
+import type { Logger } from "../../logger"
 
 const responseSchema = z.object({ content: sortingContentSchema })
 
@@ -55,8 +56,9 @@ export async function runSortingBuilder(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ): Promise<AgentResult<{ type: "sorting"; content: SortingContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -67,6 +69,7 @@ export async function runSortingBuilder(
     apiKey,
     model,
     signal,
+    logger,
   })
   return { output: { type: "sorting", content: result.output.content }, meta: result.meta }
 }

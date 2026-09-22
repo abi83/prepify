@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { runAgent, AgentResult } from "../../agent"
+import type { Logger } from "../../logger"
 
 const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
@@ -38,7 +39,8 @@ export async function runDiagramAgent(
   description: string,
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "DiagramAgent",
@@ -48,6 +50,7 @@ export async function runDiagramAgent(
     apiKey,
     model,
     signal,
+    logger,
   })
 
   const blob = buildDiagramBlob(result.output.dsl)

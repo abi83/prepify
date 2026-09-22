@@ -6,6 +6,7 @@ import type { QuestionTask } from "../../../types/pipeline"
 import { multipleChoiceContentSchema } from "../../../types/questions"
 import type { MultipleChoiceContent } from "../../../types/questions"
 import { runAgent, AgentResult } from "../../agent"
+import type { Logger } from "../../logger"
 
 const responseSchema = z.object({ content: multipleChoiceContentSchema })
 
@@ -59,8 +60,9 @@ export async function runMultipleChoiceBuilder(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ): Promise<AgentResult<{ type: "multiple_choice"; content: MultipleChoiceContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -71,6 +73,7 @@ export async function runMultipleChoiceBuilder(
     apiKey,
     model,
     signal,
+    logger,
   })
   return { output: { type: "multiple_choice", content: result.output.content }, meta: result.meta }
 }

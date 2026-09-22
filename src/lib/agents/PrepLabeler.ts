@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { Concept } from "../../types/pipeline"
 import { runAgent, AgentResult } from "../agent"
+import type { Logger } from "../logger"
 
 export const DISCIPLINES = [
   "History",
@@ -58,7 +59,8 @@ export async function runPrepLabeler(
   concepts: Concept[],
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<PrepLabel>> {
   const conceptList = concepts
     .sort((a, b) => b.importance - a.importance)
@@ -74,5 +76,6 @@ export async function runPrepLabeler(
     apiKey,
     model,
     signal,
+    logger,
   })
 }

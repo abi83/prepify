@@ -4,6 +4,7 @@ import { runMoleculeAgent } from "./MoleculeAgent"
 import type { AssetHint, AssetType } from "../../../types/questions"
 import type { AgentResult } from "../../agent"
 import { EMPTY_AGENT_META } from "../../agent"
+import type { Logger } from "../../logger"
 
 export interface AssetOutput {
   type: AssetType
@@ -16,19 +17,20 @@ export async function routeAsset(
   hint: ActiveAssetHint,
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
   case "formula": {
-    const r = await runFormulaAgent(hint.description, apiKey, model, signal)
+    const r = await runFormulaAgent(hint.description, apiKey, model, signal, logger)
     return { output: { type: "formula", blob: r.output }, meta: r.meta }
   }
   case "molecule": {
-    const r = await runMoleculeAgent(hint.description, apiKey, model, signal)
+    const r = await runMoleculeAgent(hint.description, apiKey, model, signal, logger)
     return { output: { type: "molecule", blob: r.output }, meta: r.meta }
   }
   case "diagram": {
-    const r = await runDiagramAgent(hint.description, apiKey, model, signal)
+    const r = await runDiagramAgent(hint.description, apiKey, model, signal, logger)
     return { output: { type: "diagram", blob: r.output }, meta: r.meta }
   }
   case "table":

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { updatePrep } from "../actions/preps"
 import { runPrepLabeler, DISCIPLINES, type Discipline } from "../lib/agents/PrepLabeler"
 import { disciplineToEnum } from "../lib/disciplineMapping"
+import { consoleLogger } from "../lib/logger"
 import type { Concept } from "../types/pipeline"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -64,7 +65,7 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, apiKey, model, ac.signal).then(result => {
+    runPrepLabeler(concepts, apiKey, model, ac.signal, consoleLogger).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)

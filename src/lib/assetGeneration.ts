@@ -1,5 +1,7 @@
 import type { Question } from "@prisma/client"
 
+import { serializeError } from "./logger"
+import type { Logger } from "./logger"
 import { insertAsset } from "../actions/assets"
 import { recordGenerationMeta } from "../actions/generationMeta"
 import { incrementPrepTokens } from "../actions/preps"
@@ -21,7 +23,8 @@ export async function generateAndSaveAssets(
   prepId: string,
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<void> {
   const pending = questions
     .map(q => ({ q, hint: extractAssetHint(q) }))
@@ -34,7 +37,7 @@ export async function generateAndSaveAssets(
   await Promise.allSettled(
     pending.map(async ({ q, hint }) => {
       try {
-        const result = await routeAsset(hint, apiKey, model, signal)
+        const result = await routeAsset(hint, apiKey, model, signal, logger)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)
@@ -42,10 +45,10 @@ export async function generateAndSaveAssets(
         if (result.meta.totalTokens > 0) {
           void incrementPrepTokens(prepId, result.meta.totalTokens)
         }
-        void recordGenerationMeta("question", q.id, result.meta).catch(e => console.warn("[assets] failed to record GenerationMeta:", e))
+        void recordGenerationMeta("question", q.id, result.meta).catch(e => logger.warn("assets: failed to record GenerationMeta", { error: serializeError(e) }))
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
-          console.warn(`[assets] failed to generate asset for question ${q.id}:`, e)
+          logger.warn("assets: failed to generate asset", { questionId: q.id, error: serializeError(e) })
         }
       }
     })

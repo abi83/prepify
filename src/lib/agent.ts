@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
 import { z, ZodSchema } from "zod"
 
+import type { Logger } from "./logger"
 import { computeCost } from "./pricing"
 
 /**
@@ -58,7 +59,8 @@ interface RunAgentConfig<T> {
   schema: ZodSchema<T>
   apiKey: string
   model?: string
-  signal?: AbortSignal
+  signal: AbortSignal
+  logger: Logger
 }
 
 function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.ChatCompletionContentPart[] {
@@ -153,9 +155,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         executionMs,
       }
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[agent:${name}]`, meta)
-      }
+      config.logger.debug(`agent:${name}`, meta as Record<string, unknown>)
 
       return { output: validated, meta }
     } catch (err) {

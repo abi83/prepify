@@ -6,6 +6,7 @@ import type { QuestionTask } from "../../../types/pipeline"
 import { flashcardContentSchema } from "../../../types/questions"
 import type { FlashcardContent } from "../../../types/questions"
 import { runAgent, AgentResult } from "../../agent"
+import type { Logger } from "../../logger"
 
 const responseSchema = z.object({ content: flashcardContentSchema })
 
@@ -48,8 +49,9 @@ export async function runFlashcardBuilder(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ): Promise<AgentResult<{ type: "flashcard"; content: FlashcardContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -60,6 +62,7 @@ export async function runFlashcardBuilder(
     apiKey,
     model,
     signal,
+    logger,
   })
   return { output: { type: "flashcard", content: result.output.content }, meta: result.meta }
 }
