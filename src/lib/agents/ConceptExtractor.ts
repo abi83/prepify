@@ -3,6 +3,7 @@ import type { Concept } from "../../types/pipeline"
 import type { Page } from "../../types/prep"
 import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "../agent"
 import { CHUNK_SIZE } from "../config"
+import type { Logger } from "../logger"
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 
@@ -90,6 +91,7 @@ export async function runConceptExtractor(
   model: string,
   language: string,
   signal?: AbortSignal,
+  logger?: Logger,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
@@ -106,6 +108,7 @@ export async function runConceptExtractor(
       apiKey,
       model,
       signal,
+      logger,
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
     allConcepts.push(...filtered)

@@ -3,6 +3,7 @@ import { z } from "zod"
 import type { QuestionTask } from "../../types/pipeline"
 import type { GeneratedQuestion, QuestionType } from "../../types/questions"
 import { runAgent, AgentResult } from "../agent"
+import type { Logger } from "../logger"
 
 const TYPES_WITH_DISTRACTORS = new Set<QuestionType>([ "single_choice", "multiple_choice", "fill_the_gap" ])
 
@@ -124,6 +125,7 @@ export async function runQuestionReviewer(
   model: string,
   language: string,
   signal?: AbortSignal,
+  logger?: Logger,
 ): Promise<AgentResult<{ review: Review; passed: boolean }>> {
   const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({
@@ -137,6 +139,7 @@ export async function runQuestionReviewer(
     apiKey,
     model,
     signal,
+    logger,
   })
   return { output: { review: result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
 }

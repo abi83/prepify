@@ -244,7 +244,7 @@ describe("runPipeline reviewer rejection", () => {
     expect(buildFlashcard.mock.calls[1][5]).toEqual({ question: first, feedback: expect.stringContaining("overall") })
     expect(reviewQuestion).toHaveBeenCalledTimes(2)
     expect(reviewQuestion.mock.calls[1][0]).toBe(second)
-    expect(reviewQuestion.mock.calls[1]).toHaveLength(6) // no prior-review context passed
+    expect(reviewQuestion.mock.calls[1]).toHaveLength(7) // no prior-review context passed
     expect(result.questions).toEqual([ { ...second, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([ [ buildMeta2, reviewMeta2 ] ])
     expect(finishSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])

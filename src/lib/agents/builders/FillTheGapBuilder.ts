@@ -6,6 +6,7 @@ import type { QuestionTask } from "../../../types/pipeline"
 import { fillTheGapContentSchema } from "../../../types/questions"
 import type { FillTheGapContent } from "../../../types/questions"
 import { runAgent, AgentResult } from "../../agent"
+import type { Logger } from "../../logger"
 
 const responseSchema = z.object({ content: fillTheGapContentSchema })
 
@@ -57,6 +58,7 @@ export async function runFillTheGapBuilder(
   language: string,
   signal?: AbortSignal,
   rewrite?: RewriteInput,
+  logger?: Logger,
 ): Promise<AgentResult<{ type: "fill_the_gap"; content: FillTheGapContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -67,6 +69,7 @@ export async function runFillTheGapBuilder(
     apiKey,
     model,
     signal,
+    logger,
   })
   return { output: { type: "fill_the_gap", content: result.output.content }, meta: result.meta }
 }

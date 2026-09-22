@@ -1,5 +1,6 @@
 import type { AgentMeta, AgentResult } from "./agent"
-import { logger, serializeError } from "./logger"
+import { consoleLogger, serializeError } from "./logger"
+import type { Logger } from "./logger"
 import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
 import {
   loadOrCreateRun,
@@ -80,6 +81,7 @@ type BuilderFn = (
   language: string,
   signal?: AbortSignal,
   rewrite?: RewriteInput,
+  logger?: Logger,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
 const BUILDERS: Record<QuestionType, BuilderFn> = {
@@ -120,6 +122,7 @@ export interface PipelineConfig {
   /** Relative weights per difficulty tier (default 30/40/30). */
   difficultyMix?: DifficultyMix
   signal?: AbortSignal
+  logger?: Logger
   onProgress: (event: PipelineProgressEvent) => void
   /** Called as soon as title+description are ready — fires even if the pipeline is later cancelled. */
   onMetaReady?: (title: string, description: string) => void
@@ -127,6 +130,7 @@ export interface PipelineConfig {
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
   const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, difficultyMix, signal, onProgress, onMetaReady } = config
+  const logger = config.logger ?? consoleLogger
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -144,7 +148,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: "concepts" })
-    const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
+    const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal, logger)
     totalTokens += meta.totalTokens
     void incrementPrepTokens(prepId, meta.totalTokens)
     void recordGenerationMeta("prep", prepId, meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
@@ -153,10 +157,10 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
-      ? await runConceptMerger(deduped, apiKey, model, language, signal).then(r => {
+      ? await runConceptMerger(deduped, apiKey, model, language, signal, logger).then(r => {
         totalTokens += r.meta.totalTokens
         void incrementPrepTokens(prepId, r.meta.totalTokens)
-        void recordGenerationMeta("prep", prepId, r.meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
+        void recordGenerationMeta("prep", prepId, r.meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
         return r.output
       })
       : deduped
@@ -206,13 +210,13 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let prepTitle: string | null = null
   let prepDescription: string | null = null
 
-  const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal)
+  const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal, logger)
     .then(r => {
       prepTitle = r.output.title
       prepDescription = r.output.description
       totalTokens += r.meta.totalTokens
       void incrementPrepTokens(prepId, r.meta.totalTokens)
-      void recordGenerationMeta("prep", prepId, r.meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
+      void recordGenerationMeta("prep", prepId, r.meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
       onMetaReady?.(r.output.title, r.output.description)
     })
     .catch(() => null)
@@ -311,7 +315,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
           if (resumeBuild && attemptNum === startAttemptNum) {
             built = { output: resumeBuild.question, meta: resumeBuild.meta }
           } else {
-            built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite)
+            built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite, logger)
             attemptMeta.push(built.meta)
             trackTokens(built.meta)
             await saveAttemptBuild(runId, taskIdx, attemptNum, built.output, built.meta)
@@ -324,7 +328,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
             }
           }
 
-          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal)
+          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal, logger)
           attemptMeta.push(reviewed.meta)
           trackTokens(reviewed.meta)
           await saveAttemptReview(runId, taskIdx, attemptNum, reviewed.output.review, reviewed.output.passed, reviewed.meta)

@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-import { logger, serializeError } from "@/lib/logger"
+import { serializeError } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
 import { withHandler } from "@/lib/withHandler"
 
-export const GET = withHandler(async (_req: NextRequest) => {
+export const GET = withHandler(async (_req: NextRequest, logger) => {
   try {
     await prisma.$queryRaw`SELECT 1`
     return NextResponse.json({ status: "ok" })
