@@ -2,9 +2,10 @@
  * Pure functions for building the question task list from extracted concepts.
  * No external dependencies — safe to unit-test in isolation.
  */
-import type { DifficultyMix } from "./generationConfig"
 import type { Concept, QuestionTask } from "@/types/pipeline"
 import type { Difficulty, QuestionType } from "@/types/questions"
+
+import type { DifficultyMix } from "./generationConfig"
 
 const DIFFICULTIES: Difficulty[] = [ "easy", "medium", "hard" ]
 

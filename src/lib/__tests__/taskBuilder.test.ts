@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 
+import { buildDifficultyPool, buildQuestionTasks } from "@/lib/taskBuilder"
 import type { Concept } from "@/types/pipeline"
 import type { Difficulty } from "@/types/questions"
-import { buildDifficultyPool, buildQuestionTasks } from "@/lib/taskBuilder"
 
 const MIX = { easy: 3, medium: 4, hard: 3 }
 

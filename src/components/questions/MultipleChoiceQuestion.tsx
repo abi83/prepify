@@ -1,5 +1,6 @@
-import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
 import type { MultipleChoiceContent } from "@/types/questions"
+
+import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
 
 interface Props {
   content: MultipleChoiceContent

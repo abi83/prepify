@@ -1,12 +1,13 @@
 import type { Question } from "@prisma/client"
 
-import { serializeError } from "./logger"
-import type { Logger } from "./logger"
 import { insertAsset } from "@/actions/assets"
 import { recordGenerationMeta } from "@/actions/generationMeta"
 import { incrementPrepTokens } from "@/actions/preps"
 import type { AssetHint } from "@/types/questions"
+
 import { routeAsset, type ActiveAssetHint } from "./agents/assets/assetRouter"
+import type { Logger } from "./logger"
+import { serializeError } from "./logger"
 
 function extractAssetHint(question: Question): AssetHint | null {
   const content = question.content as Record<string, unknown>

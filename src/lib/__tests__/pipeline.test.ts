@@ -52,12 +52,13 @@ vi.mock("@/lib/agents/QuestionReviewer", async importOriginal => ({
   runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args),
 }))
 
-import type { PipelineSlotState } from "@/repositories/pipelineRepository"
-import type { PipelineAttempt } from "@/types/pipeline"
-import type { GeneratedQuestion } from "@/types/questions"
 import type { AgentMeta } from "@/lib/agent"
 import { consoleLogger } from "@/lib/logger"
 import { runPipeline } from "@/lib/pipeline"
+import type { PipelineSlotState } from "@/repositories/pipelineRepository"
+import type { PipelineAttempt } from "@/types/pipeline"
+import type { GeneratedQuestion } from "@/types/questions"
+
 import { concept, flashcard, meta, review, task } from "./pipelineFixtures"
 
 function reviewedOutput(passed: boolean) {

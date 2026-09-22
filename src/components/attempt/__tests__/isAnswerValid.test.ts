@@ -5,8 +5,8 @@ vi.mock("@/actions/attempts", () => ({
   insertAttempt: vi.fn().mockResolvedValue({}),
 }))
 
-import { emptyAnswer } from "@/components/questions/QuestionBody"
 import { isAnswerValid } from "@/components/attempt/AttemptFlow"
+import { emptyAnswer } from "@/components/questions/QuestionBody"
 
 const NO_ASSET = { needed: false, type: null, description: null } as const
 

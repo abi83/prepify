@@ -1,12 +1,13 @@
 import { z } from "zod"
 
-import { difficultyInstructions } from "./difficulty"
-import { rewriteInstructions, type RewriteInput } from "./rewrite"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
 import type { QuestionTask } from "@/types/pipeline"
 import { fillTheGapContentSchema } from "@/types/questions"
 import type { FillTheGapContent } from "@/types/questions"
-import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
+
+import { difficultyInstructions } from "./difficulty"
+import { rewriteInstructions, type RewriteInput } from "./rewrite"
 
 const responseSchema = z.object({ content: fillTheGapContentSchema })
 

@@ -1,7 +1,6 @@
-import { cn } from "@/lib/utils"
-
-import type { FillTheGapContent } from "@/types/questions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import type { FillTheGapContent } from "@/types/questions"
 
 interface Props {
   content: FillTheGapContent

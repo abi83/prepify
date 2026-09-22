@@ -1,9 +1,8 @@
 import { useState } from "react"
 
-import { cn } from "@/lib/utils"
-
-import type { FlashcardContent } from "@/types/questions"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import type { FlashcardContent } from "@/types/questions"
 
 interface Props {
   cards: FlashcardContent[]
