@@ -90,8 +90,8 @@ export async function runConceptExtractor(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""

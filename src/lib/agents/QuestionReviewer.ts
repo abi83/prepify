@@ -124,8 +124,8 @@ export async function runQuestionReviewer(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<{ review: Review; passed: boolean }>> {
   const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({

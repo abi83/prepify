@@ -17,8 +17,8 @@ export async function routeAsset(
   hint: ActiveAssetHint,
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
   case "formula": {

@@ -59,8 +59,8 @@ export async function runPrepLabeler(
   concepts: Concept[],
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<PrepLabel>> {
   const conceptList = concepts
     .sort((a, b) => b.importance - a.importance)

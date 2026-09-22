@@ -57,9 +57,9 @@ export async function runSingleChoiceBuilder(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
-  logger?: Logger,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ): Promise<AgentResult<{ type: "single_choice"; content: SingleChoiceContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({

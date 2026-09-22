@@ -60,9 +60,9 @@ export async function runMultipleChoiceBuilder(
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
-  logger?: Logger,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ): Promise<AgentResult<{ type: "multiple_choice"; content: MultipleChoiceContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({

@@ -55,7 +55,8 @@ export async function runOcrAgent(
   images: AgentImage[],
   apiKey: string,
   model: string,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: "ocr",
@@ -64,6 +65,7 @@ export async function runOcrAgent(
     schema: ocrSchema,
     apiKey,
     model,
+    signal,
     logger,
   })
 

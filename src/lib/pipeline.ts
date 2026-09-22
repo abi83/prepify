@@ -1,5 +1,5 @@
 import type { AgentMeta, AgentResult } from "./agent"
-import { consoleLogger, serializeError } from "./logger"
+import { serializeError } from "./logger"
 import type { Logger } from "./logger"
 import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
 import {
@@ -79,9 +79,9 @@ type BuilderFn = (
   apiKey: string,
   model: string,
   language: string,
-  signal?: AbortSignal,
-  rewrite?: RewriteInput,
-  logger?: Logger,
+  signal: AbortSignal,
+  rewrite: RewriteInput | undefined,
+  logger: Logger,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
 const BUILDERS: Record<QuestionType, BuilderFn> = {
@@ -122,15 +122,15 @@ export interface PipelineConfig {
   /** Relative weights per difficulty tier (default 30/40/30). */
   difficultyMix?: DifficultyMix
   signal?: AbortSignal
-  logger?: Logger
+  logger: Logger
   onProgress: (event: PipelineProgressEvent) => void
   /** Called as soon as title+description are ready — fires even if the pipeline is later cancelled. */
   onMetaReady?: (title: string, description: string) => void
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, difficultyMix, signal, onProgress, onMetaReady } = config
-  const logger = config.logger ?? consoleLogger
+  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, difficultyMix, logger, onProgress, onMetaReady } = config
+  const signal = config.signal ?? new AbortController().signal
   let totalTokens = 0
 
   const totalTextLength = pages.reduce((sum, p) => sum + p.text.length, 0)
@@ -349,7 +349,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
         } catch (e) {
           recordWasted(attemptMeta)
           // A cancelled pipeline isn't a failed slot; runAgent has already exhausted its own retries otherwise.
-          if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) throw e
+          if (signal.aborted || (e instanceof Error && e.name === "AbortError")) throw e
           logger.warn("pipeline: slot attempt failed", { taskIdx, attemptNum, error: serializeError(e) })
           break
         }

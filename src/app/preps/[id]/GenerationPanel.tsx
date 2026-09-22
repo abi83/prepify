@@ -17,6 +17,7 @@ import { generateAndSaveAssets } from "@/lib/assetGeneration"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
+import { consoleLogger } from "@/lib/logger"
 import { runPipeline, TextTooLongError } from "@/lib/pipeline"
 import { cn } from "@/lib/utils"
 import type { PartialRunSummary } from "@/repositories/pipelineRepository"
@@ -102,6 +103,7 @@ export default function GenerationPanel({
         enabledTypes: localConfig.enabledTypes,
         difficultyMix: localConfig.difficultyMix,
         signal: abortRef.current.signal,
+        logger: consoleLogger,
         onProgress: (event) => {
           setPipelineProgress(event)
           if (event.stage === "crafting") setCraftProgress({ done: event.done, total: event.total })
@@ -124,7 +126,7 @@ export default function GenerationPanel({
       )
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, abortRef.current?.signal)
+        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, abortRef.current.signal, consoleLogger)
       }
 
       const freshPrep = await getMyPrep(prepId)

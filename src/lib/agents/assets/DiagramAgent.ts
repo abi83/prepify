@@ -39,8 +39,8 @@ export async function runDiagramAgent(
   description: string,
   apiKey: string,
   model: string,
-  signal?: AbortSignal,
-  logger?: Logger,
+  signal: AbortSignal,
+  logger: Logger,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "DiagramAgent",
