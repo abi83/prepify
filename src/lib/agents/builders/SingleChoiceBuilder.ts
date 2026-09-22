@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { difficultyInstructions } from "./difficulty"
+import { rewriteInstructions, type RewriteInput } from "./rewrite"
 import type { QuestionTask } from "../../../types/pipeline"
 import { singleChoiceContentSchema } from "../../../types/questions"
 import type { SingleChoiceContent } from "../../../types/questions"
@@ -56,12 +57,13 @@ export async function runSingleChoiceBuilder(
   model: string,
   language: string,
   signal?: AbortSignal,
+  rewrite?: RewriteInput,
 ): Promise<AgentResult<{ type: "single_choice"; content: SingleChoiceContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
     name: "SingleChoiceBuilder",
     systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "with-distractors")}` },
+    userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "with-distractors")}${rewriteInstructions(rewrite)}` },
     schema: responseSchema,
     apiKey,
     model,

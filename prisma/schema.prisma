@@ -131,6 +131,8 @@ model GenerationMeta {
   costUsd          Float
   toolCalls        Int
   executionMs      Int
+  // Billed but discarded: the call's output isn't the one that became the final Question.
+  wasted           Boolean              @default(false)
   generatedAt      DateTime             @default(now())
 
   @@index([entityType, entityId])

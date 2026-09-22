@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+const recordGenerationMeta = vi.fn().mockResolvedValue(undefined)
+const recordGenerationMetaMany = vi.fn().mockResolvedValue(undefined)
 vi.mock("../../actions/generationMeta", () => ({
-  recordGenerationMeta: vi.fn().mockResolvedValue(undefined),
+  recordGenerationMeta: (...args: unknown[]) => recordGenerationMeta(...args),
+  recordGenerationMetaMany: (...args: unknown[]) => recordGenerationMetaMany(...args),
 }))
 
 const saveQuestionSlot = vi.fn().mockResolvedValue(undefined)
@@ -36,7 +39,10 @@ vi.mock("../agents/builders/FillTheGapBuilder", () => ({ runFillTheGapBuilder: v
 vi.mock("../agents/builders/SortingBuilder", () => ({ runSortingBuilder: vi.fn() }))
 
 const reviewQuestion = vi.fn()
-vi.mock("../agents/QuestionReviewer", () => ({ runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args) }))
+vi.mock("../agents/QuestionReviewer", async importOriginal => ({
+  ...await importOriginal<typeof import("../agents/QuestionReviewer")>(),
+  runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args),
+}))
 
 import type { Concept, QuestionTask } from "../../types/pipeline"
 import type { GeneratedQuestion } from "../../types/questions"
@@ -61,8 +67,37 @@ function flashcard(front: string): GeneratedQuestion {
   }
 }
 
+function review(passed: boolean) {
+  const metric = { score: passed ? 1 : 0.5, comment: "c" }
+  return {
+    review: { scores: { correctness: metric, conceptAlignment: metric, clarity: metric, cognitiveDemand: metric, distractorQuality: null }, comment: "overall" },
+    passed,
+  }
+}
+
+function singleSlotRun() {
+  loadOrCreateRun.mockResolvedValue({
+    runId: "run-1",
+    concepts: [ concept ],
+    questionTasks: [ task ],
+    questionSlots: new Map([ [ 0, null ] ]),
+    slotMeta: new Map([ [ 0, [] ] ]),
+  })
+}
+
+function run() {
+  return runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", onProgress: vi.fn() })
+}
+
+/** Every `metas` argument recordGenerationMetaMany was called with, wasted calls only, flattened in call order. */
+function wastedMetas(): AgentMeta[] {
+  return recordGenerationMetaMany.mock.calls.filter(c => c[3] === true).flatMap(c => c[2])
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  buildFlashcard.mockReset()
+  reviewQuestion.mockReset()
 })
 
 describe("runPipeline resume", () => {
@@ -83,11 +118,7 @@ describe("runPipeline resume", () => {
     const builtQuestion = flashcard("built")
     buildFlashcard.mockResolvedValue({ output: builtQuestion, meta: builtMeta })
     reviewQuestion.mockResolvedValue({
-      output: {
-        question: builtQuestion,
-        scores: { correctness: 1, conceptAlignment: 1, clarity: 1, cognitiveDemand: 1, distractorQuality: null },
-        passed: true,
-      },
+      output: review(true),
       meta: reviewMeta,
     })
 
@@ -109,45 +140,88 @@ describe("runPipeline resume", () => {
 })
 
 describe("runPipeline reviewer rejection", () => {
-  it("rebuilds once, unreviewed, when the reviewer's score doesn't pass, and uses the rebuild as-is", async () => {
-    const builtMeta = meta({ model: "build-model" })
-    const reviewMeta = meta({ model: "review-model" })
-    const retryMeta = meta({ model: "retry-model" })
+  const buildMeta1 = meta({ model: "build-1" })
+  const reviewMeta1 = meta({ model: "review-1" })
+  const buildMeta2 = meta({ model: "build-2" })
+  const reviewMeta2 = meta({ model: "review-2" })
+  const first = flashcard("first")
+  const second = flashcard("second")
 
-    loadOrCreateRun.mockResolvedValue({
-      runId: "run-1",
-      concepts: [ concept ],
-      questionTasks: [ task ],
-      questionSlots: new Map([ [ 0, null ] ]),
-      slotMeta: new Map([ [ 0, [] ] ]),
-    })
-
-    const rejectedQuestion = flashcard("rejected")
-    const retryQuestion = flashcard("retry")
+  beforeEach(() => {
+    singleSlotRun()
     buildFlashcard
-      .mockResolvedValueOnce({ output: rejectedQuestion, meta: builtMeta })
-      .mockResolvedValueOnce({ output: retryQuestion, meta: retryMeta })
-    reviewQuestion.mockResolvedValue({
-      output: {
-        question: rejectedQuestion,
-        scores: { correctness: 0.5, conceptAlignment: 0.5, clarity: 0.5, cognitiveDemand: 0.5, distractorQuality: null },
-        passed: false,
-      },
-      meta: reviewMeta,
-    })
+      .mockResolvedValueOnce({ output: first, meta: buildMeta1 })
+      .mockResolvedValueOnce({ output: second, meta: buildMeta2 })
+  })
 
-    const result = await runPipeline({
-      prepId: "prep-1",
-      pages: [],
-      apiKey: "key",
-      model: "model",
-      onProgress: vi.fn(),
-    })
+  it("rewrites with the reviewer's feedback and reviews the rewrite independently; ships a passing rewrite", async () => {
+    reviewQuestion
+      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: review(true), meta: reviewMeta2 })
+
+    const result = await run()
+
+    expect(buildFlashcard.mock.calls[1][5]).toEqual({ question: first, feedback: expect.stringContaining("overall") })
+    expect(reviewQuestion).toHaveBeenCalledTimes(2)
+    expect(reviewQuestion.mock.calls[1][0]).toBe(second)
+    expect(reviewQuestion.mock.calls[1]).toHaveLength(6) // no prior-review context passed
+    expect(result.questions).toEqual([ { ...second, difficulty: "easy" } ])
+    expect(result.questionMeta).toEqual([ [ buildMeta2, reviewMeta2 ] ])
+    expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])
+  })
+
+  it("flags the discarded first attempt's calls as wasted when the rewrite ships", async () => {
+    reviewQuestion
+      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: review(true), meta: reviewMeta2 })
+
+    await run()
+
+    expect(wastedMetas()).toEqual([ buildMeta1, reviewMeta1 ])
+    expect(recordGenerationMetaMany.mock.calls.every(c => c[0] === "prep")).toBe(true)
+  })
+
+  it("fails the slot after a second rejection, with no third attempt and all calls flagged wasted", async () => {
+    reviewQuestion
+      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta2 })
+
+    const result = await run()
 
     expect(buildFlashcard).toHaveBeenCalledTimes(2)
-    expect(reviewQuestion).toHaveBeenCalledTimes(1)
-    expect(result.questions).toEqual([ { ...retryQuestion, difficulty: "easy" } ])
-    expect(result.questionMeta).toEqual([ [ builtMeta, reviewMeta, retryMeta ] ])
-    expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 0, retryQuestion, [ builtMeta, reviewMeta, retryMeta ])
+    expect(result.questions).toEqual([])
+    expect(saveQuestionSlot).not.toHaveBeenCalled()
+    expect(wastedMetas()).toEqual([ buildMeta1, reviewMeta1, buildMeta2, reviewMeta2 ])
+  })
+})
+
+describe("runPipeline agent failure", () => {
+  it("fails the slot without a rewrite when an agent call throws, flagging completed calls wasted", async () => {
+    singleSlotRun()
+    const buildMeta1 = meta({ model: "build-1" })
+    buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: buildMeta1 })
+    reviewQuestion.mockRejectedValue(new Error("invalid JSON after retries"))
+    vi.spyOn(console, "warn").mockImplementation(() => undefined)
+
+    const result = await run()
+
+    expect(buildFlashcard).toHaveBeenCalledTimes(1)
+    expect(result.questions).toEqual([])
+    expect(wastedMetas()).toEqual([ buildMeta1 ])
+  })
+
+  it("propagates cancellation, still flagging the calls it already billed as wasted", async () => {
+    singleSlotRun()
+    const buildMeta1 = meta({ model: "build-1" })
+    buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: buildMeta1 })
+    const abort = new Error("aborted")
+    abort.name = "AbortError"
+    reviewQuestion.mockRejectedValue(abort)
+    vi.spyOn(console, "warn").mockImplementation(() => undefined)
+
+    const result = await run()
+
+    expect(result.questions).toEqual([])
+    expect(wastedMetas()).toEqual([ buildMeta1 ])
   })
 })

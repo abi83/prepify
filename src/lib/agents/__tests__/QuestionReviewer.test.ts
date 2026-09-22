@@ -1,52 +1,68 @@
 import { describe, it, expect } from "vitest"
 
-import { assertDistractorQualityShape, passesReview } from "../QuestionReviewer"
-import type { ReviewScores } from "../QuestionReviewer"
+import { hasValidDistractorShape, passesReview, reviewFeedback } from "../QuestionReviewer"
+import type { Review, ReviewScores } from "../QuestionReviewer"
 
-function scores(overrides: Partial<ReviewScores> = {}): ReviewScores {
+function scores(values: Partial<Record<keyof ReviewScores, number | null>> = {}): ReviewScores {
+  const value = (key: keyof ReviewScores) => {
+    const v = key in values ? values[key] : 1
+    return v === null ? null : { score: v as number, comment: `${key} comment` }
+  }
   return {
-    correctness: 1,
-    conceptAlignment: 1,
-    clarity: 1,
-    cognitiveDemand: 1,
-    distractorQuality: 1,
-    ...overrides,
+    correctness: value("correctness")!,
+    conceptAlignment: value("conceptAlignment")!,
+    clarity: value("clarity")!,
+    cognitiveDemand: value("cognitiveDemand")!,
+    distractorQuality: value("distractorQuality"),
   }
 }
 
 describe("passesReview", () => {
-  it("passes when every applicable metric is at or above threshold", () => {
-    expect(passesReview(scores({ correctness: 0.9, conceptAlignment: 0.8, clarity: 0.8, cognitiveDemand: 0.8, distractorQuality: 0.8 }))).toBe(true)
+  it("passes when every metric clears its floor and the average clears the average floor", () => {
+    expect(passesReview(scores({ correctness: 0.95, conceptAlignment: 0.85, clarity: 0.85, cognitiveDemand: 0.85, distractorQuality: 0.85 }))).toBe(true)
   })
 
-  it("fails on a high average if correctness is below the floor", () => {
-    expect(passesReview(scores({ correctness: 0.7, conceptAlignment: 1, clarity: 1, cognitiveDemand: 1, distractorQuality: 1 }))).toBe(false)
+  it("fails when correctness is below its floor despite a high average", () => {
+    expect(passesReview(scores({ correctness: 0.8 }))).toBe(false)
   })
 
-  it("fails when correctness is high but the average is below the pass threshold", () => {
-    expect(passesReview(scores({ correctness: 1, conceptAlignment: 0.3, clarity: 0.3, cognitiveDemand: 0.3, distractorQuality: 0.3 }))).toBe(false)
+  it("fails when any other metric is below its floor despite a high average", () => {
+    expect(passesReview(scores({ clarity: 0.6 }))).toBe(false)
+  })
+
+  it("fails when every floor is met but the average is below the average floor", () => {
+    expect(passesReview(scores({ correctness: 0.9, conceptAlignment: 0.8, clarity: 0.8, cognitiveDemand: 0.8, distractorQuality: 0.8 }))).toBe(false)
   })
 
   it("excludes a null distractorQuality from the average instead of counting it as 0", () => {
-    const withNullDistractor = scores({ correctness: 0.9, conceptAlignment: 0.8, clarity: 0.8, cognitiveDemand: 0.8, distractorQuality: null })
-    expect(passesReview(withNullDistractor)).toBe(true)
+    expect(passesReview(scores({ distractorQuality: null }))).toBe(true)
   })
 })
 
-describe("assertDistractorQualityShape", () => {
-  it("accepts a number for a choice-based type", () => {
-    expect(() => assertDistractorQualityShape("single_choice", scores({ distractorQuality: 0.7 }))).not.toThrow()
+describe("hasValidDistractorShape", () => {
+  it("accepts a score for a choice-based type", () => {
+    expect(hasValidDistractorShape("single_choice", scores())).toBe(true)
   })
 
   it("accepts null for a type with no distractors", () => {
-    expect(() => assertDistractorQualityShape("flashcard", scores({ distractorQuality: null }))).not.toThrow()
+    expect(hasValidDistractorShape("flashcard", scores({ distractorQuality: null }))).toBe(true)
   })
 
-  it("throws when a choice-based type gets a null distractorQuality", () => {
-    expect(() => assertDistractorQualityShape("multiple_choice", scores({ distractorQuality: null }))).toThrow()
+  it("rejects null for a choice-based type", () => {
+    expect(hasValidDistractorShape("multiple_choice", scores({ distractorQuality: null }))).toBe(false)
   })
 
-  it("throws when a type with no distractors gets a numeric distractorQuality", () => {
-    expect(() => assertDistractorQualityShape("sorting", scores({ distractorQuality: 0.5 }))).toThrow()
+  it("rejects a score for a type with no distractors", () => {
+    expect(hasValidDistractorShape("sorting", scores())).toBe(false)
+  })
+})
+
+describe("reviewFeedback", () => {
+  it("lists the global comment and each applicable metric, skipping a null distractorQuality", () => {
+    const review: Review = { scores: scores({ clarity: 0.5, distractorQuality: null }), comment: "Tighten the stem." }
+    const feedback = reviewFeedback(review)
+    expect(feedback).toContain("Tighten the stem.")
+    expect(feedback).toContain("clarity: 0.50 — clarity comment")
+    expect(feedback).not.toContain("distractorQuality")
   })
 })

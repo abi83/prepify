@@ -1,5 +1,5 @@
 import type { AgentMeta, AgentResult } from "./agent"
-import { recordGenerationMeta } from "../actions/generationMeta"
+import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -13,12 +13,13 @@ import type { Difficulty, GeneratedQuestion, QuestionType } from "../types/quest
 import { runFillTheGapBuilder } from "./agents/builders/FillTheGapBuilder"
 import { runFlashcardBuilder } from "./agents/builders/FlashcardBuilder"
 import { runMultipleChoiceBuilder } from "./agents/builders/MultipleChoiceBuilder"
+import type { RewriteInput } from "./agents/builders/rewrite"
 import { runSingleChoiceBuilder } from "./agents/builders/SingleChoiceBuilder"
 import { runSortingBuilder } from "./agents/builders/SortingBuilder"
 import { runConceptExtractor } from "./agents/ConceptExtractor"
 import { runConceptMerger } from "./agents/ConceptMerger"
 import { runPrepNamer } from "./agents/PrepNamer"
-import { runQuestionReviewer } from "./agents/QuestionReviewer"
+import { reviewFeedback, runQuestionReviewer } from "./agents/QuestionReviewer"
 import { BYOK_TEXT_HARD_LIMIT } from "./config"
 import { DEFAULT_GEN_CONFIG, type DifficultyMix } from "./generationConfig"
 import { deduplicateExact } from "./mergeConceptLists"
@@ -34,6 +35,9 @@ export class TextTooLongError extends Error {
 
 /** Maximum number of concurrent build→review→save chains. */
 const CONCURRENCY = 5
+
+/** Bounded build→review chain per slot: an initial attempt, plus one reviewed rewrite on rejection. */
+const MAX_SLOT_ATTEMPTS = 2
 
 /**
  * Runs `tasks` with at most `limit` concurrent executions.
@@ -70,6 +74,7 @@ type BuilderFn = (
   model: string,
   language: string,
   signal?: AbortSignal,
+  rewrite?: RewriteInput,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
 const BUILDERS: Record<QuestionType, BuilderFn> = {
@@ -201,9 +206,9 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   // Stage 3: Build + review all missing slots in parallel.
   //
-  // Each slot is a self-contained async pipeline: build → review → persist.
-  // allSettled isolates failures per slot — a bad LLM response only kills
-  // that one question; the others save normally and are skipped on retry.
+  // Each slot is a self-contained async pipeline: build → review, then at most one
+  // reviewed rewrite → persist. A slot whose calls fail or whose rewrite is rejected
+  // is dropped; the others save normally and are skipped on retry.
   //
   // Counters increment per-question (not per-batch) so crafting and reviewing
   // progress advance concurrently as soon as each individual step finishes.
@@ -224,39 +229,62 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   const settled = await withConcurrency(
     missingIndices.map((taskIdx) => async () => {
       const task = tasks[taskIdx]
-      const metas: AgentMeta[] = []
+      const trackTokens = (meta: AgentMeta) => {
+        totalTokens += meta.totalTokens
+        void incrementPrepTokens(prepId, meta.totalTokens)
+      }
 
-      // Build
-      const buildResult = await BUILDERS[task.type](task, apiKey, model, language, signal)
-      totalTokens += buildResult.meta.totalTokens
-      void incrementPrepTokens(prepId, buildResult.meta.totalTokens)
-      metas.push(buildResult.meta)
-      craftDone++
-      onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
+      // Every call whose output isn't the final Question is billed-but-discarded — recorded
+      // as soon as an attempt is superseded or fails, not diffed at the end, so a cancellation
+      // or a future extra attempt can't leave calls unaccounted for.
+      const recordWasted = (metas: AgentMeta[]) => {
+        void recordGenerationMetaMany("prep", prepId, metas, true).catch(e => console.warn("[pipeline] failed to record wasted GenerationMeta:", e))
+      }
 
-      // Review immediately — no waiting for other slots to finish building
-      const reviewed = await runQuestionReviewer(buildResult.output, task, apiKey, model, language, signal)
-      totalTokens += reviewed.meta.totalTokens
-      void incrementPrepTokens(prepId, reviewed.meta.totalTokens)
-      metas.push(reviewed.meta)
+      let final: { question: GeneratedQuestion; meta: AgentMeta[] } | null = null
+      let rewrite: RewriteInput | undefined
 
-      let question: GeneratedQuestion
-      if (!reviewed.output.passed) {
-        // Retry build once on reviewer rejection — still a single unreviewed retry; #212 replaces this with a reviewed rewrite loop
-        const retry = await BUILDERS[task.type](task, apiKey, model, language, signal)
-        totalTokens += retry.meta.totalTokens
-        void incrementPrepTokens(prepId, retry.meta.totalTokens)
-        metas.push(retry.meta)
-        question = retry.output
-      } else {
-        question = reviewed.output.question
+      for (let attemptNum = 1; attemptNum <= MAX_SLOT_ATTEMPTS && !final; attemptNum++) {
+        const attemptMeta: AgentMeta[] = []
+        try {
+          const built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite)
+          attemptMeta.push(built.meta)
+          trackTokens(built.meta)
+          if (attemptNum === 1) {
+            craftDone++
+            onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
+          }
+
+          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal)
+          attemptMeta.push(reviewed.meta)
+          trackTokens(reviewed.meta)
+
+          if (reviewed.output.passed) {
+            final = { question: built.output, meta: attemptMeta }
+          } else {
+            recordWasted(attemptMeta)
+            rewrite = { question: built.output, feedback: reviewFeedback(reviewed.output.review) }
+          }
+        } catch (e) {
+          recordWasted(attemptMeta)
+          // A cancelled pipeline isn't a failed slot; runAgent has already exhausted its own retries otherwise.
+          if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) throw e
+          console.warn(`[pipeline] slot ${taskIdx} attempt ${attemptNum} failed:`, e)
+          break
+        }
+      }
+
+      reviewDone++
+      onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
+
+      if (!final) {
+        // TODO(#212): failed slots aren't persisted or shown yet; they rerun on resume.
+        return
       }
 
       // Persist before marking in-memory — if save throws the slot stays null in DB
-      await saveQuestionSlot(runId, taskIdx, question, metas)
-      slots.set(taskIdx, { question, meta: metas })
-      reviewDone++
-      onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
+      await saveQuestionSlot(runId, taskIdx, final.question, final.meta)
+      slots.set(taskIdx, { question: final.question, meta: final.meta })
     }),
     CONCURRENCY,
   )

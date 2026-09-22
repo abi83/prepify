@@ -13,7 +13,19 @@ export async function recordGenerationMeta(
   entityType: GenerationEntityType,
   entityId: string,
   meta: AgentMeta,
+  wasted = false,
 ): Promise<void> {
   if (meta.promptTokens + meta.completionTokens + meta.cachedTokens === 0) return
-  await generationMetaRepository.record(toGenerationMeta(entityType, entityId, meta))
+  await generationMetaRepository.record(toGenerationMeta(entityType, entityId, meta, wasted))
+}
+
+/** Batched variant of `recordGenerationMeta` — one round-trip for several metas against the same entity. */
+export async function recordGenerationMetaMany(
+  entityType: GenerationEntityType,
+  entityId: string,
+  metas: AgentMeta[],
+  wasted = false,
+): Promise<void> {
+  const billed = metas.filter(m => m.promptTokens + m.completionTokens + m.cachedTokens > 0)
+  await generationMetaRepository.recordMany(billed.map(m => toGenerationMeta(entityType, entityId, m, wasted)))
 }
