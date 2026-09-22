@@ -1,15 +1,15 @@
 import type { Question, Asset } from "@prisma/client"
 import { useState } from "react"
 
-import { cn } from "@/lib/utils"
-
-import ScoreScreen from "./ScoreScreen"
 import { insertAttempt } from "@/actions/attempts"
-import { isAnswerCorrect } from "@/lib/scoring"
-import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
 import QuestionBody, { AnswerState, emptyAnswer } from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { isAnswerCorrect } from "@/lib/scoring"
+import { cn } from "@/lib/utils"
+import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
+
+import ScoreScreen from "./ScoreScreen"
 
 function shuffleArray<T>(arr: T[]): T[] {
   const result = [ ...arr ]

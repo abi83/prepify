@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
+import CatalogPage from "@/app/catalog/CatalogPage"
 import type { CatalogEntry } from "@/repositories/prepRepository"
 import { createNavigationMock } from "@/testUtils/navigationMock"
 
@@ -14,8 +15,6 @@ vi.mock("next/navigation", () => {
   mocks.nav = createNavigationMock()
   return mocks.nav
 })
-
-import CatalogPage from "@/app/catalog/CatalogPage"
 
 function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {
