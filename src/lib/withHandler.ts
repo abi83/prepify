@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-import { createLogger, parseTraceparent, serializeError } from "./logger"
+import { parseTraceparent, serializeError } from "./logger"
 import type { Logger } from "./logger"
+import { createLogger } from "./logger/core"
 
 type WrappedHandler = (req: NextRequest, logger: Logger) => Promise<NextResponse>
 

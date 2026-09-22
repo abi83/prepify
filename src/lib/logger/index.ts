@@ -1,4 +1,3 @@
-export { createLogger, type LoggerOptions } from "./core"
 export { consoleLogger } from "./console"
 export { parseTraceparent } from "./traceparent"
 export { serializeError } from "./serialize"
