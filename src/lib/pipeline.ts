@@ -1,4 +1,5 @@
 import type { AgentMeta, AgentResult } from "./agent"
+import { logger, serializeError } from "./logger"
 import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
 import {
   loadOrCreateRun,
@@ -146,7 +147,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal)
     totalTokens += meta.totalTokens
     void incrementPrepTokens(prepId, meta.totalTokens)
-    void recordGenerationMeta("prep", prepId, meta).catch(e => console.warn("[pipeline] failed to record GenerationMeta:", e))
+    void recordGenerationMeta("prep", prepId, meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
 
     // Deduplicate across chunks: exact-match pass (free) then LLM merger (one call).
     // Skip merger on single-chunk runs — there's nothing to merge across.
@@ -265,7 +266,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       // as soon as an attempt is superseded or fails, not diffed at the end, so a cancellation
       // or a future extra attempt can't leave calls unaccounted for.
       const recordWasted = (metas: AgentMeta[]) => {
-        void recordGenerationMetaMany("prep", prepId, metas, true).catch(e => console.warn("[pipeline] failed to record wasted GenerationMeta:", e))
+        void recordGenerationMetaMany("prep", prepId, metas, true).catch(e => logger.warn("pipeline: failed to record wasted GenerationMeta", { error: serializeError(e) }))
       }
 
       let final: { question: GeneratedQuestion; meta: AgentMeta[] } | null = null
@@ -345,7 +346,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
           recordWasted(attemptMeta)
           // A cancelled pipeline isn't a failed slot; runAgent has already exhausted its own retries otherwise.
           if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) throw e
-          console.warn(`[pipeline] slot ${taskIdx} attempt ${attemptNum} failed:`, e)
+          logger.warn("pipeline: slot attempt failed", { taskIdx, attemptNum, error: serializeError(e) })
           break
         }
       }
@@ -362,7 +363,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
         try {
           await failSlot(runId, taskIdx)
         } catch (e) {
-          console.warn(`[pipeline] slot ${taskIdx} failed but could not persist failed status:`, e)
+          logger.warn("pipeline: could not persist slot failed status", { taskIdx, error: serializeError(e) })
         }
         return
       }
@@ -375,7 +376,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   settled.forEach((r, i) => {
     if (r.status === "rejected") {
-      console.warn(`[pipeline] slot ${pendingIndices[i]} left pending, will resume next run:`, r.reason)
+      logger.warn("pipeline: slot left pending, will resume next run", { taskIdx: pendingIndices[i], error: serializeError(r.reason) })
     }
   })
 

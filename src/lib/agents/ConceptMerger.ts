@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { Concept } from "../../types/pipeline"
 import { runAgent, AgentResult, EMPTY_AGENT_META } from "../agent"
+import { logger } from "../logger"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
 
@@ -52,7 +53,7 @@ export async function runConceptMerger(
   const merged: Concept[] = result.output.groups.flatMap(group => {
     const members = group.flatMap(name => {
       if (!nameSet.has(name)) {
-        console.warn(`[ConceptMerger] unmatched name in response, skipping: "${name}"`)
+        logger.warn("ConceptMerger: unmatched name in response, skipping", { name })
         return []
       }
       return [ conceptByName.get(name)! ]

@@ -1,6 +1,7 @@
 import type { Question } from "@prisma/client"
 
 import { insertAsset } from "../actions/assets"
+import { logger, serializeError } from "./logger"
 import { recordGenerationMeta } from "../actions/generationMeta"
 import { incrementPrepTokens } from "../actions/preps"
 import type { AssetHint } from "../types/questions"
@@ -42,10 +43,10 @@ export async function generateAndSaveAssets(
         if (result.meta.totalTokens > 0) {
           void incrementPrepTokens(prepId, result.meta.totalTokens)
         }
-        void recordGenerationMeta("question", q.id, result.meta).catch(e => console.warn("[assets] failed to record GenerationMeta:", e))
+        void recordGenerationMeta("question", q.id, result.meta).catch(e => logger.warn("assets: failed to record GenerationMeta", { error: serializeError(e) }))
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
-          console.warn(`[assets] failed to generate asset for question ${q.id}:`, e)
+          logger.warn("assets: failed to generate asset", { questionId: q.id, error: serializeError(e) })
         }
       }
     })

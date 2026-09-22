@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
 import { z, ZodSchema } from "zod"
 
+import { logger } from "./logger"
 import { computeCost } from "./pricing"
 
 /**
@@ -153,9 +154,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         executionMs,
       }
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[agent:${name}]`, meta)
-      }
+      logger.debug(`agent:${name}`, meta as Record<string, unknown>)
 
       return { output: validated, meta }
     } catch (err) {
