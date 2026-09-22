@@ -10,7 +10,6 @@ import {
   pipelineQuestionStatusSchema,
   type Concept,
   type PipelineAttempt,
-  type PipelineQuestionStatus,
   type QuestionTask,
 } from "../types/pipeline"
 import { generatedQuestionSchema, type GeneratedQuestion } from "../types/questions"
@@ -28,13 +27,12 @@ async function assertOwnsRun(userId: string, runId: string): Promise<string> {
   return run.prepId
 }
 
-/** One slot's full state: which attempts ran, and — once `status` is terminal — the outcome. */
-export interface PipelineSlotState {
-  status: PipelineQuestionStatus
-  attempts: PipelineAttempt[]
-  question: GeneratedQuestion | null // set once status = finished
-  meta: AgentMeta[] | null // set once status = finished
-}
+/** One slot's full state: which attempts ran, and — once `status` is terminal — the outcome.
+ *  A discriminated union so `finished` always carries its question/meta and `pending`/`failed`
+ *  never do — no reachable state where a non-finished slot has a question, or vice versa. */
+export type PipelineSlotState =
+  | { status: "pending" | "failed"; attempts: PipelineAttempt[]; question: null; meta: null }
+  | { status: "finished"; attempts: PipelineAttempt[]; question: GeneratedQuestion; meta: AgentMeta[] }
 
 export interface PipelineRunState {
   runId: string
@@ -50,9 +48,11 @@ function toSlotState(q: { id: string; status: string; attempts: unknown; questio
   const attempts = pipelineAttemptsSchema.parse(q.attempts)
 
   if (q.question === null) {
+    if (status === "finished") throw new Error(`PipelineQuestion ${q.id} is finished but has no question`)
     if (q.meta !== null) throw new Error(`PipelineQuestion ${q.id} has meta without a question`)
     return { status, attempts, question: null, meta: null }
   }
+  if (status !== "finished") throw new Error(`PipelineQuestion ${q.id} has a question but status is "${status}"`)
   return {
     status,
     attempts,
@@ -150,6 +150,9 @@ export async function saveAttemptReview(
   const { attempts } = await getAttempts(runId, taskIndex)
   const target = attempts.find(a => a.attemptNum === attemptNum)
   if (!target) throw new Error(`PipelineQuestion run ${runId} task ${taskIndex} has no build for attempt ${attemptNum} to review`)
+  if (target.review !== null) {
+    throw new Error(`PipelineQuestion run ${runId} task ${taskIndex} attempt ${attemptNum} already has a review`)
+  }
   const updated = attempts.map(a => a.attemptNum === attemptNum ? { ...a, review: { review, passed, meta } } : a)
   await prisma.pipelineQuestion.update({
     where: { runId_taskIndex: { runId, taskIndex } },

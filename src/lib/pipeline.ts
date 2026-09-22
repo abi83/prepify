@@ -234,6 +234,15 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let rewriteDone = 0
   let reviewDone = resumedCount
 
+  // Rewrite total: pending slots whose persisted last attempt is already a rejection (known
+  // upfront, so the "Revise rejected questions" row's denominator doesn't grow mid-run), plus
+  // one for each first-attempt rejection discovered fresh below.
+  let rewriteTotal = pendingIndices.filter(i => {
+    const attempts = state.slots.get(i)?.attempts ?? []
+    const last = attempts[attempts.length - 1]
+    return last !== undefined && last.review !== null && !last.review.passed
+  }).length
+
   // Build/review meta isn't a GenerationMeta row yet — the Question this slot becomes
   // doesn't exist until the caller inserts it (see questionRepository.insertMany), so
   // it's returned alongside `questions`, same order, for the caller to persist once
@@ -281,6 +290,19 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
         }
       }
 
+      // Progress credit for build steps already persisted from a previous run — each step
+      // (attempt 1, attempt 2) is counted exactly once, whether it happened before this run
+      // or during it. The loop below only performs a fresh build for an attempt number NOT
+      // already in `resumeAttempts`, so there's no double-counting between this and it.
+      if (resumeAttempts.some(a => a.attemptNum === 1)) {
+        craftDone++
+        onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
+      }
+      if (resumeAttempts.some(a => a.attemptNum === 2)) {
+        rewriteDone++
+        onProgress({ stage: "rewriting", done: rewriteDone, total: rewriteTotal })
+      }
+
       for (let attemptNum = startAttemptNum; attemptNum <= MAX_SLOT_ATTEMPTS && !final; attemptNum++) {
         const attemptMeta: AgentMeta[] = []
         try {
@@ -297,7 +319,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
               onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
             } else {
               rewriteDone++
-              onProgress({ stage: "rewriting", done: rewriteDone, total: pendingIndices.length })
+              onProgress({ stage: "rewriting", done: rewriteDone, total: rewriteTotal })
             }
           }
 
@@ -311,6 +333,13 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
           } else {
             recordWasted([ built.meta, reviewed.meta ])
             rewrite = { question: built.output, feedback: reviewFeedback(reviewed.output.review) }
+            // A rejection discovered fresh this run (not already reflected in the upfront scan
+            // above) means one more slot is about to need a rewrite — only when there's an
+            // attempt left to spend on it.
+            if (attemptNum < MAX_SLOT_ATTEMPTS) {
+              rewriteTotal++
+              onProgress({ stage: "rewriting", done: rewriteDone, total: rewriteTotal })
+            }
           }
         } catch (e) {
           recordWasted(attemptMeta)
@@ -325,8 +354,16 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       onProgress({ stage: "reviewing", done: reviewDone, total: tasks.length })
 
       if (!final) {
-        await failSlot(runId, taskIdx)
+        // Update in-memory state before persisting: a transient DB error on failSlot shouldn't
+        // also drop this slot from this run's failedCount — the DB row stays "pending" and
+        // self-heals into "failed" on the next resume (exhausted attempts re-derive the same
+        // outcome with no further LLM calls).
         failedIndices.add(taskIdx)
+        try {
+          await failSlot(runId, taskIdx)
+        } catch (e) {
+          console.warn(`[pipeline] slot ${taskIdx} failed but could not persist failed status:`, e)
+        }
         return
       }
 

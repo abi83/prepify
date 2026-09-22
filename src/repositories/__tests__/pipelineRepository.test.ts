@@ -5,33 +5,14 @@ vi.mock("../../lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import type { AgentMeta } from "../../lib/agent"
-import type { Review } from "../../lib/agents/QuestionReviewer"
+import { concept, flashcard, meta, review, task } from "../../lib/__tests__/pipelineFixtures"
 import { prisma } from "../../lib/prisma"
-import type { Concept, QuestionTask } from "../../types/pipeline"
-import type { GeneratedQuestion } from "../../types/questions"
 import { ForbiddenError } from "../errors"
 import * as pipelineRepository from "../pipelineRepository"
 import * as prepRepository from "../prepRepository"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"
-
-const concept: Concept = { name: "Concept", description: "x".repeat(40), importance: 0.5, misconceptions: [] }
-const task: QuestionTask = { concepts: [ concept ], type: "flashcard", difficulty: "easy" }
-
-function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
-  return { model: "test-model", tier: "flash", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.01, toolCalls: 0, executionMs: 100, ...overrides }
-}
-
-function flashcard(front: string): GeneratedQuestion {
-  return { type: "flashcard", content: { front, back: "A", back_explanation: "", asset_hint: { needed: false, type: null, description: null } } }
-}
-
-function review(passed: boolean): Review {
-  const metric = { score: passed ? 1 : 0.5, comment: "c" }
-  return { scores: { correctness: metric, conceptAlignment: metric, clarity: metric, cognitiveDemand: metric, distractorQuality: null }, comment: "overall" }
-}
 
 beforeEach(async () => {
   await prisma.attempt.deleteMany()
@@ -138,6 +119,28 @@ describe("run progression", () => {
     await pipelineRepository.saveAttemptBuild(OWNER, runId, 0, 1, flashcard("a"), meta())
 
     await expect(pipelineRepository.saveAttemptBuild(OWNER, runId, 0, 1, flashcard("b"), meta())).rejects.toThrow()
+  })
+
+  it("rejects saving a second review for an attempt that already has one", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
+    await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
+    await pipelineRepository.saveAttemptBuild(OWNER, runId, 0, 1, flashcard("a"), meta())
+    await pipelineRepository.saveAttemptReview(OWNER, runId, 0, 1, review(false), false, meta())
+
+    await expect(pipelineRepository.saveAttemptReview(OWNER, runId, 0, 1, review(true), true, meta())).rejects.toThrow()
+  })
+})
+
+describe("loadOrCreateRun data integrity", () => {
+  it("throws instead of silently returning a contentless question for a finished row with a null question", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
+    await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
+    // Simulate corrupt data a normal write path here can't produce (buggy migration, direct DB write).
+    await prisma.pipelineQuestion.update({ where: { runId_taskIndex: { runId, taskIndex: 0 } }, data: { status: "finished" } })
+
+    await expect(pipelineRepository.loadOrCreateRun(OWNER, prep.id)).rejects.toThrow(/finished but has no question/)
   })
 })
 

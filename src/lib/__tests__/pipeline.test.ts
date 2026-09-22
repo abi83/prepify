@@ -33,7 +33,9 @@ vi.mock("../agents/ConceptMerger", () => ({ runConceptMerger: vi.fn() }))
 vi.mock("../agents/PrepNamer", () => ({
   runPrepNamer: vi.fn().mockResolvedValue({
     output: { title: "Title", description: "Description" },
-    meta: emptyMeta(),
+    // Inlined rather than imported: vi.mock factories are hoisted above imports, so an
+    // imported binding isn't initialized yet when this runs.
+    meta: { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 },
   }),
 }))
 
@@ -51,34 +53,11 @@ vi.mock("../agents/QuestionReviewer", async importOriginal => ({
 }))
 
 import type { PipelineSlotState } from "../../repositories/pipelineRepository"
-import type { Concept, PipelineAttempt, QuestionTask } from "../../types/pipeline"
+import type { PipelineAttempt } from "../../types/pipeline"
 import type { GeneratedQuestion } from "../../types/questions"
 import type { AgentMeta } from "../agent"
-import type { Review } from "../agents/QuestionReviewer"
 import { runPipeline } from "../pipeline"
-
-function emptyMeta(): AgentMeta {
-  return { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 }
-}
-
-function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
-  return { ...emptyMeta(), model: "gpt-5-nano", tier: "flex", promptTokens: 100, completionTokens: 50, totalTokens: 150, costUsd: 0.0003, executionMs: 500, ...overrides }
-}
-
-const concept: Concept = { name: "Concept", description: "x".repeat(40), importance: 0.5, misconceptions: [] }
-const task: QuestionTask = { concepts: [ concept ], type: "flashcard", difficulty: "easy" }
-
-function flashcard(front: string): GeneratedQuestion {
-  return {
-    type: "flashcard",
-    content: { front, back: "A", back_explanation: "", asset_hint: { needed: false, type: null, description: null } },
-  }
-}
-
-function review(passed: boolean): Review {
-  const metric = { score: passed ? 1 : 0.5, comment: "c" }
-  return { scores: { correctness: metric, conceptAlignment: metric, clarity: metric, cognitiveDemand: metric, distractorQuality: null }, comment: "overall" }
-}
+import { concept, flashcard, meta, review, task } from "./pipelineFixtures"
 
 function reviewedOutput(passed: boolean) {
   return { review: review(passed), passed }
@@ -353,5 +332,59 @@ describe("runPipeline progress events", () => {
 
     expect(events).toContain("rewriting")
     expect(events[events.length - 1]).toBe("done")
+  })
+
+  it("credits a resumed slot's already-persisted build toward the crafting count", async () => {
+    // Both slots are pending with an attempt-1 build already persisted (crashed before review).
+    const resumedBuild = { attemptNum: 1, build: { question: flashcard("a"), meta: meta() }, review: null }
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task, task ],
+      slots: new Map([ [ 0, pendingSlot([ resumedBuild ]) ], [ 1, pendingSlot([ resumedBuild ]) ] ]),
+    })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: meta() })
+
+    const craftEvents: Array<{ done: number; total: number }> = []
+    await runPipeline({
+      prepId: "prep-1", pages: [], apiKey: "key", model: "model",
+      onProgress: e => { if (e.stage === "crafting") craftEvents.push({ done: e.done, total: e.total }) },
+    })
+
+    expect(buildFlashcard).not.toHaveBeenCalled()
+    // Neither slot goes through a fresh build (both resume), but crafting still reaches 2/2.
+    expect(craftEvents[craftEvents.length - 1]).toEqual({ done: 2, total: 2 })
+  })
+
+  it("knows the rewrite total upfront from a resumed rejection — the denominator doesn't grow mid-run", async () => {
+    const rejected = { attemptNum: 1, build: { question: flashcard("a"), meta: meta() }, review: { review: review(false), passed: false, meta: meta() } }
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task ],
+      slots: new Map([ [ 0, pendingSlot([ rejected ]) ] ]),
+    })
+    buildFlashcard.mockResolvedValue({ output: flashcard("rewritten"), meta: meta() })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: meta() })
+
+    const rewriteEvents: Array<{ done: number; total: number }> = []
+    await runPipeline({
+      prepId: "prep-1", pages: [], apiKey: "key", model: "model",
+      onProgress: e => { if (e.stage === "rewriting") rewriteEvents.push({ done: e.done, total: e.total }) },
+    })
+
+    expect(rewriteEvents.every(e => e.total === 1)).toBe(true)
+  })
+
+  it("still counts a slot as failed in this run's result even if persisting the failure throws", async () => {
+    singleSlotRun()
+    buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: meta() })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(false), meta: meta() })
+    failSlot.mockRejectedValue(new Error("transient DB error"))
+    vi.spyOn(console, "warn").mockImplementation(() => undefined)
+
+    const result = await run()
+
+    expect(result.failedCount).toBe(1)
   })
 })
