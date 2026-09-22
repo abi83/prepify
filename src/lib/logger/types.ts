@@ -3,6 +3,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error"
 export type TraceContext = {
   traceId: string
   spanId: string
+  sampled: boolean
 }
 
 export type LogFields = Record<string, unknown>

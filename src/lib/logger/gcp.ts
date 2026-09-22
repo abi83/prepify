@@ -7,14 +7,15 @@ export function formatGcp(args: FormatArgs): Record<string, unknown> {
   const project = process.env.GOOGLE_CLOUD_PROJECT
 
   const entry: Record<string, unknown> = {
+    ...fields,
     severity: GCP_SEVERITY[level],
     message,
     version,
-    ...fields,
   }
 
   if (trace) {
     entry["logging.googleapis.com/spanId"] = trace.spanId
+    entry["logging.googleapis.com/traceSampled"] = trace.sampled
     entry["logging.googleapis.com/trace"] = project
       ? `projects/${project}/traces/${trace.traceId}`
       : trace.traceId

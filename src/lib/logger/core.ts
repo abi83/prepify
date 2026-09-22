@@ -22,7 +22,7 @@ function defaultMinLevel(): LogLevel {
 
 function formatPlain(args: FormatArgs): Record<string, unknown> {
   const { level, message, version, trace, fields } = args
-  return { level, message, version, ...trace, ...fields }
+  return { ...fields, ...trace, level, message, version }
 }
 
 export type LoggerOptions = {
