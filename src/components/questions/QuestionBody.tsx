@@ -5,7 +5,7 @@ import FillTheGapQuestion from "./FillTheGapQuestion"
 import MultipleChoiceQuestion from "./MultipleChoiceQuestion"
 import SingleChoiceQuestion from "./SingleChoiceQuestion"
 import SortingQuestion from "./SortingQuestion"
-import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "../../types/questions"
+import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
 
 export interface AnswerState {
   single: string | null

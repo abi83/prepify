@@ -1,9 +1,9 @@
-import { conceptsResponseSchema } from "../../types/pipeline"
-import type { Concept } from "../../types/pipeline"
-import type { Page } from "../../types/prep"
-import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "../agent"
-import { CHUNK_SIZE } from "../config"
-import type { Logger } from "../logger"
+import { conceptsResponseSchema } from "@/types/pipeline"
+import type { Concept } from "@/types/pipeline"
+import type { Page } from "@/types/prep"
+import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
+import { CHUNK_SIZE } from "@/lib/config"
+import type { Logger } from "@/lib/logger"
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
 

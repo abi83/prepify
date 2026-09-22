@@ -5,11 +5,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const insertAttemptMock = vi.fn().mockResolvedValue({})
 
-vi.mock("../../../actions/attempts", () => ({
+vi.mock("@/actions/attempts", () => ({
   insertAttempt: (...args: unknown[]) => insertAttemptMock(...args),
 }))
 
-import AttemptFlow from "../AttemptFlow"
+import AttemptFlow from "@/components/attempt/AttemptFlow"
 
 const singleQ: Question = {
   id: "q1", prepId: "p1", createdAt: new Date(0), difficulty: null, type: "single_choice",

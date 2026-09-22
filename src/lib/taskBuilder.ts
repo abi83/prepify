@@ -3,8 +3,8 @@
  * No external dependencies — safe to unit-test in isolation.
  */
 import type { DifficultyMix } from "./generationConfig"
-import type { Concept, QuestionTask } from "../types/pipeline"
-import type { Difficulty, QuestionType } from "../types/questions"
+import type { Concept, QuestionTask } from "@/types/pipeline"
+import type { Difficulty, QuestionType } from "@/types/questions"
 
 const DIFFICULTIES: Difficulty[] = [ "easy", "medium", "hard" ]
 

@@ -1,5 +1,5 @@
 import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
-import type { SingleChoiceContent } from "../../types/questions"
+import type { SingleChoiceContent } from "@/types/questions"
 
 interface Props {
   content: SingleChoiceContent

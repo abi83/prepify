@@ -2,13 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("../../actions/preps", () => ({
+vi.mock("@/actions/preps", () => ({
   updatePrep: vi.fn().mockResolvedValue({}),
 }))
 
-vi.mock("../../lib/agents/PrepLabeler", async () => {
-  const actual = await vi.importActual<typeof import("../../lib/agents/PrepLabeler")>(
-    "../../lib/agents/PrepLabeler",
+vi.mock("@/lib/agents/PrepLabeler", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/agents/PrepLabeler")>(
+    "@/lib/agents/PrepLabeler",
   )
   return {
     ...actual,
@@ -19,7 +19,7 @@ vi.mock("../../lib/agents/PrepLabeler", async () => {
   }
 })
 
-import ShareModal from "../ShareModal"
+import ShareModal from "@/components/ShareModal"
 
 const baseProps = {
   prepId: "prep-123",

@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("../../lib/prisma", async () => {
-  const { createPglitePrisma } = await import("../../test/pglitePrisma")
+vi.mock("@/lib/prisma", async () => {
+  const { createPglitePrisma } = await import("@/test/pglitePrisma")
   return { prisma: await createPglitePrisma() }
 })
 
-import { concept, flashcard, meta, review, task } from "../../lib/__tests__/pipelineFixtures"
-import { prisma } from "../../lib/prisma"
-import { ForbiddenError } from "../errors"
-import * as pipelineRepository from "../pipelineRepository"
-import * as prepRepository from "../prepRepository"
+import { concept, flashcard, meta, review, task } from "@/lib/__tests__/pipelineFixtures"
+import { prisma } from "@/lib/prisma"
+import { ForbiddenError } from "@/repositories/errors"
+import * as pipelineRepository from "@/repositories/pipelineRepository"
+import * as prepRepository from "@/repositories/prepRepository"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"

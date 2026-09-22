@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("../../lib/prisma", async () => {
-  const { createPglitePrisma } = await import("../../test/pglitePrisma")
+vi.mock("@/lib/prisma", async () => {
+  const { createPglitePrisma } = await import("@/test/pglitePrisma")
   return { prisma: await createPglitePrisma() }
 })
 
-import { prisma } from "../../lib/prisma"
-import * as assetRepository from "../assetRepository"
-import { ForbiddenError } from "../errors"
-import * as prepRepository from "../prepRepository"
-import * as questionRepository from "../questionRepository"
+import { prisma } from "@/lib/prisma"
+import * as assetRepository from "@/repositories/assetRepository"
+import { ForbiddenError } from "@/repositories/errors"
+import * as prepRepository from "@/repositories/prepRepository"
+import * as questionRepository from "@/repositories/questionRepository"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"

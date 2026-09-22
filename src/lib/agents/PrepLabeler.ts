@@ -1,8 +1,8 @@
 import { z } from "zod"
 
-import type { Concept } from "../../types/pipeline"
-import { runAgent, AgentResult } from "../agent"
-import type { Logger } from "../logger"
+import type { Concept } from "@/types/pipeline"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
 
 export const DISCIPLINES = [
   "History",

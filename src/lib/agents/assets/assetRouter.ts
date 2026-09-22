@@ -1,10 +1,10 @@
 import { runDiagramAgent } from "./DiagramAgent"
 import { runFormulaAgent } from "./FormulaAgent"
 import { runMoleculeAgent } from "./MoleculeAgent"
-import type { AssetHint, AssetType } from "../../../types/questions"
-import type { AgentResult } from "../../agent"
-import { EMPTY_AGENT_META } from "../../agent"
-import type { Logger } from "../../logger"
+import type { AssetHint, AssetType } from "@/types/questions"
+import type { AgentResult } from "@/lib/agent"
+import { EMPTY_AGENT_META } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
 
 export interface AssetOutput {
   type: AssetType

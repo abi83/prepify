@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { sortingContentSchema } from "../questions"
+import { sortingContentSchema } from "@/types/questions"
 
 function sortingContent(correctIndexes: number[]) {
   return {

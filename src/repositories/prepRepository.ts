@@ -1,7 +1,7 @@
 import { Prisma, type Prep, type PrepDiscipline, type PrepVisibility } from "@prisma/client"
 
 import { ForbiddenError, NotFoundError } from "./errors"
-import { prisma } from "../lib/prisma"
+import { prisma } from "@/lib/prisma"
 
 export function isReadableBy(prep: Prep, userId: string | null): boolean {
   return prep.userId === userId || prep.visibility !== "private"

@@ -1,6 +1,6 @@
 import type { Question } from "@prisma/client"
 
-import type { AnswerState } from "../components/questions/QuestionBody"
+import type { AnswerState } from "@/components/questions/QuestionBody"
 
 export function isAnswerCorrect(q: Question, a: AnswerState): boolean {
   switch (q.type) {

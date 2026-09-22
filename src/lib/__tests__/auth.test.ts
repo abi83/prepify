@@ -2,7 +2,7 @@ import type { Session } from "next-auth"
 import type { JWT } from "next-auth/jwt"
 import { describe, it, expect } from "vitest"
 
-import { jwtCallback, sessionCallback } from "../authCallbacks"
+import { jwtCallback, sessionCallback } from "@/lib/authCallbacks"
 
 describe("jwtCallback", () => {
   it("carries the Google profile sub into the token", () => {

@@ -1,4 +1,4 @@
-import type { Concept } from "../types/pipeline"
+import type { Concept } from "@/types/pipeline"
 
 /**
  * Normalizes a concept name for exact-match deduplication.

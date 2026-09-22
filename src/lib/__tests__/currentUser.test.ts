@@ -1,10 +1,10 @@
 import type { Session } from "next-auth"
 import { describe, it, expect, vi } from "vitest"
 
-vi.mock("../auth", () => ({ auth: vi.fn() }))
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }))
 
-import { auth } from "../auth"
-import { requireUserId } from "../currentUser"
+import { auth } from "@/lib/auth"
+import { requireUserId } from "@/lib/currentUser"
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>
 

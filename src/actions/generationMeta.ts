@@ -1,8 +1,8 @@
 "use server"
 
-import type { AgentMeta } from "../lib/agent"
-import * as generationMetaRepository from "../repositories/generationMetaRepository"
-import { toGenerationMeta, type GenerationEntityType } from "../types/generationMeta"
+import type { AgentMeta } from "@/lib/agent"
+import * as generationMetaRepository from "@/repositories/generationMetaRepository"
+import { toGenerationMeta, type GenerationEntityType } from "@/types/generationMeta"
 
 /**
  * Fire-and-forget from the client pipeline as generation progresses — no revalidation needed.

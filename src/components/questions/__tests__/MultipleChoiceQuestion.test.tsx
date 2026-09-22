@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi } from "vitest"
 
-import type { MultipleChoiceContent } from "../../../types/questions"
-import MultipleChoiceQuestion from "../MultipleChoiceQuestion"
+import type { MultipleChoiceContent } from "@/types/questions"
+import MultipleChoiceQuestion from "@/components/questions/MultipleChoiceQuestion"
 
 const content: MultipleChoiceContent = {
   question: "Which are primary colors?",

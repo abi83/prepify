@@ -2,8 +2,8 @@ import { z } from "zod"
 
 import type { Difficulty, QuestionType } from "./questions"
 import { generatedQuestionSchema } from "./questions"
-import { agentMetaSchema } from "../lib/agent"
-import { reviewSchema } from "../lib/agents/QuestionReviewer"
+import { agentMetaSchema } from "@/lib/agent"
+import { reviewSchema } from "@/lib/agents/QuestionReviewer"
 
 export const conceptSchema = z.object({
   name: z.string().min(3).max(80),

@@ -2,11 +2,11 @@ import { z } from "zod"
 
 import { difficultyInstructions } from "./difficulty"
 import { rewriteInstructions, type RewriteInput } from "./rewrite"
-import type { QuestionTask } from "../../../types/pipeline"
-import { multipleChoiceContentSchema } from "../../../types/questions"
-import type { MultipleChoiceContent } from "../../../types/questions"
-import { runAgent, AgentResult } from "../../agent"
-import type { Logger } from "../../logger"
+import type { QuestionTask } from "@/types/pipeline"
+import { multipleChoiceContentSchema } from "@/types/questions"
+import type { MultipleChoiceContent } from "@/types/questions"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
 
 const responseSchema = z.object({ content: multipleChoiceContentSchema })
 

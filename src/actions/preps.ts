@@ -3,9 +3,9 @@
 import type { Prep } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
-import { requireUserId } from "../lib/currentUser"
-import * as prepRepository from "../repositories/prepRepository"
-import type { CatalogEntry, CreatePrepInput, UpdatePrepInput } from "../repositories/prepRepository"
+import { requireUserId } from "@/lib/currentUser"
+import * as prepRepository from "@/repositories/prepRepository"
+import type { CatalogEntry, CreatePrepInput, UpdatePrepInput } from "@/repositories/prepRepository"
 
 export async function listMyPreps(): Promise<Prep[]> {
   return prepRepository.listOwnedPreps(await requireUserId())

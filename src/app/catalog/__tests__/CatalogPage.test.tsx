@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => {
   return mocks.nav
 })
 
-import CatalogPage from "../CatalogPage"
+import CatalogPage from "@/app/catalog/CatalogPage"
 
 function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {

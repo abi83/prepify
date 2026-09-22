@@ -2,7 +2,7 @@ import type { Asset } from "@prisma/client"
 
 import { ForbiddenError, NotFoundError } from "./errors"
 import { isReadableBy } from "./prepRepository"
-import { prisma } from "../lib/prisma"
+import { prisma } from "@/lib/prisma"
 
 export async function listByQuestionIds(userId: string | null, questionIds: string[]): Promise<Asset[]> {
   if (questionIds.length === 0) return []

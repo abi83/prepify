@@ -21,7 +21,7 @@ import { useState } from "react"
 
 import { cn } from "@/lib/utils"
 
-import type { SortingContent } from "../../types/questions"
+import type { SortingContent } from "@/types/questions"
 
 interface Props {
   content: SortingContent

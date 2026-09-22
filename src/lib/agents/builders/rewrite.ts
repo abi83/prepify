@@ -1,4 +1,4 @@
-import type { GeneratedQuestion } from "../../../types/questions"
+import type { GeneratedQuestion } from "@/types/questions"
 
 /** A rejected question plus the reviewer's critique, handed to a builder to rewrite it. */
 export interface RewriteInput {

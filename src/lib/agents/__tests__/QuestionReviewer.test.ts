@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 
-import { hasValidDistractorShape, passesReview, reviewFeedback } from "../QuestionReviewer"
-import type { Review, ReviewScores } from "../QuestionReviewer"
+import { hasValidDistractorShape, passesReview, reviewFeedback } from "@/lib/agents/QuestionReviewer"
+import type { Review, ReviewScores } from "@/lib/agents/QuestionReviewer"
 
 function scores(values: Partial<Record<keyof ReviewScores, number | null>> = {}): ReviewScores {
   const value = (key: keyof ReviewScores) => {
