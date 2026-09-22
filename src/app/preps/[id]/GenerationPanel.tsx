@@ -51,8 +51,10 @@ export default function GenerationPanel({
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
   const [ pipelineProgress, setPipelineProgress ] = useState<PipelineProgressEvent | null>(null)
   const [ craftProgress, setCraftProgress ] = useState<{ done: number; total: number } | null>(null)
+  const [ rewriteProgress, setRewriteProgress ] = useState<{ done: number; total: number } | null>(null)
   const [ reviewProgress, setReviewProgress ] = useState<{ done: number; total: number } | null>(null)
   const [ titleReady, setTitleReady ] = useState(false)
+  const [ failedCount, setFailedCount ] = useState(0)
   const [ runSummary, setRunSummary ] = useState<PartialRunSummary | null>(initialRunSummary)
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
@@ -81,8 +83,10 @@ export default function GenerationPanel({
     setGenError(null)
     setPipelineProgress(null)
     setCraftProgress(null)
+    setRewriteProgress(null)
     setReviewProgress(null)
     setTitleReady(false)
+    setFailedCount(0)
     abortRef.current = new AbortController()
     genStartRef.current = performance.now()
     setGenPhase("running")
@@ -101,7 +105,9 @@ export default function GenerationPanel({
         onProgress: (event) => {
           setPipelineProgress(event)
           if (event.stage === "crafting") setCraftProgress({ done: event.done, total: event.total })
+          if (event.stage === "rewriting") setRewriteProgress({ done: event.done, total: event.total })
           if (event.stage === "reviewing") setReviewProgress({ done: event.done, total: event.total })
+          if (event.stage === "done") setFailedCount(event.failed)
         },
         onMetaReady: (title, description) => {
           void updatePrep(prepId, { title, description })
@@ -167,7 +173,7 @@ export default function GenerationPanel({
   if (hasQuestions && genPhase === "idle") return null
 
   const checklistRows = isRunning
-    ? rowsFromProgress(pipelineProgress, craftProgress, reviewProgress, titleReady)
+    ? rowsFromProgress(pipelineProgress, craftProgress, rewriteProgress, reviewProgress, titleReady)
     : hasPartialRun ? rowsFromSummary(runSummary, prepTitle) : null
 
   return (
@@ -201,7 +207,7 @@ export default function GenerationPanel({
                   <Button variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button>
                 ) : (
                   <Button onClick={handleGenerate}>
-                    {hasPartialRun && runSummary.completedSlots > 0 ? "Resume generation" : "Start generation"}
+                    {hasPartialRun && (runSummary.completedSlots > 0 || runSummary.failedSlots > 0) ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
@@ -280,6 +286,12 @@ export default function GenerationPanel({
       {genPhase === "done" && totalTokens > 0 && (
         <div className="text-xs text-muted-foreground">
           Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
+        </div>
+      )}
+
+      {genPhase === "done" && failedCount > 0 && (
+        <div className="text-xs text-error">
+          {failedCount} question{failedCount === 1 ? "" : "s"} failed review twice and {failedCount === 1 ? "was" : "were"} skipped.
         </div>
       )}
     </>

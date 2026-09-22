@@ -1,6 +1,9 @@
 import { z } from "zod"
 
 import type { Difficulty, QuestionType } from "./questions"
+import { generatedQuestionSchema } from "./questions"
+import { agentMetaSchema } from "../lib/agent"
+import { reviewSchema } from "../lib/agents/QuestionReviewer"
 
 export const conceptSchema = z.object({
   name: z.string().min(3).max(80),
@@ -26,4 +29,21 @@ export type PipelineProgressEvent =
   | { stage: "resuming"; done: number; total: number }
   | { stage: "crafting"; done: number; total: number }
   | { stage: "reviewing"; done: number; total: number }
-  | { stage: "done" }
+  | { stage: "rewriting"; done: number; total: number }
+  | { stage: "done"; failed: number }
+
+/** Terminal states are `finished` (shipped as a Question) and `failed` (max attempts exhausted,
+ *  never retried on resume). `pending` with a non-empty `attempts` array is resumable — continue
+ *  at the first step the last attempt is missing. */
+export const pipelineQuestionStatusSchema = z.enum([ "pending", "finished", "failed" ])
+export type PipelineQuestionStatus = z.infer<typeof pipelineQuestionStatusSchema>
+
+/** One slot's build (+ its independent review, once done) — see `PipelineQuestionStatus`. */
+export const pipelineAttemptSchema = z.object({
+  attemptNum: z.number(),
+  build: z.object({ question: generatedQuestionSchema, meta: agentMetaSchema }),
+  review: z.object({ review: reviewSchema, passed: z.boolean(), meta: agentMetaSchema }).nullable(),
+})
+export type PipelineAttempt = z.infer<typeof pipelineAttemptSchema>
+
+export const pipelineAttemptsSchema = z.array(pipelineAttemptSchema)

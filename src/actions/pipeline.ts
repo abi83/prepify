@@ -1,6 +1,7 @@
 "use server"
 
 import type { AgentMeta } from "../lib/agent"
+import type { Review } from "../lib/agents/QuestionReviewer"
 import { requireUserId } from "../lib/currentUser"
 import * as pipelineRepository from "../repositories/pipelineRepository"
 import type { PartialRunSummary, PipelineRunState } from "../repositories/pipelineRepository"
@@ -19,13 +20,38 @@ export async function saveQuestionTasksAndInitSlots(runId: string, tasks: Questi
   await pipelineRepository.saveQuestionTasksAndInitSlots(await requireUserId(), runId, tasks)
 }
 
-export async function saveQuestionSlot(
+export async function saveAttemptBuild(
+  runId: string,
+  taskIndex: number,
+  attemptNum: number,
+  question: GeneratedQuestion,
+  meta: AgentMeta,
+): Promise<void> {
+  await pipelineRepository.saveAttemptBuild(await requireUserId(), runId, taskIndex, attemptNum, question, meta)
+}
+
+export async function saveAttemptReview(
+  runId: string,
+  taskIndex: number,
+  attemptNum: number,
+  review: Review,
+  passed: boolean,
+  meta: AgentMeta,
+): Promise<void> {
+  await pipelineRepository.saveAttemptReview(await requireUserId(), runId, taskIndex, attemptNum, review, passed, meta)
+}
+
+export async function finishSlot(
   runId: string,
   taskIndex: number,
   question: GeneratedQuestion,
   meta: AgentMeta[],
 ): Promise<void> {
-  await pipelineRepository.saveQuestionSlot(await requireUserId(), runId, taskIndex, question, meta)
+  await pipelineRepository.finishSlot(await requireUserId(), runId, taskIndex, question, meta)
+}
+
+export async function failSlot(runId: string, taskIndex: number): Promise<void> {
+  await pipelineRepository.failSlot(await requireUserId(), runId, taskIndex)
 }
 
 export async function deleteRun(prepId: string): Promise<void> {

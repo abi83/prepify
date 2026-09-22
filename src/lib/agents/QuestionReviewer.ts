@@ -25,7 +25,7 @@ const reviewScoresSchema = z.object({
 
 export type ReviewScores = z.infer<typeof reviewScoresSchema>
 
-const reviewSchema = z.object({
+export const reviewSchema = z.object({
   scores: reviewScoresSchema,
   comment: z.string().max(200),
 })
