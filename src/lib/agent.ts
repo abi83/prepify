@@ -1,6 +1,6 @@
 import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
-import { ZodSchema } from "zod"
+import { z, ZodSchema } from "zod"
 
 import { computeCost } from "./pricing"
 
@@ -10,17 +10,19 @@ import { computeCost } from "./pricing"
  * and what callers use for progress/cost display. Nothing downstream of `runAgent`
  * should read an OpenAI response shape directly.
  */
-export interface AgentMeta {
-  model: string
-  tier: string
-  promptTokens: number
-  cachedTokens: number
-  completionTokens: number
-  totalTokens: number
-  costUsd: number
-  toolCalls: number
-  executionMs: number
-}
+export const agentMetaSchema = z.object({
+  model: z.string(),
+  tier: z.string(),
+  promptTokens: z.number(),
+  cachedTokens: z.number(),
+  completionTokens: z.number(),
+  totalTokens: z.number(),
+  costUsd: z.number(),
+  toolCalls: z.number(),
+  executionMs: z.number(),
+})
+
+export type AgentMeta = z.infer<typeof agentMetaSchema>
 
 export interface AgentResult<T> {
   output: T

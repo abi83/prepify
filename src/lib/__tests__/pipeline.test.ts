@@ -7,14 +7,20 @@ vi.mock("../../actions/generationMeta", () => ({
   recordGenerationMetaMany: (...args: unknown[]) => recordGenerationMetaMany(...args),
 }))
 
-const saveQuestionSlot = vi.fn().mockResolvedValue(undefined)
+const saveAttemptBuild = vi.fn().mockResolvedValue(undefined)
+const saveAttemptReview = vi.fn().mockResolvedValue(undefined)
+const finishSlot = vi.fn().mockResolvedValue(undefined)
+const failSlot = vi.fn().mockResolvedValue(undefined)
 const loadOrCreateRun = vi.fn()
 
 vi.mock("../../actions/pipeline", () => ({
   loadOrCreateRun: (...args: unknown[]) => loadOrCreateRun(...args),
   saveConcepts: vi.fn().mockResolvedValue(undefined),
   saveQuestionTasksAndInitSlots: vi.fn().mockResolvedValue(undefined),
-  saveQuestionSlot: (...args: unknown[]) => saveQuestionSlot(...args),
+  saveAttemptBuild: (...args: unknown[]) => saveAttemptBuild(...args),
+  saveAttemptReview: (...args: unknown[]) => saveAttemptReview(...args),
+  finishSlot: (...args: unknown[]) => finishSlot(...args),
+  failSlot: (...args: unknown[]) => failSlot(...args),
 }))
 
 vi.mock("../../actions/preps", () => ({
@@ -27,7 +33,9 @@ vi.mock("../agents/ConceptMerger", () => ({ runConceptMerger: vi.fn() }))
 vi.mock("../agents/PrepNamer", () => ({
   runPrepNamer: vi.fn().mockResolvedValue({
     output: { title: "Title", description: "Description" },
-    meta: emptyMeta(),
+    // Inlined rather than imported: vi.mock factories are hoisted above imports, so an
+    // imported binding isn't initialized yet when this runs.
+    meta: { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 },
   }),
 }))
 
@@ -44,44 +52,37 @@ vi.mock("../agents/QuestionReviewer", async importOriginal => ({
   runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args),
 }))
 
-import type { Concept, QuestionTask } from "../../types/pipeline"
+import type { PipelineSlotState } from "../../repositories/pipelineRepository"
+import type { PipelineAttempt } from "../../types/pipeline"
 import type { GeneratedQuestion } from "../../types/questions"
 import type { AgentMeta } from "../agent"
 import { runPipeline } from "../pipeline"
+import { concept, flashcard, meta, review, task } from "./pipelineFixtures"
 
-function emptyMeta(): AgentMeta {
-  return { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 }
+function reviewedOutput(passed: boolean) {
+  return { review: review(passed), passed }
 }
 
-function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
-  return { ...emptyMeta(), model: "gpt-5-nano", tier: "flex", promptTokens: 100, completionTokens: 50, totalTokens: 150, costUsd: 0.0003, executionMs: 500, ...overrides }
+/** A finished slot, as `loadOrCreateRun` would report it. */
+function finishedSlot(question: GeneratedQuestion, m: AgentMeta[]): PipelineSlotState {
+  return { status: "finished", attempts: [], question, meta: m }
 }
 
-const concept: Concept = { name: "Concept", description: "x".repeat(40), importance: 0.5, misconceptions: [] }
-const task: QuestionTask = { concepts: [ concept ], type: "flashcard", difficulty: "easy" }
-
-function flashcard(front: string): GeneratedQuestion {
-  return {
-    type: "flashcard",
-    content: { front, back: "A", back_explanation: "", asset_hint: { needed: false, type: null, description: null } },
-  }
+/** A pending slot, optionally resuming from persisted attempts (defaults to a brand-new slot). */
+function pendingSlot(attempts: PipelineAttempt[] = []): PipelineSlotState {
+  return { status: "pending", attempts, question: null, meta: null }
 }
 
-function review(passed: boolean) {
-  const metric = { score: passed ? 1 : 0.5, comment: "c" }
-  return {
-    review: { scores: { correctness: metric, conceptAlignment: metric, clarity: metric, cognitiveDemand: metric, distractorQuality: null }, comment: "overall" },
-    passed,
-  }
+function failedSlot(): PipelineSlotState {
+  return { status: "failed", attempts: [], question: null, meta: null }
 }
 
-function singleSlotRun() {
+function singleSlotRun(slot = pendingSlot()) {
   loadOrCreateRun.mockResolvedValue({
     runId: "run-1",
     concepts: [ concept ],
     questionTasks: [ task ],
-    questionSlots: new Map([ [ 0, null ] ]),
-    slotMeta: new Map([ [ 0, [] ] ]),
+    slots: new Map([ [ 0, slot ] ]),
   })
 }
 
@@ -101,7 +102,7 @@ beforeEach(() => {
 })
 
 describe("runPipeline resume", () => {
-  it("keeps a resumed slot's persisted meta at its original array position, alongside newly built meta", async () => {
+  it("keeps a finished slot's persisted meta, alongside a newly built slot", async () => {
     const resumedQuestion = flashcard("resumed")
     const resumedMeta = meta({ model: "resumed-model" })
     const builtMeta = meta({ model: "build-model" })
@@ -111,31 +112,110 @@ describe("runPipeline resume", () => {
       runId: "run-1",
       concepts: [ concept ],
       questionTasks: [ task, task ],
-      questionSlots: new Map([ [ 0, resumedQuestion ], [ 1, null ] ]),
-      slotMeta: new Map([ [ 0, [ resumedMeta ] ], [ 1, [] ] ]),
+      slots: new Map([ [ 0, finishedSlot(resumedQuestion, [ resumedMeta ]) ], [ 1, pendingSlot() ] ]),
     })
 
     const builtQuestion = flashcard("built")
     buildFlashcard.mockResolvedValue({ output: builtQuestion, meta: builtMeta })
-    reviewQuestion.mockResolvedValue({
-      output: review(true),
-      meta: reviewMeta,
-    })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: reviewMeta })
 
-    const result = await runPipeline({
-      prepId: "prep-1",
-      pages: [],
-      apiKey: "key",
-      model: "model",
-      onProgress: vi.fn(),
-    })
+    const result = await run()
 
     expect(result.questions).toEqual([ { ...resumedQuestion, difficulty: "easy" }, { ...builtQuestion, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([
       [ resumedMeta ],
       [ builtMeta, reviewMeta ],
     ])
-    expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 1, builtQuestion, [ builtMeta, reviewMeta ])
+    expect(result.failedCount).toBe(0)
+    expect(finishSlot).toHaveBeenCalledWith("run-1", 1, builtQuestion, [ builtMeta, reviewMeta ])
+  })
+
+  it("skips a failed slot entirely — no rebuild, excluded from questions, counted as failed", async () => {
+    const finishedQuestion = flashcard("ok")
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task, task ],
+      slots: new Map([ [ 0, finishedSlot(finishedQuestion, [ meta() ]) ], [ 1, failedSlot() ] ]),
+    })
+
+    const result = await run()
+
+    expect(buildFlashcard).not.toHaveBeenCalled()
+    expect(reviewQuestion).not.toHaveBeenCalled()
+    expect(failSlot).not.toHaveBeenCalled()
+    expect(result.questions).toEqual([ { ...finishedQuestion, difficulty: "easy" } ])
+    expect(result.failedCount).toBe(1)
+  })
+
+  it("resumes a slot whose build was persisted but never reviewed — no rebuild, reviews the persisted question", async () => {
+    const persistedBuild = flashcard("persisted")
+    const persistedBuildMeta = meta({ model: "persisted-build" })
+    const reviewMeta = meta({ model: "review-model" })
+
+    singleSlotRun(pendingSlot([ { attemptNum: 1, build: { question: persistedBuild, meta: persistedBuildMeta }, review: null } ]))
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: reviewMeta })
+
+    const result = await run()
+
+    expect(buildFlashcard).not.toHaveBeenCalled()
+    expect(saveAttemptBuild).not.toHaveBeenCalled()
+    expect(reviewQuestion.mock.calls[0][0]).toBe(persistedBuild)
+    expect(result.questions).toEqual([ { ...persistedBuild, difficulty: "easy" } ])
+    expect(finishSlot).toHaveBeenCalledWith("run-1", 0, persistedBuild, [ persistedBuildMeta, reviewMeta ])
+  })
+
+  it("resumes a slot whose only attempt was rejected — rewrites using the persisted feedback", async () => {
+    const rejected = flashcard("rejected")
+    const rejectedBuildMeta = meta({ model: "rejected-build" })
+    const rejectedReviewMeta = meta({ model: "rejected-review" })
+    singleSlotRun(pendingSlot([
+      { attemptNum: 1, build: { question: rejected, meta: rejectedBuildMeta }, review: { review: review(false), passed: false, meta: rejectedReviewMeta } },
+    ]))
+
+    const rewritten = flashcard("rewritten")
+    buildFlashcard.mockResolvedValue({ output: rewritten, meta: meta({ model: "rewrite-build" }) })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: meta({ model: "rewrite-review" }) })
+
+    const result = await run()
+
+    expect(buildFlashcard).toHaveBeenCalledTimes(1)
+    expect(buildFlashcard.mock.calls[0][5]).toEqual({ question: rejected, feedback: expect.stringContaining("overall") })
+    expect(saveAttemptBuild).toHaveBeenCalledWith("run-1", 0, 2, rewritten, expect.anything())
+    expect(result.questions).toEqual([ { ...rewritten, difficulty: "easy" } ])
+  })
+
+  it("finishes a slot whose review already passed but the crash happened before finishSlot — no new calls", async () => {
+    const built = flashcard("built")
+    const buildMeta = meta({ model: "build" })
+    const reviewMeta = meta({ model: "review" })
+    singleSlotRun(pendingSlot([
+      { attemptNum: 1, build: { question: built, meta: buildMeta }, review: { review: review(true), passed: true, meta: reviewMeta } },
+    ]))
+
+    const result = await run()
+
+    expect(buildFlashcard).not.toHaveBeenCalled()
+    expect(reviewQuestion).not.toHaveBeenCalled()
+    expect(result.questions).toEqual([ { ...built, difficulty: "easy" } ])
+    expect(finishSlot).toHaveBeenCalledWith("run-1", 0, built, [ buildMeta, reviewMeta ])
+  })
+})
+
+describe("runPipeline per-step persistence", () => {
+  it("persists each build and review as it completes", async () => {
+    singleSlotRun()
+    const built = flashcard("built")
+    const buildMeta = meta({ model: "build" })
+    const reviewMeta = meta({ model: "review" })
+    buildFlashcard.mockResolvedValue({ output: built, meta: buildMeta })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: reviewMeta })
+
+    await run()
+
+    expect(saveAttemptBuild).toHaveBeenCalledWith("run-1", 0, 1, built, buildMeta)
+    expect(saveAttemptReview).toHaveBeenCalledWith("run-1", 0, 1, review(true), true, reviewMeta)
+    expect(finishSlot).toHaveBeenCalledWith("run-1", 0, built, [ buildMeta, reviewMeta ])
   })
 })
 
@@ -156,8 +236,8 @@ describe("runPipeline reviewer rejection", () => {
 
   it("rewrites with the reviewer's feedback and reviews the rewrite independently; ships a passing rewrite", async () => {
     reviewQuestion
-      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
-      .mockResolvedValueOnce({ output: review(true), meta: reviewMeta2 })
+      .mockResolvedValueOnce({ output: reviewedOutput(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: reviewedOutput(true), meta: reviewMeta2 })
 
     const result = await run()
 
@@ -167,13 +247,14 @@ describe("runPipeline reviewer rejection", () => {
     expect(reviewQuestion.mock.calls[1]).toHaveLength(6) // no prior-review context passed
     expect(result.questions).toEqual([ { ...second, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([ [ buildMeta2, reviewMeta2 ] ])
-    expect(saveQuestionSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])
+    expect(finishSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])
+    expect(failSlot).not.toHaveBeenCalled()
   })
 
   it("flags the discarded first attempt's calls as wasted when the rewrite ships", async () => {
     reviewQuestion
-      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
-      .mockResolvedValueOnce({ output: review(true), meta: reviewMeta2 })
+      .mockResolvedValueOnce({ output: reviewedOutput(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: reviewedOutput(true), meta: reviewMeta2 })
 
     await run()
 
@@ -183,14 +264,16 @@ describe("runPipeline reviewer rejection", () => {
 
   it("fails the slot after a second rejection, with no third attempt and all calls flagged wasted", async () => {
     reviewQuestion
-      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta1 })
-      .mockResolvedValueOnce({ output: review(false), meta: reviewMeta2 })
+      .mockResolvedValueOnce({ output: reviewedOutput(false), meta: reviewMeta1 })
+      .mockResolvedValueOnce({ output: reviewedOutput(false), meta: reviewMeta2 })
 
     const result = await run()
 
     expect(buildFlashcard).toHaveBeenCalledTimes(2)
     expect(result.questions).toEqual([])
-    expect(saveQuestionSlot).not.toHaveBeenCalled()
+    expect(result.failedCount).toBe(1)
+    expect(finishSlot).not.toHaveBeenCalled()
+    expect(failSlot).toHaveBeenCalledWith("run-1", 0)
     expect(wastedMetas()).toEqual([ buildMeta1, reviewMeta1, buildMeta2, reviewMeta2 ])
   })
 })
@@ -207,10 +290,12 @@ describe("runPipeline agent failure", () => {
 
     expect(buildFlashcard).toHaveBeenCalledTimes(1)
     expect(result.questions).toEqual([])
+    expect(result.failedCount).toBe(1)
+    expect(failSlot).toHaveBeenCalledWith("run-1", 0)
     expect(wastedMetas()).toEqual([ buildMeta1 ])
   })
 
-  it("propagates cancellation, still flagging the calls it already billed as wasted", async () => {
+  it("propagates cancellation, still flagging the calls it already billed as wasted, without failing the slot", async () => {
     singleSlotRun()
     const buildMeta1 = meta({ model: "build-1" })
     buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: buildMeta1 })
@@ -222,6 +307,84 @@ describe("runPipeline agent failure", () => {
     const result = await run()
 
     expect(result.questions).toEqual([])
+    expect(failSlot).not.toHaveBeenCalled()
     expect(wastedMetas()).toEqual([ buildMeta1 ])
+  })
+})
+
+describe("runPipeline progress events", () => {
+  it("emits a rewriting stage for a second-attempt build, and a done stage carrying the failed count", async () => {
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task ],
+      slots: new Map([ [ 0, pendingSlot() ] ]),
+    })
+    buildFlashcard
+      .mockResolvedValueOnce({ output: flashcard("first"), meta: meta() })
+      .mockResolvedValueOnce({ output: flashcard("second"), meta: meta() })
+    reviewQuestion
+      .mockResolvedValueOnce({ output: reviewedOutput(false), meta: meta() })
+      .mockResolvedValueOnce({ output: reviewedOutput(true), meta: meta() })
+
+    const events: string[] = []
+    await runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", onProgress: e => events.push(e.stage) })
+
+    expect(events).toContain("rewriting")
+    expect(events[events.length - 1]).toBe("done")
+  })
+
+  it("credits a resumed slot's already-persisted build toward the crafting count", async () => {
+    // Both slots are pending with an attempt-1 build already persisted (crashed before review).
+    const resumedBuild = { attemptNum: 1, build: { question: flashcard("a"), meta: meta() }, review: null }
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task, task ],
+      slots: new Map([ [ 0, pendingSlot([ resumedBuild ]) ], [ 1, pendingSlot([ resumedBuild ]) ] ]),
+    })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: meta() })
+
+    const craftEvents: Array<{ done: number; total: number }> = []
+    await runPipeline({
+      prepId: "prep-1", pages: [], apiKey: "key", model: "model",
+      onProgress: e => { if (e.stage === "crafting") craftEvents.push({ done: e.done, total: e.total }) },
+    })
+
+    expect(buildFlashcard).not.toHaveBeenCalled()
+    // Neither slot goes through a fresh build (both resume), but crafting still reaches 2/2.
+    expect(craftEvents[craftEvents.length - 1]).toEqual({ done: 2, total: 2 })
+  })
+
+  it("knows the rewrite total upfront from a resumed rejection — the denominator doesn't grow mid-run", async () => {
+    const rejected = { attemptNum: 1, build: { question: flashcard("a"), meta: meta() }, review: { review: review(false), passed: false, meta: meta() } }
+    loadOrCreateRun.mockResolvedValue({
+      runId: "run-1",
+      concepts: [ concept ],
+      questionTasks: [ task ],
+      slots: new Map([ [ 0, pendingSlot([ rejected ]) ] ]),
+    })
+    buildFlashcard.mockResolvedValue({ output: flashcard("rewritten"), meta: meta() })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(true), meta: meta() })
+
+    const rewriteEvents: Array<{ done: number; total: number }> = []
+    await runPipeline({
+      prepId: "prep-1", pages: [], apiKey: "key", model: "model",
+      onProgress: e => { if (e.stage === "rewriting") rewriteEvents.push({ done: e.done, total: e.total }) },
+    })
+
+    expect(rewriteEvents.every(e => e.total === 1)).toBe(true)
+  })
+
+  it("still counts a slot as failed in this run's result even if persisting the failure throws", async () => {
+    singleSlotRun()
+    buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: meta() })
+    reviewQuestion.mockResolvedValue({ output: reviewedOutput(false), meta: meta() })
+    failSlot.mockRejectedValue(new Error("transient DB error"))
+    vi.spyOn(console, "warn").mockImplementation(() => undefined)
+
+    const result = await run()
+
+    expect(result.failedCount).toBe(1)
   })
 })

@@ -95,16 +95,29 @@ model PipelineRun {
   questions PipelineQuestion[]
 }
 
+enum PipelineQuestionStatus {
+  pending
+  finished
+  failed
+}
+
 model PipelineQuestion {
-  id        String   @id @default(uuid())
+  id        String                 @id @default(uuid())
   runId     String
   taskIndex Int
   task      Json
+  status    PipelineQuestionStatus @default(pending)
+  // Per-attempt build/review state, in attempt order — lets crash-resume continue from the
+  // last completed step (build, or build+review) instead of redoing the whole slot. Shape:
+  // { attemptNum, build: {question, meta}, review: {review, passed, meta} | null }[].
+  // `status: pending` with a non-empty attempts array means resumable; `failed` is terminal
+  // (max attempts exhausted) and is never retried on resume.
+  attempts  Json                   @default("[]")
+  // Final question + its build/review AgentMeta, set once status = finished.
   question  Json?
-  // Build/review(/retry) AgentMeta for `question`, same shape as pipeline.ts's in-memory
-  // slotMeta — persisted here so crash-resumed slots keep their GenerationMeta on insert.
   meta      Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @default(now())
 
   run PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
