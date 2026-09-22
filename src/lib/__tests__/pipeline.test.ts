@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const recordGenerationMeta = vi.fn().mockResolvedValue(undefined)
+const recordGenerationMetaMany = vi.fn().mockResolvedValue(undefined)
 vi.mock("../../actions/generationMeta", () => ({
   recordGenerationMeta: (...args: unknown[]) => recordGenerationMeta(...args),
+  recordGenerationMetaMany: (...args: unknown[]) => recordGenerationMetaMany(...args),
 }))
 
 const saveQuestionSlot = vi.fn().mockResolvedValue(undefined)
@@ -85,6 +87,11 @@ function singleSlotRun() {
 
 function run() {
   return runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", onProgress: vi.fn() })
+}
+
+/** Every `metas` argument recordGenerationMetaMany was called with, wasted calls only, flattened in call order. */
+function wastedMetas(): AgentMeta[] {
+  return recordGenerationMetaMany.mock.calls.filter(c => c[3] === true).flatMap(c => c[2])
 }
 
 beforeEach(() => {
@@ -170,9 +177,8 @@ describe("runPipeline reviewer rejection", () => {
 
     await run()
 
-    const wasted = recordGenerationMeta.mock.calls.filter(c => c[3] === true).map(c => c[2])
-    expect(wasted).toEqual([ buildMeta1, reviewMeta1 ])
-    expect(recordGenerationMeta.mock.calls.every(c => c[0] === "prep")).toBe(true)
+    expect(wastedMetas()).toEqual([ buildMeta1, reviewMeta1 ])
+    expect(recordGenerationMetaMany.mock.calls.every(c => c[0] === "prep")).toBe(true)
   })
 
   it("fails the slot after a second rejection, with no third attempt and all calls flagged wasted", async () => {
@@ -185,8 +191,7 @@ describe("runPipeline reviewer rejection", () => {
     expect(buildFlashcard).toHaveBeenCalledTimes(2)
     expect(result.questions).toEqual([])
     expect(saveQuestionSlot).not.toHaveBeenCalled()
-    const wasted = recordGenerationMeta.mock.calls.filter(c => c[3] === true).map(c => c[2])
-    expect(wasted).toEqual([ buildMeta1, reviewMeta1, buildMeta2, reviewMeta2 ])
+    expect(wastedMetas()).toEqual([ buildMeta1, reviewMeta1, buildMeta2, reviewMeta2 ])
   })
 })
 
@@ -202,19 +207,21 @@ describe("runPipeline agent failure", () => {
 
     expect(buildFlashcard).toHaveBeenCalledTimes(1)
     expect(result.questions).toEqual([])
-    expect(recordGenerationMeta.mock.calls.filter(c => c[3] === true).map(c => c[2])).toEqual([ buildMeta1 ])
+    expect(wastedMetas()).toEqual([ buildMeta1 ])
   })
 
-  it("propagates cancellation instead of failing the slot", async () => {
+  it("propagates cancellation, still flagging the calls it already billed as wasted", async () => {
     singleSlotRun()
+    const buildMeta1 = meta({ model: "build-1" })
+    buildFlashcard.mockResolvedValue({ output: flashcard("first"), meta: buildMeta1 })
     const abort = new Error("aborted")
     abort.name = "AbortError"
-    buildFlashcard.mockRejectedValue(abort)
+    reviewQuestion.mockRejectedValue(abort)
     vi.spyOn(console, "warn").mockImplementation(() => undefined)
 
     const result = await run()
 
     expect(result.questions).toEqual([])
-    expect(recordGenerationMeta).not.toHaveBeenCalledWith("prep", "prep-1", expect.anything(), true)
+    expect(wastedMetas()).toEqual([ buildMeta1 ])
   })
 })

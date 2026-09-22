@@ -88,7 +88,7 @@ export const fillTheGapContentSchema = z.object({
 export const sortingAnswerSchema = z.object({
   id: z.string(),
   text: z.string(),
-  correct_index: z.number().min(1).max(4),
+  correct_index: z.number().int().min(1).max(4),
   explanation: z.string(),
 })
 

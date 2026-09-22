@@ -1,5 +1,5 @@
 import type { AgentMeta, AgentResult } from "./agent"
-import { recordGenerationMeta } from "../actions/generationMeta"
+import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -35,6 +35,9 @@ export class TextTooLongError extends Error {
 
 /** Maximum number of concurrent build→review→save chains. */
 const CONCURRENCY = 5
+
+/** Bounded build→review chain per slot: an initial attempt, plus one reviewed rewrite on rejection. */
+const MAX_SLOT_ATTEMPTS = 2
 
 /**
  * Runs `tasks` with at most `limit` concurrent executions.
@@ -226,47 +229,49 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   const settled = await withConcurrency(
     missingIndices.map((taskIdx) => async () => {
       const task = tasks[taskIdx]
-      const spent: AgentMeta[] = [] // every billed call of this slot, kept or not
-
-      const track = (meta: AgentMeta) => {
-        spent.push(meta)
+      const trackTokens = (meta: AgentMeta) => {
         totalTokens += meta.totalTokens
         void incrementPrepTokens(prepId, meta.totalTokens)
       }
 
-      // One build (or rewrite) plus its independent review.
-      const attempt = async (rewrite?: RewriteInput) => {
-        const built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite)
-        track(built.meta)
-        if (!rewrite) {
-          craftDone++
-          onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
-        }
-        const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal)
-        track(reviewed.meta)
-        return { question: built.output, ...reviewed.output, meta: [ built.meta, reviewed.meta ] }
-      }
-
-      // Every call whose output isn't the final Question is billed-but-discarded.
-      const recordWasted = (kept: AgentMeta[]) => {
-        for (const meta of spent.filter(m => !kept.includes(m))) {
-          void recordGenerationMeta("prep", prepId, meta, true).catch(e => console.warn("[pipeline] failed to record wasted GenerationMeta:", e))
-        }
+      // Every call whose output isn't the final Question is billed-but-discarded — recorded
+      // as soon as an attempt is superseded or fails, not diffed at the end, so a cancellation
+      // or a future extra attempt can't leave calls unaccounted for.
+      const recordWasted = (metas: AgentMeta[]) => {
+        void recordGenerationMetaMany("prep", prepId, metas, true).catch(e => console.warn("[pipeline] failed to record wasted GenerationMeta:", e))
       }
 
       let final: { question: GeneratedQuestion; meta: AgentMeta[] } | null = null
-      try {
-        const first = await attempt()
-        if (first.passed) {
-          final = first
-        } else {
-          const second = await attempt({ question: first.question, feedback: reviewFeedback(first.review) })
-          if (second.passed) final = second
+      let rewrite: RewriteInput | undefined
+
+      for (let attemptNum = 1; attemptNum <= MAX_SLOT_ATTEMPTS && !final; attemptNum++) {
+        const attemptMeta: AgentMeta[] = []
+        try {
+          const built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite)
+          attemptMeta.push(built.meta)
+          trackTokens(built.meta)
+          if (attemptNum === 1) {
+            craftDone++
+            onProgress({ stage: "crafting", done: craftDone, total: tasks.length })
+          }
+
+          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal)
+          attemptMeta.push(reviewed.meta)
+          trackTokens(reviewed.meta)
+
+          if (reviewed.output.passed) {
+            final = { question: built.output, meta: attemptMeta }
+          } else {
+            recordWasted(attemptMeta)
+            rewrite = { question: built.output, feedback: reviewFeedback(reviewed.output.review) }
+          }
+        } catch (e) {
+          recordWasted(attemptMeta)
+          // A cancelled pipeline isn't a failed slot; runAgent has already exhausted its own retries otherwise.
+          if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) throw e
+          console.warn(`[pipeline] slot ${taskIdx} attempt ${attemptNum} failed:`, e)
+          break
         }
-      } catch (e) {
-        // A cancelled pipeline isn't a failed slot; runAgent has already exhausted its own retries otherwise.
-        if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) throw e
-        console.warn(`[pipeline] slot ${taskIdx} failed:`, e)
       }
 
       reviewDone++
@@ -274,14 +279,12 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
       if (!final) {
         // TODO(#212): failed slots aren't persisted or shown yet; they rerun on resume.
-        recordWasted([])
         return
       }
 
       // Persist before marking in-memory — if save throws the slot stays null in DB
       await saveQuestionSlot(runId, taskIdx, final.question, final.meta)
       slots.set(taskIdx, { question: final.question, meta: final.meta })
-      recordWasted(final.meta)
     }),
     CONCURRENCY,
   )

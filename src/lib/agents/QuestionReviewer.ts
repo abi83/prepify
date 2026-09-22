@@ -42,30 +42,33 @@ export function hasValidDistractorShape(type: QuestionType, scores: ReviewScores
   return hasDistractors(type) === (scores.distractorQuality !== null)
 }
 
-function applicableMetrics(scores: ReviewScores): Array<[ string, number ]> {
-  const metrics: Array<[ string, number ]> = [
-    [ "correctness", scores.correctness.score ],
-    [ "conceptAlignment", scores.conceptAlignment.score ],
-    [ "clarity", scores.clarity.score ],
-    [ "cognitiveDemand", scores.cognitiveDemand.score ],
+interface NamedMetric {
+  name: string
+  score: number
+  comment: string
+}
+
+function applicableMetrics(scores: ReviewScores): NamedMetric[] {
+  const metrics: NamedMetric[] = [
+    { name: "correctness", ...scores.correctness },
+    { name: "conceptAlignment", ...scores.conceptAlignment },
+    { name: "clarity", ...scores.clarity },
+    { name: "cognitiveDemand", ...scores.cognitiveDemand },
   ]
-  if (scores.distractorQuality !== null) metrics.push([ "distractorQuality", scores.distractorQuality.score ])
+  if (scores.distractorQuality !== null) metrics.push({ name: "distractorQuality", ...scores.distractorQuality })
   return metrics
 }
 
 export function passesReview(scores: ReviewScores): boolean {
   const metrics = applicableMetrics(scores)
-  const belowFloor = metrics.some(([ name, score ]) => score < (name === "correctness" ? CORRECTNESS_FLOOR : METRIC_FLOOR))
-  const average = metrics.reduce((sum, [ , score ]) => sum + score, 0) / metrics.length
+  const belowFloor = metrics.some(m => m.score < (m.name === "correctness" ? CORRECTNESS_FLOOR : METRIC_FLOOR))
+  const average = metrics.reduce((sum, m) => sum + m.score, 0) / metrics.length
   return !belowFloor && average >= AVERAGE_FLOOR
 }
 
 /** Critique text for a builder rewrite: the global comment plus every metric's score and comment. */
 export function reviewFeedback(review: Review): string {
-  const lines = applicableMetrics(review.scores).map(([ name ]) => {
-    const metric = review.scores[name as keyof ReviewScores]!
-    return `- ${name}: ${metric.score.toFixed(2)} — ${metric.comment}`
-  })
+  const lines = applicableMetrics(review.scores).map(m => `- ${m.name}: ${m.score.toFixed(2)} — ${m.comment}`)
   return `${review.comment}\n${lines.join("\n")}`
 }
 
