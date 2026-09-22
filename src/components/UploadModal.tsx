@@ -1,15 +1,15 @@
 import type { Prisma } from "@prisma/client"
 import { useEffect, useRef, useState } from "react"
 
+import { listMyPreps, createPrep } from "@/actions/preps"
+import type { VisualElementOutput } from "@/lib/agents/OcrAgent"
+import { runOcrAgent } from "@/lib/agents/OcrAgent"
+import { getApiKey } from "@/lib/apiKey"
+import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { consoleLogger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
+import type { Page } from "@/types/prep"
 
-import { listMyPreps, createPrep } from "../actions/preps"
-import type { VisualElementOutput } from "../lib/agents/OcrAgent"
-import { runOcrAgent } from "../lib/agents/OcrAgent"
-import { getApiKey } from "../lib/apiKey"
-import { BYOK_TEXT_HARD_LIMIT } from "../lib/config"
-import { consoleLogger } from "../lib/logger"
-import type { Page } from "../types/prep"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
 

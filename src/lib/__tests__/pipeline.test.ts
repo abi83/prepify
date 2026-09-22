@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const recordGenerationMeta = vi.fn().mockResolvedValue(undefined)
 const recordGenerationMetaMany = vi.fn().mockResolvedValue(undefined)
-vi.mock("../../actions/generationMeta", () => ({
+vi.mock("@/actions/generationMeta", () => ({
   recordGenerationMeta: (...args: unknown[]) => recordGenerationMeta(...args),
   recordGenerationMetaMany: (...args: unknown[]) => recordGenerationMetaMany(...args),
 }))
@@ -13,7 +13,7 @@ const finishSlot = vi.fn().mockResolvedValue(undefined)
 const failSlot = vi.fn().mockResolvedValue(undefined)
 const loadOrCreateRun = vi.fn()
 
-vi.mock("../../actions/pipeline", () => ({
+vi.mock("@/actions/pipeline", () => ({
   loadOrCreateRun: (...args: unknown[]) => loadOrCreateRun(...args),
   saveConcepts: vi.fn().mockResolvedValue(undefined),
   saveQuestionTasksAndInitSlots: vi.fn().mockResolvedValue(undefined),
@@ -23,14 +23,14 @@ vi.mock("../../actions/pipeline", () => ({
   failSlot: (...args: unknown[]) => failSlot(...args),
 }))
 
-vi.mock("../../actions/preps", () => ({
+vi.mock("@/actions/preps", () => ({
   incrementPrepTokens: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock("../agents/ConceptExtractor", () => ({ runConceptExtractor: vi.fn() }))
-vi.mock("../agents/ConceptMerger", () => ({ runConceptMerger: vi.fn() }))
+vi.mock("@/lib/agents/ConceptExtractor", () => ({ runConceptExtractor: vi.fn() }))
+vi.mock("@/lib/agents/ConceptMerger", () => ({ runConceptMerger: vi.fn() }))
 
-vi.mock("../agents/PrepNamer", () => ({
+vi.mock("@/lib/agents/PrepNamer", () => ({
   runPrepNamer: vi.fn().mockResolvedValue({
     output: { title: "Title", description: "Description" },
     // Inlined rather than imported: vi.mock factories are hoisted above imports, so an
@@ -40,24 +40,25 @@ vi.mock("../agents/PrepNamer", () => ({
 }))
 
 const buildFlashcard = vi.fn()
-vi.mock("../agents/builders/FlashcardBuilder", () => ({ runFlashcardBuilder: (...args: unknown[]) => buildFlashcard(...args) }))
-vi.mock("../agents/builders/SingleChoiceBuilder", () => ({ runSingleChoiceBuilder: vi.fn() }))
-vi.mock("../agents/builders/MultipleChoiceBuilder", () => ({ runMultipleChoiceBuilder: vi.fn() }))
-vi.mock("../agents/builders/FillTheGapBuilder", () => ({ runFillTheGapBuilder: vi.fn() }))
-vi.mock("../agents/builders/SortingBuilder", () => ({ runSortingBuilder: vi.fn() }))
+vi.mock("@/lib/agents/builders/FlashcardBuilder", () => ({ runFlashcardBuilder: (...args: unknown[]) => buildFlashcard(...args) }))
+vi.mock("@/lib/agents/builders/SingleChoiceBuilder", () => ({ runSingleChoiceBuilder: vi.fn() }))
+vi.mock("@/lib/agents/builders/MultipleChoiceBuilder", () => ({ runMultipleChoiceBuilder: vi.fn() }))
+vi.mock("@/lib/agents/builders/FillTheGapBuilder", () => ({ runFillTheGapBuilder: vi.fn() }))
+vi.mock("@/lib/agents/builders/SortingBuilder", () => ({ runSortingBuilder: vi.fn() }))
 
 const reviewQuestion = vi.fn()
-vi.mock("../agents/QuestionReviewer", async importOriginal => ({
-  ...await importOriginal<typeof import("../agents/QuestionReviewer")>(),
+vi.mock("@/lib/agents/QuestionReviewer", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/agents/QuestionReviewer")>(),
   runQuestionReviewer: (...args: unknown[]) => reviewQuestion(...args),
 }))
 
-import type { PipelineSlotState } from "../../repositories/pipelineRepository"
-import type { PipelineAttempt } from "../../types/pipeline"
-import type { GeneratedQuestion } from "../../types/questions"
-import type { AgentMeta } from "../agent"
-import { consoleLogger } from "../logger"
-import { runPipeline } from "../pipeline"
+import type { AgentMeta } from "@/lib/agent"
+import { consoleLogger } from "@/lib/logger"
+import { runPipeline } from "@/lib/pipeline"
+import type { PipelineSlotState } from "@/repositories/pipelineRepository"
+import type { PipelineAttempt } from "@/types/pipeline"
+import type { GeneratedQuestion } from "@/types/questions"
+
 import { concept, flashcard, meta, review, task } from "./pipelineFixtures"
 
 function reviewedOutput(passed: boolean) {

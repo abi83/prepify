@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { sanitizeLLMText } from "../agent"
+import { sanitizeLLMText } from "@/lib/agent"
 
 describe("sanitizeLLMText", () => {
   it("passes through clean text unchanged", () => {

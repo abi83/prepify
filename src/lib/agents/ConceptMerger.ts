@@ -1,8 +1,8 @@
 import { z } from "zod"
 
-import type { Concept } from "../../types/pipeline"
-import { runAgent, AgentResult, EMPTY_AGENT_META } from "../agent"
-import type { Logger } from "../logger"
+import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
+import type { Concept } from "@/types/pipeline"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
 

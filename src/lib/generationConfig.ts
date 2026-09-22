@@ -1,4 +1,4 @@
-import type { Difficulty, QuestionType } from "../types/questions"
+import type { Difficulty, QuestionType } from "@/types/questions"
 
 const STORAGE_KEY = "prepify_gen_config"
 

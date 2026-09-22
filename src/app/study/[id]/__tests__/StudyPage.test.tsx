@@ -16,7 +16,7 @@ vi.mock("@/actions/attempts", () => ({
   insertAttempt: vi.fn().mockResolvedValue({}),
 }))
 
-import StudyPage from "../StudyPage"
+import StudyPage from "@/app/study/[id]/StudyPage"
 
 function prep(overrides: Partial<Prep> = {}): Prep {
   return {

@@ -1,12 +1,13 @@
 import { z } from "zod"
 
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
+import type { QuestionTask } from "@/types/pipeline"
+import { flashcardContentSchema } from "@/types/questions"
+import type { FlashcardContent } from "@/types/questions"
+
 import { difficultyInstructions } from "./difficulty"
 import { rewriteInstructions, type RewriteInput } from "./rewrite"
-import type { QuestionTask } from "../../../types/pipeline"
-import { flashcardContentSchema } from "../../../types/questions"
-import type { FlashcardContent } from "../../../types/questions"
-import { runAgent, AgentResult } from "../../agent"
-import type { Logger } from "../../logger"
 
 const responseSchema = z.object({ content: flashcardContentSchema })
 

@@ -1,5 +1,24 @@
 import nextConfig from "eslint-config-next"
 
+const noParentImports = {
+  rules: {
+    "no-parent-imports": {
+      create(context) {
+        const check = (node, value) => {
+          if (typeof value === "string" && value.startsWith("../")) {
+            context.report({ node, message: "Use @/ alias instead of relative parent imports." })
+          }
+        }
+        return {
+          ImportDeclaration(node) { check(node, node.source.value) },
+          ExportNamedDeclaration(node) { if (node.source) check(node, node.source.value) },
+          ImportExpression(node) { if (node.source.type === "Literal") check(node, node.source.value) },
+        }
+      },
+    },
+  },
+}
+
 const config = [
   {
     ignores: [
@@ -11,6 +30,10 @@ const config = [
     ],
   },
   ...nextConfig,
+  {
+    plugins: { local: noParentImports },
+    rules: { "local/no-parent-imports": "error" },
+  },
   {
     rules: {
       "import/order": [

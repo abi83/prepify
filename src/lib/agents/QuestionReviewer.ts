@@ -1,9 +1,9 @@
 import { z } from "zod"
 
-import type { QuestionTask } from "../../types/pipeline"
-import type { GeneratedQuestion, QuestionType } from "../../types/questions"
-import { runAgent, AgentResult } from "../agent"
-import type { Logger } from "../logger"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
+import type { QuestionTask } from "@/types/pipeline"
+import type { GeneratedQuestion, QuestionType } from "@/types/questions"
 
 const TYPES_WITH_DISTRACTORS = new Set<QuestionType>([ "single_choice", "multiple_choice", "fill_the_gap" ])
 

@@ -1,6 +1,6 @@
 import type { GenerationEntityType } from "@prisma/client"
 
-import type { AgentMeta } from "../lib/agent"
+import type { AgentMeta } from "@/lib/agent"
 
 /** Entities #194 covers today. Concepts get their own value once #48 makes them first-class. */
 export type { GenerationEntityType }

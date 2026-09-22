@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 import type { CatalogEntry } from "@/repositories/prepRepository"
+/* eslint-disable import/order */
 import { createNavigationMock } from "@/testUtils/navigationMock"
 
 // vi.mock is hoisted above this file's imports, so the mock object itself must be
@@ -15,7 +16,9 @@ vi.mock("next/navigation", () => {
   return mocks.nav
 })
 
-import CatalogPage from "../CatalogPage"
+// Must come after vi.mock — Vitest's import transform initializes this after the mock is registered.
+import CatalogPage from "@/app/catalog/CatalogPage"
+/* eslint-enable import/order */
 
 function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {

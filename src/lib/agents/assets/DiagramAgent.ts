@@ -1,7 +1,7 @@
 import { z } from "zod"
 
-import { runAgent, AgentResult } from "../../agent"
-import type { Logger } from "../../logger"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { Logger } from "@/lib/logger"
 
 const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 

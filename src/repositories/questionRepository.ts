@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto"
 
 import { Prisma, type Question } from "@prisma/client"
 
+import type { AgentMeta } from "@/lib/agent"
+import { prisma } from "@/lib/prisma"
+import { toGenerationMeta } from "@/types/generationMeta"
+import type { Difficulty } from "@/types/questions"
+
 import { ForbiddenError } from "./errors"
 import { getPrep } from "./prepRepository"
-import type { AgentMeta } from "../lib/agent"
-import { prisma } from "../lib/prisma"
-import { toGenerationMeta } from "../types/generationMeta"
-import type { Difficulty } from "../types/questions"
 
 export async function listByPrep(userId: string | null, prepId: string): Promise<Question[]> {
   await getPrep(userId, prepId) // throws NotFoundError/ForbiddenError if not readable

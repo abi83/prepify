@@ -1,10 +1,10 @@
 import { z } from "zod"
 
-import { runAgent, AgentResult } from "../agent"
-import type { AgentImage } from "../agent"
-import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "../config"
-import type { SupportedLanguage } from "../config"
-import type { Logger } from "../logger"
+import { runAgent, AgentResult } from "@/lib/agent"
+import type { AgentImage } from "@/lib/agent"
+import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
+import type { SupportedLanguage } from "@/lib/config"
+import type { Logger } from "@/lib/logger"
 
 const visualElementSchema = z.object({
   type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),

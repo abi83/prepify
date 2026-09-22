@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi } from "vitest"
 
-import type { SingleChoiceContent } from "../../../types/questions"
-import SingleChoiceQuestion from "../SingleChoiceQuestion"
+import SingleChoiceQuestion from "@/components/questions/SingleChoiceQuestion"
+import type { SingleChoiceContent } from "@/types/questions"
 
 const content: SingleChoiceContent = {
   question: "What is the capital of France?",

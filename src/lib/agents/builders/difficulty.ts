@@ -1,4 +1,4 @@
-import type { QuestionTask } from "../../../types/pipeline"
+import type { QuestionTask } from "@/types/pipeline"
 
 /** Builder types that produce wrong options (distractors) alongside the correct answer. */
 export type DistractorSupport = "with-distractors" | "no-distractors"

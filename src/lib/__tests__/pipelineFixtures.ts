@@ -1,7 +1,7 @@
-import type { Concept, QuestionTask } from "../../types/pipeline"
-import type { GeneratedQuestion } from "../../types/questions"
-import type { AgentMeta } from "../agent"
-import type { Review } from "../agents/QuestionReviewer"
+import type { AgentMeta } from "@/lib/agent"
+import type { Review } from "@/lib/agents/QuestionReviewer"
+import type { Concept, QuestionTask } from "@/types/pipeline"
+import type { GeneratedQuestion } from "@/types/questions"
 
 export function emptyMeta(): AgentMeta {
   return { model: "", tier: "", promptTokens: 0, cachedTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, toolCalls: 0, executionMs: 0 }

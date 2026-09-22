@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { computeCost } from "../pricing"
+import { computeCost } from "@/lib/pricing"
 
 describe("computeCost", () => {
   it("prices prompt tokens at the input rate, completion tokens at the output rate", () => {

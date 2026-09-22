@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 
-import { prepLabelSchema, DISCIPLINES } from "../PrepLabeler"
+import { prepLabelSchema, DISCIPLINES } from "@/lib/agents/PrepLabeler"
 
 describe("prepLabelSchema", () => {
   it("accepts a fully-labelled result", () => {

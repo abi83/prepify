@@ -1,7 +1,4 @@
-import type { AgentMeta, AgentResult } from "./agent"
-import { serializeError } from "./logger"
-import type { Logger } from "./logger"
-import { recordGenerationMeta, recordGenerationMetaMany } from "../actions/generationMeta"
+import { recordGenerationMeta, recordGenerationMetaMany } from "@/actions/generationMeta"
 import {
   loadOrCreateRun,
   saveConcepts,
@@ -10,12 +7,14 @@ import {
   saveAttemptReview,
   finishSlot,
   failSlot,
-} from "../actions/pipeline"
-import { incrementPrepTokens } from "../actions/preps"
-import type { PipelineSlotState } from "../repositories/pipelineRepository"
-import type { Concept, PipelineAttempt, QuestionTask, PipelineProgressEvent } from "../types/pipeline"
-import type { Page } from "../types/prep"
-import type { Difficulty, GeneratedQuestion, QuestionType } from "../types/questions"
+} from "@/actions/pipeline"
+import { incrementPrepTokens } from "@/actions/preps"
+import type { PipelineSlotState } from "@/repositories/pipelineRepository"
+import type { Concept, PipelineAttempt, QuestionTask, PipelineProgressEvent } from "@/types/pipeline"
+import type { Page } from "@/types/prep"
+import type { Difficulty, GeneratedQuestion, QuestionType } from "@/types/questions"
+
+import type { AgentMeta, AgentResult } from "./agent"
 import { runFillTheGapBuilder } from "./agents/builders/FillTheGapBuilder"
 import { runFlashcardBuilder } from "./agents/builders/FlashcardBuilder"
 import { runMultipleChoiceBuilder } from "./agents/builders/MultipleChoiceBuilder"
@@ -28,6 +27,8 @@ import { runPrepNamer } from "./agents/PrepNamer"
 import { reviewFeedback, runQuestionReviewer } from "./agents/QuestionReviewer"
 import { BYOK_TEXT_HARD_LIMIT } from "./config"
 import { DEFAULT_GEN_CONFIG, type DifficultyMix } from "./generationConfig"
+import type { Logger } from "./logger"
+import { serializeError } from "./logger"
 import { deduplicateExact } from "./mergeConceptLists"
 import { buildQuestionTasks } from "./taskBuilder"
 

@@ -1,18 +1,19 @@
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
-import { ForbiddenError, NotFoundError } from "./errors"
-import { agentMetaSchema, type AgentMeta } from "../lib/agent"
-import type { Review } from "../lib/agents/QuestionReviewer"
-import { prisma } from "../lib/prisma"
+import { agentMetaSchema, type AgentMeta } from "@/lib/agent"
+import type { Review } from "@/lib/agents/QuestionReviewer"
+import { prisma } from "@/lib/prisma"
 import {
   pipelineAttemptsSchema,
   pipelineQuestionStatusSchema,
   type Concept,
   type PipelineAttempt,
   type QuestionTask,
-} from "../types/pipeline"
-import { generatedQuestionSchema, type GeneratedQuestion } from "../types/questions"
+} from "@/types/pipeline"
+import { generatedQuestionSchema, type GeneratedQuestion } from "@/types/questions"
+
+import { ForbiddenError, NotFoundError } from "./errors"
 
 async function assertOwnsPrep(userId: string, prepId: string): Promise<void> {
   const prep = await prisma.prep.findUnique({ where: { id: prepId } })
