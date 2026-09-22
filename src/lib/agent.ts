@@ -72,6 +72,15 @@ function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.
   ]
 }
 
+// Strips characters that Postgres rejects in text/JSON columns:
+// - C0 controls (0x00–0x1F) except tab, newline, carriage return
+// - Lone UTF-16 surrogates (unpaired high or low surrogate code units)
+export function sanitizeLLMText(s: string): string {
+  return s
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
+}
+
 const MAX_ATTEMPTS = 3
 const SERVICE_TIER = "flex"
 
@@ -121,7 +130,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const usage = response.usage
       const message = response.choices[0]?.message
 
-      const rawText = message?.content ?? ""
+      const rawText = sanitizeLLMText(message?.content ?? "")
       const parsed = JSON.parse(rawText)
 
       // Zod validation — model is constrained to match the schema via Structured Outputs,
