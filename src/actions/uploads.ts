@@ -1,11 +1,11 @@
 "use server"
 
-import { randomUUID } from "crypto"
-
 import { Storage } from "@google-cloud/storage"
 
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
+import { ForbiddenError } from "@/repositories/errors"
+import * as prepRepository from "@/repositories/prepRepository"
 
 const storage = new Storage()
 
@@ -21,22 +21,24 @@ const MIME_TO_EXT: Record<string, string> = {
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
-export type UploadUrlResult = {
-  uploadUrl: string
-  gcsKey: string
-}
-
-export async function getUploadSignedUrl(mimeType: string): Promise<UploadUrlResult> {
+export async function getUploadSignedUrl(
+  prepId: string,
+  pageIndex: number,
+  mimeType: string,
+): Promise<{ key: string; signedUrl: string }> {
   const userId = await requireUserId()
+
+  const prep = await prepRepository.getPrep(userId, prepId)
+  if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} does not belong to this user`)
 
   const ext = MIME_TO_EXT[mimeType]
   if (!ext) throw new Error(`Unsupported mime type: ${mimeType}`)
 
-  const gcsKey = `photos/${userId}/${randomUUID()}.${ext}`
+  const key = `prep-pages/${prepId}/page-${pageIndex}.${ext}`
 
-  const [ uploadUrl ] = await storage
+  const [ signedUrl ] = await storage
     .bucket(config.GCS_BUCKET_NAME)
-    .file(gcsKey)
+    .file(key)
     .getSignedUrl({
       version: "v4",
       action: "write",
@@ -47,5 +49,5 @@ export async function getUploadSignedUrl(mimeType: string): Promise<UploadUrlRes
       },
     })
 
-  return { uploadUrl, gcsKey }
+  return { key, signedUrl }
 }
