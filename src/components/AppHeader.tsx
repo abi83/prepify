@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 
-import { Button } from "@/components/ui/button"
 import ThemeToggle from "@/components/ThemeToggle"
+import { Button } from "@/components/ui/button"
 import UserMenu from "@/components/UserMenu"
 
 export default function AppHeader() {
