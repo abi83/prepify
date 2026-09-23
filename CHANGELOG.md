@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.0](https://github.com/abi83/prepify/compare/v1.1.0...v1.2.0) (2026-09-23)
+
+
+### Features
+
+* add easy/medium/hard question difficulty tiers ([#215](https://github.com/abi83/prepify/issues/215)) ([78c12fa](https://github.com/abi83/prepify/commit/78c12fa0c59e06e19bb4dc97505754e25b17681e))
+* add environment URLs to deploy workflow ([#229](https://github.com/abi83/prepify/issues/229)) ([491644c](https://github.com/abi83/prepify/commit/491644cff324fb88036145e7a3605427bfc38436))
+* bake runtime version into image, expose via /api/healthz ([#189](https://github.com/abi83/prepify/issues/189)) ([a0227e4](https://github.com/abi83/prepify/commit/a0227e48e9faa97c4dfab15604ba31931446df95))
+* per-attempt pipeline state, failed-slot resume/UI, rewrite progress stage ([#218](https://github.com/abi83/prepify/issues/218)) ([2dd3cd1](https://github.com/abi83/prepify/commit/2dd3cd140adc478555c2bbca6554c881d0900716))
+* redirect www.prepify.cc to the bare domain ([#188](https://github.com/abi83/prepify/issues/188)) ([1cebec7](https://github.com/abi83/prepify/commit/1cebec7e775b6be5dcda4549dccbf09a1f67ef97))
+* reviewed rewrite loop, score-only reviewer, wasted-cost tracking ([#217](https://github.com/abi83/prepify/issues/217)) ([b73018a](https://github.com/abi83/prepify/commit/b73018ad8d0e36b6a39373b0bb17483714f9f064))
+* score QuestionReviewer output with a tier-aware rubric ([#216](https://github.com/abi83/prepify/issues/216)) ([b82a149](https://github.com/abi83/prepify/commit/b82a1496043ef7fade8612b2e316b4c6d7d18241))
+* separate least-privilege app_runtime DB role from migration owner ([#190](https://github.com/abi83/prepify/issues/190)) ([90e7a85](https://github.com/abi83/prepify/commit/90e7a858e84cbda149f3276f24665603ca8f6d72)), closes [#91](https://github.com/abi83/prepify/issues/91)
+* structured logging — W3C trace propagation, GCP adapter, single-line errors ([#222](https://github.com/abi83/prepify/issues/222)) ([a4d5f4b](https://github.com/abi83/prepify/commit/a4d5f4b7ca4996d817c98a6d6e36b8429b9d1e21))
+* visual polish pass — AppHeader/AppFooter, UserMenu, font-highlight, clean color palette ([#228](https://github.com/abi83/prepify/issues/228)) ([6c2ed57](https://github.com/abi83/prepify/commit/6c2ed57ec509ca35db07a3f31378e898404edbe2))
+
+
+### Bug Fixes
+
+* add human-readable job names, trim redundant workflow comments ([#209](https://github.com/abi83/prepify/issues/209)) ([a94bf48](https://github.com/abi83/prepify/commit/a94bf483da4ad26c68b8dc94233f7e7bf8e26f49)), closes [#208](https://github.com/abi83/prepify/issues/208)
+* add missing GenerationMeta migration, CI drift check ([#207](https://github.com/abi83/prepify/issues/207)) ([c785753](https://github.com/abi83/prepify/commit/c785753136e2c47de68659e411c8ba7feacc8869))
+* persist per-slot GenerationMeta so crash-resumed pipelines keep it ([#211](https://github.com/abi83/prepify/issues/211)) ([bcc0fea](https://github.com/abi83/prepify/commit/bcc0feadabeeae8f3b8283afef2ab450c6d2c961))
+* pin all deps to exact versions, add npm audit CI gate ([#204](https://github.com/abi83/prepify/issues/204)) ([718f483](https://github.com/abi83/prepify/commit/718f483c9a05bf5d08675caa3e2f73e0e7b2b491))
+* remove empty-string fallback for shadowDatabaseUrl ([#220](https://github.com/abi83/prepify/issues/220)) ([dfa9f73](https://github.com/abi83/prepify/commit/dfa9f732cbe21ce040df64a88c814c7c2d9894ef))
+* resolve --font-body to a real CSS var, not the Tailwind theme alias ([#192](https://github.com/abi83/prepify/issues/192)) ([424f7b9](https://github.com/abi83/prepify/commit/424f7b96f9c742af830c72649b79b6c89eda65d1))
+* strip C0 controls and lone surrogates from LLM output ([#221](https://github.com/abi83/prepify/issues/221)) ([f2a8509](https://github.com/abi83/prepify/commit/f2a8509f6c577b55dfc54bc62c17fdda5725bd60))
+* tag releases as vX.Y.Z, not &lt;package&gt;-vX.Y.Z ([#186](https://github.com/abi83/prepify/issues/186)) ([de3a37a](https://github.com/abi83/prepify/commit/de3a37ac6fefa84476608c01ed23ad1e920a8068))
+* visual polish, CSS cascade fix, unified card components ([#230](https://github.com/abi83/prepify/issues/230)) ([c2a1785](https://github.com/abi83/prepify/commit/c2a1785645a9f48157914106963e2af8ab306e9a))
+
 ## [1.1.0](https://github.com/abi83/prepify/compare/prepify-v1.0.0...prepify-v1.1.0) (2026-09-18)
 
 
