@@ -29,3 +29,11 @@ resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
+
+# Allows the Cloud Run SA to call signBlob on itself — required for ADC-based
+# signed URL generation without a key file.
+resource "google_service_account_iam_member" "run_runtime_sign_blobs" {
+  service_account_id = google_service_account.run_runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.run_runtime.email}"
+}
