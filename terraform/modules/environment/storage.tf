@@ -13,5 +13,12 @@ resource "google_storage_bucket" "this" {
     retention_period = 94608000 # 3 years
   }
 
+  cors {
+    origin          = [var.auth_url, "http://localhost:3000"]
+    method          = ["PUT", "OPTIONS"]
+    response_header = ["Content-Type", "x-goog-content-length-range"]
+    max_age_seconds = 3600
+  }
+
   depends_on = [google_project_service.this]
 }

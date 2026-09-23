@@ -9,7 +9,7 @@ export function isReadableBy(prep: Prep, userId: string | null): boolean {
 }
 
 export async function listOwnedPreps(userId: string): Promise<Prep[]> {
-  return prisma.prep.findMany({ where: { userId }, orderBy: { createdAt: "desc" } })
+  return prisma.prep.findMany({ where: { userId, isActive: true }, orderBy: { createdAt: "desc" } })
 }
 
 export interface CatalogEntry extends Prep {
@@ -18,7 +18,7 @@ export interface CatalogEntry extends Prep {
 
 export async function listPublicCatalog(): Promise<CatalogEntry[]> {
   const preps = await prisma.prep.findMany({
-    where: { visibility: "public" },
+    where: { visibility: "public", isActive: true },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { questions: true } } },
   })

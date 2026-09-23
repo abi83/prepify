@@ -68,9 +68,11 @@ describe("updatePrep / deletePrep", () => {
 })
 
 describe("listOwnedPreps", () => {
-  it("only returns the given user's preps", async () => {
-    await prepRepository.createPrep(OWNER, { title: "Owner Prep", pages: [], language: "en" })
+  it("only returns the given user's active preps", async () => {
+    const active = await prepRepository.createPrep(OWNER, { title: "Owner Prep", pages: [], language: "en" })
+    await prepRepository.createPrep(OWNER, { title: "Draft Prep", pages: [], language: "en" })
     await prepRepository.createPrep(OTHER, { title: "Other Prep", pages: [], language: "en" })
+    await prisma.prep.update({ where: { id: active.id }, data: { isActive: true } })
 
     const owned = await prepRepository.listOwnedPreps(OWNER)
     expect(owned).toHaveLength(1)
@@ -79,10 +81,11 @@ describe("listOwnedPreps", () => {
 })
 
 describe("listPublicCatalog", () => {
-  it("includes only public preps, with question counts", async () => {
+  it("includes only active public preps, with question counts", async () => {
     const priv = await prepRepository.createPrep(OWNER, { title: "Private", pages: [], language: "en" })
     const pub = await prepRepository.createPrep(OWNER, { title: "Public", pages: [], language: "en" })
     await prepRepository.updatePrep(OWNER, pub.id, { visibility: "public" })
+    await prisma.prep.update({ where: { id: pub.id }, data: { isActive: true } })
     await prisma.question.createMany({
       data: [
         { prepId: pub.id, type: "flashcard", content: {} },
