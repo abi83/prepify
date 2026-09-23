@@ -48,6 +48,7 @@ model Prep {
   language   String?
 
   description String          @default("")
+  isActive    Boolean         @default(false)
 
   questions   Question[]
   attempts    Attempt[]
