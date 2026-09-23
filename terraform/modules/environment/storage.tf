@@ -5,8 +5,13 @@ resource "google_storage_bucket" "this" {
   project                     = google_project.this.project_id
   name                        = "${var.project_id}-storage"
   location                    = var.region
+  storage_class               = "STANDARD"
   uniform_bucket_level_access = true
   force_destroy               = false
+
+  retention_policy {
+    retention_period = 94608000 # 3 years
+  }
 
   depends_on = [google_project_service.this]
 }

@@ -23,3 +23,9 @@ resource "google_project_iam_member" "terraform_ci_owner" {
   role    = "roles/owner"
   member  = "serviceAccount:${var.terraform_ci_service_account_email}"
 }
+
+resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
+  bucket = google_storage_bucket.this.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.run_runtime.email}"
+}
