@@ -1,10 +1,9 @@
 "use client"
 
 import type { Prep, PrepVisibility } from "@prisma/client"
-import { SettingsIcon, XIcon } from "lucide-react"
+import { BookOpenIcon, XIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signOut as authSignOut } from "next-auth/react"
 import { useState } from "react"
 
 import { deletePrep } from "@/actions/preps"
@@ -36,10 +35,6 @@ export default function MyPreps({ preps }: Props) {
   const [ deleting, setDeleting ] = useState(false)
   const router = useRouter()
 
-  async function signOut() {
-    await authSignOut({ redirectTo: "/" })
-  }
-
   function handleDone(prepId: string) {
     setShowUpload(false)
     router.push(`/preps/${prepId}`)
@@ -53,36 +48,22 @@ export default function MyPreps({ preps }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <span className="text-base font-bold tracking-tight">Prepify</span>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/catalog"
-            className="rounded-sm border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-          >
-            Catalog
-          </Link>
-          <Button asChild variant="outline" size="icon" title="Settings" aria-label="Settings">
-            <Link href="/settings"><SettingsIcon /></Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={signOut}>Sign out</Button>
-        </div>
-      </header>
-
+    <>
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold">My Preps</h1>
+          <h1 className="font-highlight text-2xl font-bold">My Preps</h1>
           <Button onClick={() => setShowUpload(true)}>+ New Prep</Button>
         </div>
 
         {preps.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-20 text-center text-2xl">
-            <span>📚</span>
-            <p className="text-base font-medium">No preps yet.</p>
-            <p className="mb-2 max-w-[300px] text-sm font-normal text-muted-foreground">
-              Upload a photo of a textbook page to get started.
-            </p>
+          <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+            <BookOpenIcon className="size-10 text-muted-foreground/50" />
+            <div className="flex flex-col gap-1">
+              <p className="text-base font-medium">No preps yet</p>
+              <p className="max-w-[280px] text-sm text-muted-foreground">
+                Upload a photo of a textbook page to generate study questions.
+              </p>
+            </div>
             <Button onClick={() => setShowUpload(true)}>Upload your first page</Button>
           </div>
         ) : (
@@ -95,7 +76,7 @@ export default function MyPreps({ preps }: Props) {
                 >
                   <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{prep.title}</span>
+                      <span className="text-base font-medium">{prep.title}</span>
                       <VisibilityBadge visibility={prep.visibility} />
                     </div>
                     {prep.description && (
@@ -145,7 +126,6 @@ export default function MyPreps({ preps }: Props) {
       {showUpload && (
         <UploadModal onClose={() => setShowUpload(false)} onDone={handleDone} />
       )}
-    </div>
+    </>
   )
 }
-

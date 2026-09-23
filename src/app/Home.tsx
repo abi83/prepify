@@ -15,7 +15,7 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-20 px-6 pt-20 pb-16">
+    <main className="flex flex-1 flex-col items-center gap-20 px-6 pt-20 pb-16">
       <div className="flex max-w-[620px] flex-col items-center gap-5 text-center">
         <div className="inline-block rounded-full border border-primary bg-primary/10 px-3.5 py-1 text-xs font-semibold tracking-wide text-primary uppercase">
           AI-powered study tool

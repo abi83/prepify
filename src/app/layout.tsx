@@ -2,7 +2,8 @@ import type { Metadata } from "next"
 import { Inter, Sora } from "next/font/google"
 import { SessionProvider } from "next-auth/react"
 
-import ThemeToggle from "@/components/ThemeToggle"
+import AppFooter from "@/components/AppFooter"
+import AppHeader from "@/components/AppHeader"
 import { cn } from "@/lib/utils"
 import "@/index.css"
 
@@ -45,9 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className={cn(inter.variable, sora.variable)}>
-        <SessionProvider>{children}</SessionProvider>
-        <ThemeToggle />
+      <body className={cn(inter.variable, sora.variable, "flex min-h-screen flex-col")}>
+        <SessionProvider>
+          <AppHeader />
+          <div className="flex flex-1 flex-col">{children}</div>
+          <AppFooter />
+        </SessionProvider>
       </body>
     </html>
   )

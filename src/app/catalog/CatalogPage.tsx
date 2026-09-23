@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 
-import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepLabeler"
 import { LANGUAGE_LABELS } from "@/lib/config"
@@ -57,19 +56,10 @@ export default function CatalogPage({ entries }: Props) {
   })
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center gap-4 border-b border-border px-6 py-4">
-        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
-          <Link href="/">← Home</Link>
-        </Button>
-        <h1 className="m-0 text-base font-bold tracking-tight">Prepify</h1>
-        <div className="flex-1" />
-      </header>
-
-      <main className="mx-auto flex w-full max-w-[900px] flex-1 flex-col gap-7 px-6 py-10 pb-16">
+    <main className="mx-auto flex w-full max-w-[900px] flex-1 flex-col gap-7 px-6 py-10 pb-16">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="mb-1.5 text-2xl font-bold tracking-tight">Study Catalog</h2>
+            <h2 className="mb-1.5 font-highlight text-2xl font-bold tracking-tight">Study Catalog</h2>
             <p className="text-sm text-muted-foreground">Browse publicly shared study sets</p>
           </div>
         </div>
@@ -155,8 +145,7 @@ export default function CatalogPage({ entries }: Props) {
             ))}
           </ul>
         )}
-      </main>
-    </div>
+    </main>
   )
 }
 
