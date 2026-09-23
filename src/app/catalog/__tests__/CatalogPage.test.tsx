@@ -33,6 +33,7 @@ function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
     discipline: null,
     language: null,
     description: "",
+    isActive: true,
     questionCount: 0,
     ...overrides,
   }

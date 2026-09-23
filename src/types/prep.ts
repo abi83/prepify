@@ -24,6 +24,6 @@ export type VisualElement = {
 export type Page = {
   page: number
   text: string
-  gcsKey: string
+  gcsKey?: string
   visual_elements: VisualElement[]
 }

@@ -31,6 +31,7 @@ function prep(overrides: Partial<Prep> = {}): Prep {
     discipline: null,
     language: null,
     description: "",
+    isActive: true,
     ...overrides,
   }
 }
