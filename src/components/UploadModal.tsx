@@ -199,10 +199,10 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
                 {canAddMore && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                       + Add files
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => cameraInputRef.current?.click()}>
+                    <Button variant="outline" size="sm" onClick={() => cameraInputRef.current?.click()}>
                       + Take photo
                     </Button>
                     <span className="ml-auto text-xs text-muted-foreground">{files.length} / {MAX_IMAGES} pages</span>
@@ -213,7 +213,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
 
             <div className="flex flex-col gap-2.5">
               {files.length === 0 && (
-                <Button variant="secondary" className="w-full" onClick={() => cameraInputRef.current?.click()}>
+                <Button variant="outline" className="w-full" onClick={() => cameraInputRef.current?.click()}>
                   Take photo
                 </Button>
               )}
@@ -266,7 +266,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
         {phase === "error" && (
           <div className={cn("flex flex-col items-center gap-4 py-4 text-center text-error")}>
             <p>{errorMsg}</p>
-            <Button variant="secondary" onClick={() => { setPhase("collect"); setErrorMsg("") }}>
+            <Button variant="outline" onClick={() => { setPhase("collect"); setErrorMsg("") }}>
               Try again
             </Button>
           </div>

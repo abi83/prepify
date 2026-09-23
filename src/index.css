@@ -24,9 +24,6 @@
   --ui-primary: oklch(0.55 0.21 275);
   --ui-primary-foreground: oklch(0.99 0 0);
 
-  --ui-secondary: oklch(0.96 0.005 285);
-  --ui-secondary-foreground: oklch(0.17 0.02 285);
-
   --ui-accent: oklch(0.75 0.16 55);
   --ui-accent-foreground: oklch(0.17 0.02 285);
 
@@ -56,9 +53,6 @@
   --ui-primary: oklch(0.64 0.19 275);
   --ui-primary-foreground: oklch(0.99 0 0);
 
-  --ui-secondary: oklch(0.24 0.015 285);
-  --ui-secondary-foreground: oklch(0.92 0.01 285);
-
   --ui-accent: oklch(0.75 0.16 55);
   --ui-accent-foreground: oklch(0.16 0.01 285);
 
@@ -85,9 +79,6 @@
 
   --color-primary: var(--ui-primary);
   --color-primary-foreground: var(--ui-primary-foreground);
-
-  --color-secondary: var(--ui-secondary);
-  --color-secondary-foreground: var(--ui-secondary-foreground);
 
   --color-accent: var(--ui-accent);
   --color-accent-foreground: var(--ui-accent-foreground);
