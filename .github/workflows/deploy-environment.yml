@@ -1,0 +1,88 @@
+name: deploy-environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      environment_url:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      app_version:
+        required: true
+        type: string
+      build:
+        type: boolean
+        default: true
+      push_latest:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+# Mirrors terraform/shared outputs — keep in sync by hand (same values as deploy.yml).
+env:
+  WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
+  SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com
+  REGISTRY: us-central1-docker.pkg.dev/prepify-infra/prepify
+  IMAGE: prepify-nextjs
+  REGION: us-central1
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.environment_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Configure Docker for Artifact Registry
+        if: inputs.build
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+      - name: Build and push image
+        if: inputs.build
+        run: |
+          docker build \
+            --build-arg APP_VERSION=${{ inputs.app_version }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }} \
+            .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}
+      - name: Push latest tag
+        if: inputs.push_latest
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+      - name: Run database migrations
+        run: |
+          DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          export DATABASE_URL_DIRECT
+          npx prisma migrate deploy
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: prepify
+          region: ${{ env.REGION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}

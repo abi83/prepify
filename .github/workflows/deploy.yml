@@ -153,61 +153,40 @@ jobs:
       - name: Build
         run: npm run build
 
+  resolve-dev-version:
+    name: Resolve dev version
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compute version
+        id: version
+        run: echo "value=$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
   deploy-dev:
     name: Deploy to dev
-    needs: [audit, lint, test, build, check-migrations]
+    needs: [audit, lint, test, build, check-migrations, resolve-dev-version]
     if: |
       (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (needs['check-migrations'].result == 'success' || needs['check-migrations'].result == 'skipped') &&
-      (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && inputs.tag == '')
-      )
-    runs-on: ubuntu-latest
-    environment:
-      name: dev
-      url: https://prepify-529277275400.us-central1.run.app/
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.SERVICE_ACCOUNT }}
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run database migrations
-        run: |
-          DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
-          export DATABASE_URL_DIRECT
-          npx prisma migrate deploy
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-      - name: Resolve version
-        id: version
-        run: echo "value=$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Build and push image
-        run: |
-          docker build --build-arg APP_VERSION=${{ steps.version.outputs.value }} -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }} .
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: prepify
-          region: ${{ env.REGION }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+      needs['resolve-dev-version'].result == 'success'
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: dev
+      environment_url: https://prepify-529277275400.us-central1.run.app/
+      image_tag: ${{ github.sha }}
+      app_version: ${{ needs.resolve-dev-version.outputs.app_version }}
+      build: true
+      push_latest: false
+    secrets: inherit
 
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
@@ -223,55 +202,12 @@ jobs:
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
         (github.event_name == 'workflow_dispatch' && inputs.tag != '')
       )
-    runs-on: ubuntu-latest
-    environment:
-      name: prod
-      url: http://prepify.cc/
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.SERVICE_ACCOUNT }}
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run database migrations
-        run: |
-          DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
-          export DATABASE_URL_DIRECT
-          npx prisma migrate deploy
-      - name: Resolve target version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Build and push image
-        if: github.event_name != 'workflow_dispatch'
-        run: |
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-          docker build \
-            --build-arg APP_VERSION=${{ steps.version.outputs.tag }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest \
-            .
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: prepify
-          region: ${{ env.REGION }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: prod
+      environment_url: http://prepify.cc/
+      image_tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      app_version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      build: ${{ github.event_name != 'workflow_dispatch' }}
+      push_latest: ${{ github.event_name != 'workflow_dispatch' }}
+    secrets: inherit
