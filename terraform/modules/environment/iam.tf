@@ -30,6 +30,13 @@ resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
+# Allows storage.buckets.get — needed for bucket.exists() in the readyz probe.
+resource "google_storage_bucket_iam_member" "runtime_bucket_reader" {
+  bucket = google_storage_bucket.this.name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${google_service_account.run_runtime.email}"
+}
+
 # Allows the Cloud Run SA to call signBlob on itself — required for ADC-based
 # signed URL generation without a key file.
 resource "google_service_account_iam_member" "run_runtime_sign_blobs" {
