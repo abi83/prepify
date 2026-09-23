@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronDownIcon, LogOutIcon, SettingsIcon } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { signIn, signOut, useSession } from "next-auth/react"
 
@@ -21,11 +22,12 @@ function initials(name: string | null | undefined, email: string | null | undefi
 function Avatar({ src, abbr }: { src: string | null | undefined; abbr: string }) {
   if (src) {
     return (
-      <img
+      <Image
         src={src}
         alt={abbr}
+        width={24}
+        height={24}
         className="size-6 shrink-0 rounded-full"
-        referrerPolicy="no-referrer"
       />
     )
   }

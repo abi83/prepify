@@ -1,7 +1,7 @@
 "use client"
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepLabeler"
 import { LANGUAGE_LABELS } from "@/lib/config"
 import { disciplineFromEnum } from "@/lib/disciplineMapping"
