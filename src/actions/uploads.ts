@@ -1,7 +1,8 @@
 "use server"
 
-import { Storage } from "@google-cloud/storage"
 import { randomUUID } from "crypto"
+
+import { Storage } from "@google-cloud/storage"
 
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
@@ -33,7 +34,7 @@ export async function getUploadSignedUrl(mimeType: string): Promise<UploadUrlRes
 
   const gcsKey = `photos/${userId}/${randomUUID()}.${ext}`
 
-  const [uploadUrl] = await storage
+  const [ uploadUrl ] = await storage
     .bucket(config.GCS_BUCKET_NAME)
     .file(gcsKey)
     .getSignedUrl({
