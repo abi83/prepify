@@ -1,7 +1,6 @@
 "use client"
 
-import Link from "next/link"
-
+import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepLabeler"
 import { LANGUAGE_LABELS } from "@/lib/config"
@@ -14,6 +13,25 @@ const ALL_GRADES = Array.from({ length: 13 }, (_, i) => i + 1)
 const ALL_GRADES_VALUE = "all-grades"
 const ALL_DISCIPLINES_VALUE = "all-disciplines"
 const ALL_LANGUAGES_VALUE = "all-languages"
+
+type DisplayEntry = Omit<CatalogEntry, "discipline"> & { discipline: string | null }
+
+function CatalogCard({ entry }: { entry: DisplayEntry }) {
+  return (
+    <Card href={`/study/${entry.id}`}>
+      <CardBadges>
+        {entry.discipline && <CardBadge className="border-primary/40 bg-primary/10 text-primary">{entry.discipline}</CardBadge>}
+        {entry.grade && <CardBadge className="border-primary/40 bg-primary/10 text-primary">Grade {entry.grade}</CardBadge>}
+      </CardBadges>
+      <CardTitle>{entry.title}</CardTitle>
+      {entry.description && <CardSubtitle>{entry.description}</CardSubtitle>}
+      <CardFooter>
+        <span className="text-xs text-muted-foreground">{entry.questionCount} questions</span>
+        <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
+      </CardFooter>
+    </Card>
+  )
+}
 
 interface Props {
   entries: CatalogEntry[]
@@ -120,27 +138,10 @@ export default function CatalogPage({ entries }: Props) {
             : "No preps match the selected filters."}
         </div>
       ) : (
-        <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 p-0 m-0" role="list">
+        <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" role="list">
           {filtered.map(entry => (
             <li key={entry.id}>
-              <Link
-                href={`/study/${entry.id}`}
-                className="flex h-full flex-col gap-2.5 rounded-lg border border-border bg-background p-5 text-inherit no-underline transition-[border-color,transform] hover:-translate-y-0.5 hover:border-primary"
-              >
-                <div className="flex min-h-[22px] flex-wrap gap-1.5">
-                  {entry.discipline && (
-                    <span className="rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-primary">{entry.discipline}</span>
-                  )}
-                  {entry.grade && (
-                    <span className="rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-primary">Grade {entry.grade}</span>
-                  )}
-                </div>
-                <h3 className="flex-1 text-[0.97rem] leading-snug font-semibold">{entry.title}</h3>
-                <div className="mt-auto flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">{entry.questionCount} questions</span>
-                  <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
-                </div>
-              </Link>
+              <CatalogCard entry={entry} />
             </li>
           ))}
         </ul>
