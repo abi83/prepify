@@ -1,14 +1,17 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 
 import ThemeToggle from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import UserMenu from "@/components/UserMenu"
+import { cn } from "@/lib/utils"
 
 export default function AppHeader() {
   const { data: session } = useSession()
+  const pathname = usePathname()
 
   return (
     <header className="flex items-center gap-6 border-b border-border px-6 py-3">
@@ -17,12 +20,16 @@ export default function AppHeader() {
         <span className="text-[10px] text-muted-foreground">School educational platform</span>
       </Link>
 
-      <nav className="flex items-center gap-1">
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+      <nav className="hidden items-center gap-4 sm:flex">
+        <Button asChild variant="ghost" size="sm" className={cn(
+          pathname.startsWith("/catalog") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        )}>
           <Link href="/catalog">Catalog</Link>
         </Button>
         {session && (
-          <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+          <Button asChild variant="ghost" size="sm" className={cn(
+            pathname.startsWith("/preps") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}>
             <Link href="/preps">My Preps</Link>
           </Button>
         )}
