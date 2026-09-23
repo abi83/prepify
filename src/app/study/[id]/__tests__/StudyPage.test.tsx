@@ -83,10 +83,3 @@ describe("StudyPage — loaded with questions", () => {
     expect(screen.getByRole("button", { name: /start test/i })).toBeInTheDocument()
   })
 })
-
-describe("StudyPage — anonymous user", () => {
-  it("shows sign-in note for unauthenticated visitors", async () => {
-    render(<StudyPage prep={prep({ title: "Test Prep", visibility: "public", grade: null })} questions={[]} assets={[]} />)
-    expect(await screen.findByText(/sign in/i)).toBeInTheDocument()
-  })
-})

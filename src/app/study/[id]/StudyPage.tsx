@@ -1,7 +1,6 @@
 "use client"
 
 import type { Prep, Question, Asset } from "@prisma/client"
-import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useState } from "react"
 
@@ -35,58 +34,47 @@ export default function StudyPage({ prep, questions, assets }: Props) {
 
   if (activeAttempt) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-border px-6 py-4">
-          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => setActiveAttempt(null)}>← Back to Study</Button>
+      <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
+        <div className="flex items-center justify-between">
+          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => setActiveAttempt(null)}>
+            ← Back to Study
+          </Button>
           {!userId && (
             <span className="text-sm text-muted-foreground">Sign in to save your results</span>
           )}
-        </header>
-        <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
-          <AttemptFlow
-            questions={studyQuestions}
-            assets={assets}
-            mode={activeAttempt}
-            prepId={prep.id}
-            userId={userId}
-            onExit={() => setActiveAttempt(null)}
-          />
-        </main>
-      </div>
+        </div>
+        <AttemptFlow
+          questions={studyQuestions}
+          assets={assets}
+          mode={activeAttempt}
+          prepId={prep.id}
+          userId={userId}
+          onExit={() => setActiveAttempt(null)}
+        />
+      </main>
     )
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
-          <Link href="/">← Home</Link>
-        </Button>
-        {!userId && (
-          <span className="text-sm text-muted-foreground">Sign in to track your progress</span>
+    <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="font-highlight text-2xl font-bold tracking-tight">{prep.title}</h1>
+        {prep.description && (
+          <p className="text-sm text-muted-foreground">{prep.description}</p>
         )}
-      </header>
+      </div>
 
-      <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-2xl font-bold tracking-tight">{prep.title}</h1>
-          {prep.description && (
-            <p className="text-sm text-muted-foreground">{prep.description}</p>
-          )}
-        </div>
-
-        {questions.length === 0 ? (
-          <p className="px-8 py-8 text-center text-sm text-muted-foreground">No questions available yet.</p>
-        ) : (
-          <StudyTabs
-            tab={tab}
-            onTabChange={setTab}
-            flashcards={flashcards}
-            studyQuestions={studyQuestions}
-            onStartAttempt={setActiveAttempt}
-          />
-        )}
-      </main>
-    </div>
+      {questions.length === 0 ? (
+        <p className="px-8 py-8 text-center text-sm text-muted-foreground">No questions available yet.</p>
+      ) : (
+        <StudyTabs
+          tab={tab}
+          onTabChange={setTab}
+          flashcards={flashcards}
+          studyQuestions={studyQuestions}
+          onStartAttempt={setActiveAttempt}
+        />
+      )}
+    </main>
   )
 }

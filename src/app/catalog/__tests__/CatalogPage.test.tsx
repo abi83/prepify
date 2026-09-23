@@ -175,10 +175,3 @@ describe("CatalogPage — filtering", () => {
     expect(screen.queryByText("World War II")).not.toBeInTheDocument()
   })
 })
-
-describe("CatalogPage — navigation", () => {
-  it("renders a back-to-home link", () => {
-    renderCatalog([])
-    expect(screen.getByRole("link", { name: /home/i })).toHaveAttribute("href", "/")
-  })
-})

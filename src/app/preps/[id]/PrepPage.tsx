@@ -1,7 +1,6 @@
 "use client"
 
 import type { Prep, Question, Attempt, Asset } from "@prisma/client"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useState } from "react"
@@ -75,6 +74,7 @@ export default function PrepPage({
   const hasQuestions = questions.length > 0
   const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== "flashcard")
+  const isOwner = prep.userId === userId
 
   async function handleDelete() {
     setDeleting(true)
@@ -89,26 +89,24 @@ export default function PrepPage({
 
   if (activeAttempt && (activeAttempt === "quiz" || activeAttempt === "test") && userId) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-border px-6 py-4">
-          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={handleExitAttempt}>← Back to Prep</Button>
-        </header>
-        <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
-          <AttemptFlow
-            questions={studyQuestions}
-            assets={assets}
-            mode={activeAttempt}
-            prepId={prep.id}
-            userId={userId}
-            onExit={handleExitAttempt}
-          />
-        </main>
-      </div>
+      <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
+        <Button variant="link" className="h-auto self-start p-0 text-muted-foreground" onClick={handleExitAttempt}>
+          ← Back to Prep
+        </Button>
+        <AttemptFlow
+          questions={studyQuestions}
+          assets={assets}
+          mode={activeAttempt}
+          prepId={prep.id}
+          userId={userId}
+          onExit={handleExitAttempt}
+        />
+      </main>
     )
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <>
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
@@ -126,26 +124,7 @@ export default function PrepPage({
         </DialogContent>
       </Dialog>
 
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Button asChild variant="link" className="h-auto p-0 text-muted-foreground">
-          <Link href="/preps">← My Preps</Link>
-        </Button>
-        <div className="flex items-center gap-4">
-          {prep.userId === userId && hasQuestions && (
-            <Button size="sm" onClick={() => setShowShareModal(true)}>
-              {prep.visibility === "private" ? "Share" : "Shared"}
-            </Button>
-          )}
-          {prep.userId === userId && (
-            <Button variant="link" className="h-auto p-0 text-sm text-error" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
-          )}
-          <Button asChild variant="link" className="h-auto p-0 text-sm text-muted-foreground">
-            <Link href="/settings">Settings</Link>
-          </Button>
-        </div>
-      </header>
-
-      {showShareModal && prep.userId === userId && (
+      {showShareModal && isOwner && (
         <ShareModal
           prepId={prep.id}
           concepts={concepts}
@@ -164,7 +143,21 @@ export default function PrepPage({
 
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-2xl font-bold tracking-tight">{prep.title}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="font-highlight text-2xl font-bold tracking-tight">{prep.title}</h1>
+            {isOwner && (
+              <div className="flex shrink-0 items-center gap-3 pt-1">
+                {hasQuestions && (
+                  <Button size="sm" onClick={() => setShowShareModal(true)}>
+                    {prep.visibility === "private" ? "Share" : "Shared"}
+                  </Button>
+                )}
+                <Button variant="link" className="h-auto p-0 text-sm text-error" onClick={() => setShowDeleteConfirm(true)}>
+                  Delete
+                </Button>
+              </div>
+            )}
+          </div>
           {prep.description && (
             <p className="text-sm text-muted-foreground">{prep.description}</p>
           )}
@@ -226,7 +219,6 @@ export default function PrepPage({
           </>
         )}
       </main>
-    </div>
+    </>
   )
 }
-
