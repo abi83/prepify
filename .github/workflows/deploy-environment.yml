@@ -78,6 +78,7 @@ jobs:
       - name: Run database migrations
         run: |
           DATABASE_URL_DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project=${{ vars.GCP_PROJECT_ID }})"
+          echo "::add-mask::$DATABASE_URL_DIRECT"
           export DATABASE_URL_DIRECT
           npx prisma migrate deploy
       - name: Deploy to Cloud Run
