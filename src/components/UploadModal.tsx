@@ -1,7 +1,8 @@
 import type { Prisma } from "@prisma/client"
 import { useEffect, useRef, useState } from "react"
 
-import { listMyPreps, createPrep } from "@/actions/preps"
+import { listMyPreps, createPrep, updatePrep, deletePrep } from "@/actions/preps"
+import { getUploadSignedUrl } from "@/actions/uploads"
 import type { VisualElementOutput } from "@/lib/agents/OcrAgent"
 import { runOcrAgent } from "@/lib/agents/OcrAgent"
 import { getApiKey } from "@/lib/apiKey"
@@ -39,6 +40,10 @@ export default function UploadModal({ onClose, onDone }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const draftRef = useRef<Promise<string> | null>(null)
+  const savedRef = useRef(false)
+  const uploadMapRef = useRef(new Map<File, Promise<string | null>>())
+  const nextPageIndexRef = useRef(0)
 
   const [ files, setFiles ] = useState<File[]>([])
   const [ previews, setPreviews ] = useState<string[]>([])
@@ -52,6 +57,15 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPreviews(urls)
     return () => urls.forEach(u => URL.revokeObjectURL(u))
   }, [ files ])
+
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current && draftRef.current) {
+        draftRef.current.then(id => void deletePrep(id)).catch(() => {})
+      }
+    }
+  }, [])
+
   const [ ocrProgress, setOcrProgress ] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
 
@@ -75,11 +89,37 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    setFiles(prev => [ ...prev, ...validFiles ].slice(0, MAX_IMAGES))
+    const toAdd = validFiles.slice(0, MAX_IMAGES - files.length)
+    if (toAdd.length === 0) return
+
+    setFiles(prev => [ ...prev, ...toAdd ].slice(0, MAX_IMAGES))
+
+    // Create draft prep once on first file pick
+    if (draftRef.current === null) {
+      draftRef.current = listMyPreps()
+        .then(existing => createPrep({ title: `Prep #${existing.length + 1}`, language: null }))
+        .then(prep => prep.id)
+    }
+
+    // Fire uploads immediately in background; non-fatal if they fail
+    for (const file of toAdd) {
+      const pageIndex = nextPageIndexRef.current++
+      const uploadPromise = draftRef.current
+        .then(prepId => getUploadSignedUrl(prepId, pageIndex, file.type))
+        .then(({ signedUrl, key }) =>
+          fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } })
+            .then(r => (r.ok ? key : null))
+        )
+        .catch(() => null)
+      uploadMapRef.current.set(file, uploadPromise)
+    }
   }
 
   function removeFile(index: number) {
-    setFiles(prev => prev.filter((_, i) => i !== index))
+    setFiles(prev => {
+      uploadMapRef.current.delete(prev[index])
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   async function handleRecognise() {
@@ -91,6 +131,26 @@ export default function UploadModal({ onClose, onDone }: Props) {
       setErrorMsg("No API key configured. Please set one in Settings.")
       return
     }
+
+    if (!draftRef.current) {
+      setPhase("error")
+      setErrorMsg("Unexpected error. Please try again.")
+      return
+    }
+
+    let prepId: string
+    try {
+      prepId = await draftRef.current
+    } catch {
+      setPhase("error")
+      setErrorMsg("Failed to create prep draft. Please try again.")
+      return
+    }
+
+    // Await all background uploads; failures resolve to null and are non-fatal
+    const uploadKeys = await Promise.all(
+      files.map(f => uploadMapRef.current.get(f) ?? Promise.resolve(null))
+    )
 
     abortRef.current = new AbortController()
     setPhase("ocr")
@@ -120,6 +180,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
       page: i + 1,
       text: r.text,
       visual_elements: r.visual_elements,
+      ...(uploadKeys[i] !== null ? { gcsKey: uploadKeys[i] as string } : {}),
     }))
 
     const combinedText = pages.map(p => p.text).join("\n\n")
@@ -141,12 +202,11 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase("saving")
 
     try {
-      const existing = await listMyPreps()
-      const title = `Prep #${existing.length + 1}`
-
-      const prep = await createPrep({ title, pages: pages as unknown as Prisma.InputJsonValue, language })
-      onDone(prep.id)
+      savedRef.current = true
+      await updatePrep(prepId, { pages: pages as unknown as Prisma.InputJsonValue, language, isActive: true })
+      onDone(prepId)
     } catch {
+      savedRef.current = false
       setPhase("error")
       setErrorMsg("Failed to save. Please try again.")
     }
