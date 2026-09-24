@@ -32,6 +32,7 @@ export async function createPrep(data: CreatePrepInput): Promise<Prep> {
 export async function updatePrep(id: string, data: UpdatePrepInput): Promise<Prep> {
   const prep = await prepRepository.updatePrep(await requireUserId(), id, data)
   revalidatePath(`/preps/${id}`)
+  revalidatePath("/preps")
   revalidatePath("/catalog")
   return prep
 }

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client"
 import { useEffect, useRef, useState } from "react"
 
-import { listMyPreps, createPrep } from "@/actions/preps"
+import { updatePrep, deletePrep } from "@/actions/preps"
 import type { VisualElementOutput } from "@/lib/agents/OcrAgent"
 import { runOcrAgent } from "@/lib/agents/OcrAgent"
 import { getApiKey } from "@/lib/apiKey"
@@ -10,20 +10,23 @@ import { consoleLogger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 import type { Page } from "@/types/prep"
 
+import { FilePicker, type RecogniseArgs } from "./FilePicker"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
-
-const MAX_IMAGES = 10
-const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 type Props = {
   onClose: () => void
   onDone: (prepId: string) => void
 }
 
-type Phase = "collect" | "ocr" | "saving" | "error"
+type Phase = "ocr" | "saving" | "error"
 
-async function extractTextFromImage(file: File, apiKey: string, model: string, signal: AbortSignal): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
+async function extractTextFromImage(
+  file: File,
+  apiKey: string,
+  model: string,
+  signal: AbortSignal,
+): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve((reader.result as string).split(",")[1])
@@ -36,55 +39,24 @@ async function extractTextFromImage(file: File, apiKey: string, model: string, s
 }
 
 export default function UploadModal({ onClose, onDone }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Set when OCR starts; used to delete the draft if we abort before saving.
+  const pendingPrepIdRef = useRef<string | null>(null)
+  const savedRef = useRef(false)
 
-  const [ files, setFiles ] = useState<File[]>([])
-  const [ previews, setPreviews ] = useState<string[]>([])
-  const [ phase, setPhase ] = useState<Phase>("collect")
-
-  useEffect(() => {
-    // Object URLs are an external resource that must be created and
-    // revoked in lockstep with `files` — not derivable during render.
-    const urls = files.map(f => URL.createObjectURL(f))
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPreviews(urls)
-    return () => urls.forEach(u => URL.revokeObjectURL(u))
-  }, [ files ])
-  const [ ocrProgress, setOcrProgress ] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
+  const [ phase, setPhase ] = useState<Phase | null>(null)
+  const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
 
-  function addFiles(incoming: FileList | null) {
-    if (!incoming) return
-
-    const validFiles: File[] = []
-    const oversized: string[] = []
-
-    for (const f of Array.from(incoming)) {
-      if (f.size > MAX_FILE_BYTES) {
-        oversized.push(f.name)
-      } else {
-        validFiles.push(f)
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current && pendingPrepIdRef.current) {
+        void deletePrep(pendingPrepIdRef.current)
       }
     }
+  }, [])
 
-    if (oversized.length) {
-      setPhase("error")
-      setErrorMsg(`${oversized.join(", ")} ${oversized.length === 1 ? "exceeds" : "exceed"} the 5 MB limit. Please use smaller images.`)
-      return
-    }
-
-    setFiles(prev => [ ...prev, ...validFiles ].slice(0, MAX_IMAGES))
-  }
-
-  function removeFile(index: number) {
-    setFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  async function handleRecognise() {
-    if (files.length === 0) return
-
+  async function handleRecognise({ prepId, files, uploadKeys }: RecogniseArgs) {
     const config = getApiKey()
     if (!config) {
       setPhase("error")
@@ -92,6 +64,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
+    pendingPrepIdRef.current = prepId
     abortRef.current = new AbortController()
     setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
@@ -120,6 +93,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
       page: i + 1,
       text: r.text,
       visual_elements: r.visual_elements,
+      ...(uploadKeys[i] !== null ? { gcsKey: uploadKeys[i] as string } : {}),
     }))
 
     const combinedText = pages.map(p => p.text).join("\n\n")
@@ -137,23 +111,30 @@ export default function UploadModal({ onClose, onDone }: Props) {
     }
 
     const language = results[0]?.language ?? "en"
-
     setPhase("saving")
 
     try {
-      const existing = await listMyPreps()
-      const title = `Prep #${existing.length + 1}`
-
-      const prep = await createPrep({ title, pages: pages as unknown as Prisma.InputJsonValue, language })
-      onDone(prep.id)
+      savedRef.current = true
+      await updatePrep(prepId, { pages: pages as unknown as Prisma.InputJsonValue, language, isActive: true })
+      onDone(prepId)
     } catch {
+      savedRef.current = false
       setPhase("error")
       setErrorMsg("Failed to save. Please try again.")
     }
   }
 
+  function handleRetry() {
+    // Draft from the failed attempt is now orphaned — clean it up before re-showing the picker.
+    if (!savedRef.current && pendingPrepIdRef.current) {
+      void deletePrep(pendingPrepIdRef.current)
+      pendingPrepIdRef.current = null
+    }
+    setPhase(null)
+    setErrorMsg("")
+  }
+
   const isWorking = phase === "ocr" || phase === "saving"
-  const canAddMore = files.length < MAX_IMAGES
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !isWorking) onClose() }}>
@@ -167,81 +148,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
           <DialogDescription className="sr-only">Upload photos of textbook pages to create a new prep.</DialogDescription>
         </DialogHeader>
 
-        {phase === "collect" && (
-          <>
-            {files.length === 0 ? (
-              <div
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border p-12 transition-colors hover:border-primary hover:bg-primary/10"
-                onClick={() => fileInputRef.current?.click()}
-                onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-                onDragOver={e => e.preventDefault()}
-              >
-                <span className="text-4xl">📄</span>
-                <p className="text-sm font-medium">Upload photos of textbook pages</p>
-                <p className="text-xs text-muted-foreground">Tap to select · or drag & drop</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2.5">
-                  {files.map((_, i) => (
-                    <div key={i} className="relative overflow-hidden rounded-sm border border-border bg-muted" style={{ aspectRatio: "3 / 4" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL preview, not optimizable by next/image */}
-                      <img src={previews[i]} alt={`Page ${i + 1}`} className="block h-full w-full object-cover" />
-                      <button
-                        className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/55 p-0 text-[0.65rem] text-white hover:bg-black/80"
-                        onClick={() => removeFile(i)}
-                        aria-label={`Remove page ${i + 1}`}
-                      >✕</button>
-                      <span className="absolute bottom-1 left-[5px] text-[0.65rem] font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.7)]">{i + 1}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {canAddMore && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                      + Add files
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => cameraInputRef.current?.click()}>
-                      + Take photo
-                    </Button>
-                    <span className="ml-auto text-xs text-muted-foreground">{files.length} / {MAX_IMAGES} pages</span>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="flex flex-col gap-2.5">
-              {files.length === 0 && (
-                <Button variant="outline" className="w-full" onClick={() => cameraInputRef.current?.click()}>
-                  Take photo
-                </Button>
-              )}
-              {files.length > 0 && (
-                <Button className="w-full" onClick={handleRecognise}>
-                  Recognise & Create
-                </Button>
-              )}
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-              onChange={e => { addFiles(e.target.files); e.target.value = "" }}
-            />
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: "none" }}
-              onChange={e => { addFiles(e.target.files); e.target.value = "" }}
-            />
-          </>
-        )}
+        {phase === null && <FilePicker onRecognise={handleRecognise} />}
 
         {(phase === "ocr" || phase === "saving") && (
           <div className="flex flex-col gap-3 py-4">
@@ -266,7 +173,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
         {phase === "error" && (
           <div className={cn("flex flex-col items-center gap-4 py-4 text-center text-error")}>
             <p>{errorMsg}</p>
-            <Button variant="outline" onClick={() => { setPhase("collect"); setErrorMsg("") }}>
+            <Button variant="outline" onClick={handleRetry}>
               Try again
             </Button>
           </div>

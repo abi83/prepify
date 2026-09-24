@@ -48,6 +48,9 @@ export interface UpdatePrepInput {
   visibility?: PrepVisibility
   grade?: number | null
   discipline?: PrepDiscipline | null
+  pages?: Prisma.InputJsonValue
+  language?: string | null
+  isActive?: boolean
 }
 
 export async function updatePrep(userId: string, id: string, data: UpdatePrepInput): Promise<Prep> {
