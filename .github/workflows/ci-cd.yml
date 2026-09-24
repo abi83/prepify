@@ -1,4 +1,4 @@
-name: deploy
+name: CI/CD
 
 on:
   push:
@@ -10,8 +10,8 @@ on:
       tag:
         description: "Existing vX.Y.Z tag to redeploy to prod (rollback). Leave empty to deploy the current branch to dev instead."
         required: false
-      run_tests:
-        description: "Run tests before deploying"
+      run_checks:
+        description: "Run CI checks before deploying"
         type: boolean
         default: true
 
@@ -33,58 +33,44 @@ env:
   REGION: us-central1
 
 jobs:
-  # Only workflow_dispatch's run_tests input can skip this (and the same
-  # switch on audit/lint/check-migrations/build below).
   test:
     name: Test
-    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    if: github.event_name != 'workflow_dispatch' || inputs.run_checks != false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
+      - run: npm ci
+      - run: npm test
 
   audit:
-    name: npm audit
-    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    name: Audit
+    if: github.event_name != 'workflow_dispatch' || inputs.run_checks != false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run npm audit
-        run: npm audit --audit-level=high
+      - run: npm ci
+      - run: npm audit --audit-level=high
 
   lint:
     name: Lint
-    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    if: github.event_name != 'workflow_dispatch' || inputs.run_checks != false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run lint
-        run: npm run lint
+      - run: npm ci
+      - run: npm run lint
 
   # Fails if prisma/schema.prisma changed without a matching migration file —
   # the actual gap that let #194 merge and deploy without one. Uses a
@@ -92,7 +78,7 @@ jobs:
   # the real (Neon) dev/prod databases.
   check-migrations:
     name: Check migrations
-    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    if: github.event_name != 'workflow_dispatch' || inputs.run_checks != false
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -108,15 +94,12 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
       - name: Check schema.prisma has a matching migration
         env:
           SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/prepify_migrate_check
@@ -138,21 +121,33 @@ jobs:
   # The coding pipeline gates the reviewer on this and `test` both (#134).
   build:
     name: Build
-    if: github.event_name != 'workflow_dispatch' || inputs.run_tests != false
+    if: github.event_name != 'workflow_dispatch' || inputs.run_checks != false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
+      - run: npm ci
+      - run: npm run build
 
+  # Fan-in gate — deploy jobs depend on this single job instead of repeating
+  # five success/skipped conditions each. Runs unconditionally (if: always())
+  # so it reports even when upstream jobs are skipped.
+  ci:
+    name: CI
+    needs: [test, audit, lint, check-migrations, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: All checks passed
+        run: |
+          echo '${{ toJSON(needs) }}' \
+            | jq -e '[.[].result] | all(. == "success" or . == "skipped")'
+
+  # Dev version: synthetic timestamp+sha — no tag exists on main commits.
+  # Prod version: the git tag itself (e.g. v1.2.3) — already meaningful, no job needed.
   resolve-dev-version:
     name: Resolve dev version
     if: |
@@ -162,22 +157,15 @@ jobs:
     outputs:
       app_version: ${{ steps.version.outputs.value }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Compute version
         id: version
         run: echo "value=$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
   deploy-dev:
     name: Deploy to dev
-    needs: [audit, lint, test, build, check-migrations, resolve-dev-version]
-    if: |
-      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
-      (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
-      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
-      (needs['check-migrations'].result == 'success' || needs['check-migrations'].result == 'skipped') &&
-      needs['resolve-dev-version'].result == 'success'
+    needs: [ci, resolve-dev-version]
+    if: needs.ci.result == 'success' && needs.resolve-dev-version.result == 'success'
     uses: ./.github/workflows/deploy-environment.yml
     with:
       environment: dev
@@ -191,13 +179,9 @@ jobs:
   # Gated by the "prod" environment's required-reviewer rule (GitHub settings, not visible here).
   deploy-prod:
     name: Deploy to prod
-    needs: [audit, lint, test, build, check-migrations]
+    needs: [ci]
     if: |
-      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
-      (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
-      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
-      (needs['check-migrations'].result == 'success' || needs['check-migrations'].result == 'skipped') &&
+      needs.ci.result == 'success' &&
       (
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
         (github.event_name == 'workflow_dispatch' && inputs.tag != '')

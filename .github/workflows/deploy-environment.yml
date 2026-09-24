@@ -1,4 +1,4 @@
-name: deploy-environment
+name: Deploy
 
 on:
   workflow_call:
@@ -26,7 +26,8 @@ permissions:
   contents: read
   id-token: write
 
-# Mirrors terraform/shared outputs — keep in sync by hand (same values as deploy.yml).
+# Duplicated from ci-cd.yml: workflow_call doesn't inherit the caller's env block,
+# so these must be redeclared here. Mirrors terraform/shared outputs — keep in sync by hand.
 env:
   WORKLOAD_IDENTITY_PROVIDER: projects/780464996197/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: github-deploy@prepify-infra.iam.gserviceaccount.com

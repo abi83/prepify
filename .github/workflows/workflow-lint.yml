@@ -1,4 +1,4 @@
-name: Lint pipeline
+name: Workflow Lint
 
 on:
   # No paths: filter — a required check must report on every PR, not sit pending.
@@ -9,12 +9,11 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: Lint workflows
+  lint-workflows:
+    name: Lint GitHub Actions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
+      - uses: actions/checkout@v4
       - name: Lint workflows and their inline run blocks
         # docker://rhysd/actionlint:1.7.12, pinned by digest
         uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
