@@ -9,7 +9,7 @@
 
 # Set to true to show full Claude conversation in logs and attach execution
 # logs as artifacts on every automatically triggered run.
-debug: false
+debug: true
 
 # Wiki checked out for the agents to read, at ./wiki. Disabled by default.
 wiki:
