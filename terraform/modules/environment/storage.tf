@@ -21,4 +21,8 @@ resource "google_storage_bucket" "this" {
   }
 
   depends_on = [google_project_service.this]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
