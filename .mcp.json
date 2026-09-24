@@ -2,7 +2,10 @@
   "mcpServers": {
     "neon": {
       "type": "http",
-      "url": "https://mcp.neon.tech/sse"
+      "url": "https://mcp.neon.tech/sse",
+      "headers": {
+        "Authorization": "Bearer ${NEON_DEV_API_KEY}"
+      }
     }
   }
 }
