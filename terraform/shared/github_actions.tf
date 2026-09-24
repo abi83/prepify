@@ -52,11 +52,8 @@ resource "google_artifact_registry_repository_iam_member" "github_deploy_push" {
 
 # Separate, more privileged identity for the terraform.yml workflow.
 # github-deploy above is deliberately narrow (Cloud Run + registry only) for
-# routine app deploys; running `terraform apply` against dev/prod also
-# touches project metadata and IAM bindings there, which needs project-level
-# Owner — there's no predefined role that covers exactly "manage this
-# Terraform config" short of that. Kept as its own service account so the
-# app-deploy identity never needs this much power.
+# routine app deploys; terraform-ci also touches project metadata, IAM bindings,
+# storage, secrets, etc. Kept separate so the app-deploy identity stays narrow.
 resource "google_service_account" "terraform_ci" {
   project      = google_project.infra.project_id
   account_id   = "terraform-ci"
@@ -71,8 +68,23 @@ resource "google_service_account_iam_member" "terraform_ci_wif_binding" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
 }
 
-resource "google_project_iam_member" "terraform_ci_owner_infra" {
+locals {
+  terraform_ci_infra_roles = [
+    "roles/resourcemanager.projectIamAdmin",
+    "roles/serviceusage.serviceUsageAdmin",
+    "roles/iam.serviceAccountAdmin",
+    "roles/iam.workloadIdentityPoolAdmin",
+    "roles/storage.admin",
+    "roles/artifactregistry.admin",
+    "roles/run.admin",
+    "roles/secretmanager.admin",
+  ]
+}
+
+resource "google_project_iam_member" "terraform_ci_infra" {
+  for_each = toset(local.terraform_ci_infra_roles)
+
   project = google_project.infra.project_id
-  role    = "roles/owner"
+  role    = each.value
   member  = "serviceAccount:${google_service_account.terraform_ci.email}"
 }
