@@ -35,6 +35,7 @@ export function FilePicker({ onRecognise }: Props) {
 
   useEffect(() => {
     const urls = files.map(f => URL.createObjectURL(f))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviews(urls)
     return () => urls.forEach(u => URL.revokeObjectURL(u))
   }, [ files ])
