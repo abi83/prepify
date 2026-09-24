@@ -1,4 +1,4 @@
-name: Workflow lint
+name: Workflow Lint
 
 on:
   # No paths: filter — a required check must report on every PR, not sit pending.
