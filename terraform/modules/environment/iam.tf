@@ -15,12 +15,22 @@ resource "google_service_account_iam_member" "github_deploy_act_as_runtime" {
   member             = "serviceAccount:${var.github_deploy_service_account_email}"
 }
 
-# terraform-ci needs project-level Owner to manage everything this module
-# defines (project metadata, IAM, buckets, Cloud Run, Neon/Secret Manager
-# wiring) — no predefined role covers exactly that short of Owner.
-resource "google_project_iam_member" "terraform_ci_owner" {
+locals {
+  terraform_ci_env_roles = [
+    "roles/resourcemanager.projectIamAdmin",
+    "roles/serviceusage.serviceUsageAdmin",
+    "roles/iam.serviceAccountAdmin",
+    "roles/storage.admin",
+    "roles/run.admin",
+    "roles/secretmanager.admin",
+  ]
+}
+
+resource "google_project_iam_member" "terraform_ci" {
+  for_each = toset(local.terraform_ci_env_roles)
+
   project = google_project.this.project_id
-  role    = "roles/owner"
+  role    = each.value
   member  = "serviceAccount:${var.terraform_ci_service_account_email}"
 }
 
