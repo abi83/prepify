@@ -201,7 +201,7 @@ jobs:
           TF_VAR_neon_api_key: ${{ steps.init.outputs.neon_api_key }}
 
   # Gated on a version tag push (release), not merge to main — mirrors
-  # deploy.yml's deploy-prod. Also requires manual approval, see the "prod"
+  # ci-cd.yml's deploy-prod. Also requires manual approval, see the "prod"
   # GitHub Environment's required-reviewer protection rule (repo Settings >
   # Environments). Deliberately doesn't consult needs.changes.outputs.prod:
   # that's computed by diffing against the push's base ref, which isn't
