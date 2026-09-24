@@ -37,11 +37,11 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 - **Generating** a migration (`prisma migrate dev`, or the diff-only `prisma migrate diff`) needs a database to diff against, but it can — and for anyone other than the human running it against their own configured dev environment, must — be a disposable, throwaway Postgres (a local Docker container is enough), never the shared Neon dev branch. This is safe for an agent to do directly: spin up a throwaway Postgres, point `DATABASE_URL_DIRECT` at it, run `prisma migrate dev --name <description>`, commit the resulting `prisma/migrations/.../migration.sql` in the same PR as the schema change, then discard the container. A PR that changes `prisma/schema.prisma` must include the matching migration file — CI enforces this (see `.github/workflows/check-migrations.yml`), diffing against a throwaway Postgres service container of its own.
 - **Applying** a migration to a real environment (`prisma migrate deploy`) only ever happens through the deploy pipeline (`.github/workflows/ci-cd.yml`), against the shared dev Neon branch or prod. Nobody — human or agent — runs `db:migrate`/`migrate deploy` against those directly outside of CI; that's what avoids racing another concurrent change on the one shared dev branch (no per-PR DB isolation yet — tracked at [#85](https://github.com/abi83/prepify/issues/85)).
 
-One-time setup, get the dev Neon connection strings into `.env.local` (only needed to run the app or query dev data locally — not for generating migrations, which use a disposable Postgres instead):
-```bash
-gcloud secrets versions access latest --secret=database-url-direct --project=prepify-dev-vk  # → DATABASE_URL_DIRECT
-gcloud secrets versions access latest --secret=database-url-pooling --project=prepify-dev-vk # → DATABASE_URL_POOLING
-```
+One-time setup to get dev Neon connection strings available locally (needed to run the app or query dev data — not for generating migrations, which use a disposable Postgres instead):
+1. `brew install direnv` and add `eval "$(direnv hook zsh)"` to `~/.zshrc` (adjust for your shell)
+2. `direnv allow` in the repo root
+
+`.envrc` fetches `DATABASE_URL_DIRECT` and `DATABASE_URL_POOLING` from GCP Secret Manager and injects them into your shell session on `cd`. No `.env.local` needed.
 
 Never edit an already-committed migration — create a new one instead. Authorization is enforced in the repository layer (e.g. `prepRepository.isReadableBy`), not Postgres RLS.
 
