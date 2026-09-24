@@ -24,8 +24,7 @@ Node 18+, a Neon Postgres database, a Google OAuth client, an OpenAI API key.
 git clone https://github.com/abi83/prepify.git
 cd prepify
 npm install
-# Create .env.local with the vars listed in src/lib/env.ts
-# (Internal dev: secrets are fetched automatically via direnv — see CLAUDE.md)
+# Follow setup instructions in .envrc
 npm run dev
 ```
 
