@@ -34,8 +34,8 @@ export async function getPrep(userId: string | null, id: string): Promise<Prep> 
 
 export interface CreatePrepInput {
   title: string
-  pages?: Prisma.InputJsonValue
-  language?: string | null
+  pages: Prisma.InputJsonValue
+  language: string | null
 }
 
 export async function createPrep(userId: string, data: CreatePrepInput): Promise<Prep> {
