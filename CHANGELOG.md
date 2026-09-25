@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0](https://github.com/abi83/prepify/compare/v1.2.0...v1.3.0) (2026-09-25)
+
+
+### Features
+
+* **#236:** getUploadSignedUrl server action ([#240](https://github.com/abi83/prepify/issues/240)) ([f09f6f7](https://github.com/abi83/prepify/commit/f09f6f7677c41a58d7acf9f375bff7a4123e819a))
+* **#237:** Prep.isActive, Page.gcsKey — schema, migration, catalog filter ([#239](https://github.com/abi83/prepify/issues/239)) ([ac7d8e0](https://github.com/abi83/prepify/commit/ac7d8e0d241b6f3a064f020aeb31513fe9d5db24))
+* **#238:** UploadModal — upload on pick, isActive transition ([#243](https://github.com/abi83/prepify/issues/243)) ([ea8f776](https://github.com/abi83/prepify/commit/ea8f776b08f7450292b15dd12e94be3b7eb776ec))
+* provision GCS uploads bucket for image storage ([#232](https://github.com/abi83/prepify/issues/232)) ([8fac0b8](https://github.com/abi83/prepify/commit/8fac0b8dc9324b5c5c101d8f236c44ff9bf3505b))
+
+
+### Bug Fixes
+
+* **#72:** narrow terraform-ci from roles/owner to scoped predefined roles ([#247](https://github.com/abi83/prepify/issues/247)) ([305fc17](https://github.com/abi83/prepify/commit/305fc17273740b35a93f8334ea6dc6a7c9e37097))
+* grant runtime SA storage.buckets.get for readyz GCS probe ([#242](https://github.com/abi83/prepify/issues/242)) ([88dc98f](https://github.com/abi83/prepify/commit/88dc98f0a6764b4fbacdc3245969490ad3dcf7ed))
+* mask DATABASE_URL_DIRECT in CI deploy logs ([#249](https://github.com/abi83/prepify/issues/249)) ([03e6f84](https://github.com/abi83/prepify/commit/03e6f841204a13716ca0e13b0d16e851dda37165))
+* restrict localhost CORS origin to dev environment only ([#241](https://github.com/abi83/prepify/issues/241)) ([33295ff](https://github.com/abi83/prepify/commit/33295ff46f0ecf67bf73bc31fdb755622b216451))
+
 ## [1.2.0](https://github.com/abi83/prepify/compare/v1.1.0...v1.2.0) (2026-09-23)
 
 
