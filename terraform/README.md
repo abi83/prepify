@@ -14,21 +14,18 @@ State for all three lives in the same `gs://prepify-tfstate` bucket, under diffe
 
 ## One-time manual bootstrap
 
-Three things exist outside this config on purpose, to break the chicken-and-egg problem of Terraform needing somewhere to put its own state before anything exists yet:
-
-1. The three GCP projects (`prepify-infra`, `prepify-dev-vk`, `prepify-prod`) were created with `gcloud projects create` + `gcloud billing projects link`, then imported into `shared/projects.tf` and each env's `modules/environment/projects.tf` instance. Terraform owns them from here on.
-2. The state bucket itself (`gs://prepify-tfstate`, in `prepify-infra`) was created by hand and is **not** managed by this config — a bucket can't manage the state file that describes itself.
-3. The Neon API key's *value* — Terraform manages the Secret Manager container (`google_secret_manager_secret.neon_api_key` in [shared/secrets.tf](shared/secrets.tf)), but can't populate its own bootstrap credential. Set/rotate it with:
+1. GCP projects: `gcloud projects create` + `gcloud billing projects link`, then imported.
+2. State bucket `gs://prepify-tfstate`: created by hand.
+3. Secret values with no `_secret_version` resource need setting by hand:
    ```bash
    read -s -p "Neon API key: " NEON_KEY && printf '%s' "$NEON_KEY" | gcloud secrets versions add neon-api-key --project=prepify-infra --data-file=-
    ```
-4. Google OAuth client credentials (Auth.js sign-in) — same shape as the Neon key: Terraform manages the Secret Manager containers (`google_secret_manager_secret.auth_google_client_id` / `auth_google_client_secret` in `modules/environment/auth.tf`), one pair per environment, but the client itself has to be created by hand in Google Cloud Console (APIs & Services → Credentials → OAuth client ID → Web application), with an authorized redirect URI of `https://<cloud-run-url>/api/auth/callback/google`. Populate each environment's secrets with:
+   Google OAuth client — create by hand in Google Cloud Console first (APIs & Services → Credentials → OAuth client ID → Web application, redirect URI `https://<cloud-run-url>/api/auth/callback/google`), then per environment:
    ```bash
-   read -s -p "Google OAuth client ID: " GOOGLE_ID && printf '%s' "$GOOGLE_ID" | gcloud secrets versions add auth-google-client-id --project=prepify-dev-vk --data-file=-
-   read -s -p "Google OAuth client secret: " GOOGLE_SECRET && printf '%s' "$GOOGLE_SECRET" | gcloud secrets versions add auth-google-client-secret --project=prepify-dev-vk --data-file=-
+   read -s -p "Google OAuth client ID: " GOOGLE_ID && printf '%s' "$GOOGLE_ID" | gcloud secrets versions add auth-google-client-id --project=<env-project> --data-file=-
+   read -s -p "Google OAuth client secret: " GOOGLE_SECRET && printf '%s' "$GOOGLE_SECRET" | gcloud secrets versions add auth-google-client-secret --project=<env-project> --data-file=-
    ```
-   (swap `prepify-dev-vk` for `prepify-prod` for the prod client). `AUTH_SECRET` itself doesn't need this — Terraform generates and stores it directly (`random_password.auth_secret`).
-5. Personal dev-only Neon API key for local agent use (`google_secret_manager_secret.neon_dev_api_key` in `modules/environment/neon.tf`, dev only) — same shape again. Mint it project-scoped to `prepify-dev` in the Neon Console or `neon api-keys create --project-id <id>` (needs org Admin), then:
+   Personal dev-only Neon API key — mint project-scoped to dev in the Neon Console or `neon api-keys create --project-id <id>` (needs org Admin), then:
    ```bash
    read -s -p "Neon dev-scoped API key: " NEON_KEY && printf '%s' "$NEON_KEY" | gcloud secrets versions add neon-dev-api-key --project=prepify-dev-vk --data-file=-
    ```
