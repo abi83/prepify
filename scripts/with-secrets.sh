@@ -24,12 +24,18 @@ secret() {
   gcloud secrets versions access latest --secret="$1" --project="$project"
 }
 
+database_url_pooling="$(secret database-url-pooling)"
+database_url_direct="$(secret database-url-direct)"
+auth_secret="$(secret auth-secret)"
+auth_google_client_id="$(secret auth-google-client-id)"
+auth_google_client_secret="$(secret auth-google-client-secret)"
+
 env_vars=(
-  "DATABASE_URL_POOLING=$(secret database-url-pooling)"
-  "DATABASE_URL_DIRECT=$(secret database-url-direct)"
-  "AUTH_SECRET=$(secret auth-secret)"
-  "AUTH_GOOGLE_CLIENT_ID=$(secret auth-google-client-id)"
-  "AUTH_GOOGLE_CLIENT_SECRET=$(secret auth-google-client-secret)"
+  "DATABASE_URL_POOLING=$database_url_pooling"
+  "DATABASE_URL_DIRECT=$database_url_direct"
+  "AUTH_SECRET=$auth_secret"
+  "AUTH_GOOGLE_CLIENT_ID=$auth_google_client_id"
+  "AUTH_GOOGLE_CLIENT_SECRET=$auth_google_client_secret"
   # Not a secret — deterministic from terraform/modules/environment/storage.tf.
   "GCS_BUCKET_NAME=${project}-storage"
 )
