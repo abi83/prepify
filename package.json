@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "scripts/with-secrets.sh next dev",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
@@ -13,9 +13,10 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "postinstall": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:status": "prisma migrate status",
-    "db:generate": "prisma generate"
+    "db:migrate": "scripts/with-secrets.sh prisma migrate dev",
+    "db:status": "scripts/with-secrets.sh prisma migrate status",
+    "db:generate": "prisma generate",
+    "claude": "scripts/with-claude-secrets.sh claude"
   },
   "dependencies": {
     "@google-cloud/storage": "8.2.0",

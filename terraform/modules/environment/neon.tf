@@ -79,3 +79,18 @@ resource "google_secret_manager_secret_iam_member" "run_runtime_db_url_pooling_a
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run_runtime.email}"
 }
+
+# Personal Neon API key for local agent use, project-scoped to dev only (unlike
+# shared/secrets.tf's neon_api_key, which reaches every project incl. prod).
+# Container only, no _version resource — populate by hand, see README.md.
+resource "google_secret_manager_secret" "neon_dev_api_key" {
+  count     = var.environment == "dev" ? 1 : 0
+  project   = google_project.this.project_id
+  secret_id = "neon-dev-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.this]
+}

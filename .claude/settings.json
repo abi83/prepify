@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__neon__get_database_tables",
+      "mcp__neon__describe_table_schema",
+      "mcp__neon__describe_project",
+      "mcp__neon__describe_branch",
+      "mcp__neon__list_branches",
+      "mcp__neon__list_operations",
+      "mcp__neon__get_branch",
+      "mcp__neon__list_postgres_databases",
+      "mcp__neon__list_postgres_roles",
+      "mcp__neon__get_postgres_database",
+      "mcp__neon__get_postgres_role",
+      "mcp__neon__list_slow_queries",
+      "mcp__neon__explain_sql_statement",
+      "mcp__neon__inspect_database"
+    ],
+    "deny": [
+      "mcp__neon__list_projects"
+    ]
+  }
+}

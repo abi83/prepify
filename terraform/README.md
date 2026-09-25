@@ -28,6 +28,10 @@ Three things exist outside this config on purpose, to break the chicken-and-egg 
    read -s -p "Google OAuth client secret: " GOOGLE_SECRET && printf '%s' "$GOOGLE_SECRET" | gcloud secrets versions add auth-google-client-secret --project=prepify-dev-vk --data-file=-
    ```
    (swap `prepify-dev-vk` for `prepify-prod` for the prod client). `AUTH_SECRET` itself doesn't need this — Terraform generates and stores it directly (`random_password.auth_secret`).
+5. Personal dev-only Neon API key for local agent use (`google_secret_manager_secret.neon_dev_api_key` in `modules/environment/neon.tf`, dev only) — same shape again. Mint it project-scoped to `prepify-dev` in the Neon Console or `neon api-keys create --project-id <id>` (needs org Admin), then:
+   ```bash
+   read -s -p "Neon dev-scoped API key: " NEON_KEY && printf '%s' "$NEON_KEY" | gcloud secrets versions add neon-dev-api-key --project=prepify-dev-vk --data-file=-
+   ```
 
 ## Usage
 
