@@ -29,6 +29,10 @@ State for all three lives in the same `gs://prepify-tfstate` bucket, under diffe
    ```bash
    read -s -p "Neon dev-scoped API key: " NEON_KEY && printf '%s' "$NEON_KEY" | gcloud secrets versions add neon-dev-api-key --project=prepify-dev-vk --data-file=-
    ```
+4. GCS locally (#251): Cloud Run authenticates to GCS via Workload Identity — no key file exists to fetch. `local_dev_email` in `envs/dev/main.tf` grants your account `roles/iam.serviceAccountTokenCreator` on the runtime SA so ADC can impersonate it instead, picking up the same bucket grants Cloud Run has:
+   ```bash
+   gcloud auth application-default login --impersonate-service-account=prepify-run-runtime@prepify-dev-vk.iam.gserviceaccount.com
+   ```
 
 ## Usage
 
