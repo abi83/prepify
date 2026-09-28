@@ -25,7 +25,7 @@ export async function getUploadSignedUrl(
   prepId: string,
   pageIndex: number,
   mimeType: string,
-): Promise<{ key: string; signedUrl: string }> {
+): Promise<{ key: string; signedUrl: string; contentLengthRange: string }> {
   const userId = await requireUserId()
 
   const prep = await prepRepository.getPrep(userId, prepId)
@@ -35,6 +35,7 @@ export async function getUploadSignedUrl(
   if (!ext) throw new Error(`Unsupported mime type: ${mimeType}`)
 
   const key = `prep-pages/${prepId}/page-${pageIndex}.${ext}`
+  const contentLengthRange = `0,${MAX_UPLOAD_BYTES}`
 
   const [ signedUrl ] = await storage
     .bucket(config.GCS_BUCKET_NAME)
@@ -45,9 +46,9 @@ export async function getUploadSignedUrl(
       expires: Date.now() + SIGNED_URL_TTL_MS,
       contentType: mimeType,
       extensionHeaders: {
-        "x-goog-content-length-range": `0,${MAX_UPLOAD_BYTES}`,
+        "x-goog-content-length-range": contentLengthRange,
       },
     })
 
-  return { key, signedUrl }
+  return { key, signedUrl, contentLengthRange }
 }

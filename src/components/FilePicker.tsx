@@ -85,8 +85,12 @@ export function FilePicker({ onRecognise }: Props) {
       setUploadStatuses(prev => new Map(prev).set(file, "uploading"))
       const promise = draftRef.current!
         .then(prepId => getUploadSignedUrl(prepId, pageIndex, file.type))
-        .then(({ signedUrl, key }) =>
-          fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } })
+        .then(({ signedUrl, key, contentLengthRange }) =>
+          fetch(signedUrl, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type, "x-goog-content-length-range": contentLengthRange },
+          })
             .then(r => {
               const status: UploadStatus = r.ok ? "done" : "error"
               setUploadStatuses(prev => new Map(prev).set(file, status))
