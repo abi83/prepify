@@ -34,6 +34,14 @@ resource "google_project_iam_member" "terraform_ci" {
   member  = "serviceAccount:${var.terraform_ci_service_account_email}"
 }
 
+# Lets terraform-ci attach the runtime service account to a Cloud Run
+# revision — iam.serviceAccountAdmin manages SAs but doesn't cover actAs.
+resource "google_service_account_iam_member" "terraform_ci_act_as_runtime" {
+  service_account_id = google_service_account.run_runtime.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.terraform_ci_service_account_email}"
+}
+
 resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
   bucket = google_storage_bucket.this.name
   role   = "roles/storage.objectAdmin"
