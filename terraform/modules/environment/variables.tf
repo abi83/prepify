@@ -52,3 +52,12 @@ variable "terraform_ci_service_account_email" {
   type    = string
   default = "terraform-ci@prepify-infra.iam.gserviceaccount.com"
 }
+
+# Lets a local developer's own account impersonate the runtime SA for
+# `gcloud auth application-default login --impersonate-service-account=...`
+# — see #251. Cloud Run uses Workload Identity, so there's no SA key to fetch
+# locally. Dev only; leave null in prod.
+variable "local_dev_email" {
+  type    = string
+  default = null
+}

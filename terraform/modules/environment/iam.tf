@@ -62,3 +62,14 @@ resource "google_service_account_iam_member" "run_runtime_sign_blobs" {
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "serviceAccount:${google_service_account.run_runtime.email}"
 }
+
+# See local_dev_email in variables.tf / #251. Impersonating the runtime SA
+# means local ADC picks up its bucket grants above (objectAdmin,
+# legacyBucketReader) too — no separate bucket binding needed for a dev.
+resource "google_service_account_iam_member" "local_dev_act_as_runtime" {
+  count = var.local_dev_email != null ? 1 : 0
+
+  service_account_id = google_service_account.run_runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "user:${var.local_dev_email}"
+}
