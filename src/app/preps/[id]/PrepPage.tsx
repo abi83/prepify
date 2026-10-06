@@ -173,7 +173,7 @@ export default function PrepPage({
         </div>
 
         {pages.map(page => (
-          <PageSection key={page.page} page={page} />
+          <PageSection key={page.page} prepId={prep.id} page={page} />
         ))}
 
         <GenerationPanel
