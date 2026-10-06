@@ -52,3 +52,19 @@ export async function getUploadSignedUrl(
 
   return { key, signedUrl, contentLengthRange }
 }
+
+export async function getReadSignedUrl(prepId: string, gcsKey: string): Promise<string> {
+  const userId = await requireUserId()
+  await prepRepository.getPrep(userId, prepId)
+
+  const [ signedUrl ] = await storage
+    .bucket(config.GCS_BUCKET_NAME)
+    .file(gcsKey)
+    .getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + SIGNED_URL_TTL_MS,
+    })
+
+  return signedUrl
+}
