@@ -1,25 +1,28 @@
 import type { Prep } from "@prisma/client"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const getSignedUrlMock = vi.fn().mockResolvedValue([ "https://signed.example/read" ])
+const { getSignedUrlMock } = vi.hoisted(() => ({
+  getSignedUrlMock: vi.fn().mockResolvedValue([ "https://signed.example/read" ]),
+}))
 
 vi.mock("@google-cloud/storage", () => ({
-  Storage: vi.fn().mockImplementation(() => ({
-    bucket: vi.fn().mockReturnValue({
-      file: vi.fn().mockReturnValue({ getSignedUrl: getSignedUrlMock }),
-    }),
-  })),
+  Storage: vi.fn().mockImplementation(function Storage() {
+    return {
+      bucket: vi.fn().mockReturnValue({
+        file: vi.fn().mockReturnValue({ getSignedUrl: getSignedUrlMock }),
+      }),
+    }
+  }),
 }))
 
 vi.mock("@/lib/env", () => ({ config: { GCS_BUCKET_NAME: "test-bucket" } }))
 vi.mock("@/lib/currentUser", () => ({ requireUserId: vi.fn() }))
 vi.mock("@/repositories/prepRepository", () => ({ getPrep: vi.fn() }))
 
+import { getReadSignedUrl } from "@/actions/uploads"
 import { requireUserId } from "@/lib/currentUser"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
-
-import { getReadSignedUrl } from "../uploads"
 
 const requireUserIdMock = requireUserId as unknown as ReturnType<typeof vi.fn>
 const getPrepMock = prepRepository.getPrep as unknown as ReturnType<typeof vi.fn>
