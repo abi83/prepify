@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
 import { z, ZodSchema } from "zod"
 
+import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "./config"
 import type { Logger } from "./logger"
 import { computeCost } from "./pricing"
 
@@ -107,7 +108,9 @@ function isNonRetryable(err: unknown): boolean {
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
   const { name, systemPrompt, userContent, schema, apiKey, model = "gpt-5-nano", signal } = config
 
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+  const timeout = AGENT_TIMEOUT_MS[name] ?? DEFAULT_AGENT_TIMEOUT_MS
+  // maxRetries: 0 — the backoff loop below is the only retry path; the SDK must not add a second one under it.
+  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true, timeout, maxRetries: 0 })
 
   let lastError: unknown
 

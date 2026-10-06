@@ -1,6 +1,23 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { z } from "zod"
 
-import { sanitizeLLMText } from "@/lib/agent"
+const createMock = vi.fn()
+const constructorMock = vi.fn()
+
+vi.mock("openai", async importOriginal => {
+  const actual = await importOriginal<typeof import("openai")>()
+  class MockOpenAI {
+    chat = { completions: { create: createMock } }
+    constructor(options: unknown) {
+      constructorMock(options)
+    }
+  }
+  return { ...actual, default: MockOpenAI }
+})
+
+import { runAgent, sanitizeLLMText } from "@/lib/agent"
+import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
+import { consoleLogger } from "@/lib/logger"
 
 describe("sanitizeLLMText", () => {
   it("passes through clean text unchanged", () => {
@@ -26,5 +43,45 @@ describe("sanitizeLLMText", () => {
 
   it("preserves valid non-ASCII and emoji", () => {
     expect(sanitizeLLMText("café 🎉")).toBe("café 🎉")
+  })
+})
+
+describe("runAgent", () => {
+  const schema = z.object({ answer: z.string() })
+
+  beforeEach(() => {
+    createMock.mockReset()
+    constructorMock.mockReset()
+    createMock.mockResolvedValue({
+      choices: [ { message: { content: JSON.stringify({ answer: "ok" }), tool_calls: [] } } ],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, prompt_tokens_details: { cached_tokens: 0 } },
+    })
+  })
+
+  async function run(name: string) {
+    return runAgent({
+      name,
+      systemPrompt: "system",
+      userContent: { textContent: "hello" },
+      schema,
+      apiKey: "key",
+      signal: new AbortController().signal,
+      logger: consoleLogger,
+    })
+  }
+
+  it("constructs the OpenAI client with maxRetries: 0 — runAgent owns retries, not the SDK", async () => {
+    await run("SomeAgent")
+    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0 }))
+  })
+
+  it("resolves the configured timeout for a listed agent name", async () => {
+    await run("ocr")
+    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ timeout: AGENT_TIMEOUT_MS.ocr }))
+  })
+
+  it("falls back to the default timeout for an agent name not in the lookup", async () => {
+    await run("SomeUnlistedAgent")
+    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ timeout: DEFAULT_AGENT_TIMEOUT_MS }))
   })
 })
