@@ -13,8 +13,8 @@ debug: true
 
 # Wiki checked out for the agents to read, at ./wiki. Disabled by default.
 wiki:
-  enabled: false
-  # url: owner/repo.wiki
+  enabled: true
+  url: abi83/prepify.wiki
 
 # The reviewer waits for every PR check to be green before it runs. List any
 # non-blocking advisory checks here (preview deploys, coverage deltas) to keep
