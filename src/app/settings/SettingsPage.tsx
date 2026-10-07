@@ -10,8 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS } from "@/lib/apiKey"
-import type { ModelId } from "@/lib/apiKey"
+import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
+import type { ModelId, ServiceTier } from "@/lib/apiKey"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import {
   getGenerationConfig, setGenerationConfig,
@@ -30,6 +30,7 @@ export default function SettingsPage() {
 
   const [ keyValue, setKeyValue ] = useState(() => getApiKey()?.key ?? "")
   const [ model, setModel ] = useState<ModelId>(() => getApiKey()?.model ?? "gpt-5-nano")
+  const [ tier, setTier ] = useState<ServiceTier>(() => getApiKey()?.tier ?? "flex")
   const [ saved, setSaved ] = useState(false)
   const [ testState, setTestState ] = useState<TestState>("idle")
   const [ totalTokens, setTotalTokens ] = useState(0)
@@ -62,7 +63,7 @@ export default function SettingsPage() {
 
   function handleSave() {
     if (!keyValue.trim()) return
-    setApiKey(keyValue.trim(), model)
+    setApiKey(keyValue.trim(), model, tier)
     setSaved(true)
     setTestState("idle")
     setTimeout(() => {
@@ -75,6 +76,7 @@ export default function SettingsPage() {
     clearApiKey()
     setKeyValue("")
     setModel("gpt-5-nano")
+    setTier("flex")
     setSaved(false)
     setTestState("idle")
   }
@@ -139,6 +141,20 @@ export default function SettingsPage() {
             <SelectContent>
               {AVAILABLE_MODELS.map(m => (
                 <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Service tier</Label>
+          <Select value={tier} onValueChange={v => { setTier(v as ServiceTier); setSaved(false) }}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AVAILABLE_TIERS.map(t => (
+                <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -233,7 +249,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-background px-4 py-3.5">
             <span className="text-sm text-muted-foreground">Estimated cost ({model})</span>
             <span className="text-sm font-semibold whitespace-nowrap">
-                ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model))}
+                ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model, tier))}
             </span>
           </div>
         )}

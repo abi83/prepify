@@ -60,6 +60,7 @@ export async function runMultipleChoiceBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
@@ -73,6 +74,7 @@ export async function runMultipleChoiceBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

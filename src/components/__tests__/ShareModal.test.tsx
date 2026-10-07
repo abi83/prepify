@@ -26,6 +26,7 @@ const baseProps = {
   concepts: [],
   apiKey: "sk-test",
   model: "gpt-5-nano",
+  tier: "flex",
   initialVisibility: "private" as const,
   initialGrade: null,
   initialDiscipline: null,

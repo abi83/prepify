@@ -59,6 +59,7 @@ export async function runPrepLabeler(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<AgentResult<PrepLabel>> {
@@ -75,6 +76,7 @@ export async function runPrepLabeler(
     schema: prepLabelSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

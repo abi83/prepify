@@ -60,6 +60,7 @@ interface RunAgentConfig<T> {
   schema: ZodSchema<T>
   apiKey: string
   model?: string
+  tier?: string
   signal: AbortSignal
   logger: Logger
 }
@@ -85,7 +86,6 @@ export function sanitizeLLMText(s: string): string {
 }
 
 const MAX_ATTEMPTS = 3
-const SERVICE_TIER = "flex"
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -106,7 +106,7 @@ function isNonRetryable(err: unknown): boolean {
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, apiKey, model = "gpt-5-nano", signal } = config
+  const { name, systemPrompt, userContent, schema, apiKey, model = "gpt-5-nano", tier = "flex", signal } = config
 
   const timeout = AGENT_TIMEOUT_MS[name] ?? DEFAULT_AGENT_TIMEOUT_MS
   // maxRetries: 0 — the backoff loop below is the only retry path; the SDK must not add a second one under it.
@@ -126,7 +126,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
             { role: "user", content: buildUserContent(userContent) },
           ],
           response_format: zodResponseFormat(schema, config.name),
-          service_tier: SERVICE_TIER,
+          service_tier: tier as OpenAI.ChatCompletionCreateParams["service_tier"],
         },
         { signal }
       )
@@ -148,12 +148,12 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
 
       const meta: AgentMeta = {
         model,
-        tier: SERVICE_TIER,
+        tier,
         promptTokens,
         cachedTokens,
         completionTokens,
         totalTokens: usage?.total_tokens ?? promptTokens + completionTokens,
-        costUsd: computeCost({ promptTokens, cachedTokens, completionTokens }, model),
+        costUsd: computeCost({ promptTokens, cachedTokens, completionTokens }, model, tier),
         toolCalls: message?.tool_calls?.length ?? 0,
         executionMs,
       }

@@ -25,8 +25,8 @@ export const DEFAULT_AGENT_TIMEOUT_MS = 60_000
 
 /**
  * Per-agent OpenAI request timeout (ms), keyed by the `name` passed into `runAgent`.
- * `ocr` runs with `service_tier: "flex"` on image input, which can legitimately take
- * tens of seconds — give it more headroom than the structured-text agents.
+ * `ocr` sends image input, which combined with a slower service tier (e.g. flex) can
+ * legitimately take tens of seconds — give it more headroom than the structured-text agents.
  */
 export const AGENT_TIMEOUT_MS: Record<string, number> = {
   ocr: 120_000,

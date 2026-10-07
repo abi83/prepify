@@ -25,6 +25,7 @@ export async function runFormulaAgent(
   description: string,
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<AgentResult<string>> {
@@ -35,6 +36,7 @@ export async function runFormulaAgent(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

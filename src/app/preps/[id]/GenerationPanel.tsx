@@ -98,6 +98,7 @@ export default function GenerationPanel({
         pages: pagesToProcess,
         apiKey: keyConfig.key,
         model: keyConfig.model,
+        tier: keyConfig.tier,
         language,
         questionCount: localConfig.questionCount,
         enabledTypes: localConfig.enabledTypes,
@@ -126,7 +127,7 @@ export default function GenerationPanel({
       )
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, abortRef.current.signal, consoleLogger)
+        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger)
       }
 
       const freshPrep = await getMyPrep(prepId)

@@ -28,6 +28,7 @@ export async function runPrepNamer(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   logger: Logger,
@@ -47,6 +48,7 @@ export async function runPrepNamer(
     schema: prepNameSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

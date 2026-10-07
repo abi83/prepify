@@ -123,6 +123,7 @@ export async function runQuestionReviewer(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   logger: Logger,
@@ -138,6 +139,7 @@ export async function runQuestionReviewer(
     ),
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

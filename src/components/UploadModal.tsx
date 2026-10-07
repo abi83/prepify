@@ -25,6 +25,7 @@ async function extractTextFromImage(
   file: File,
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
 ): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
   const base64 = await new Promise<string>((resolve, reject) => {
@@ -34,7 +35,7 @@ async function extractTextFromImage(
     reader.readAsDataURL(file)
   })
 
-  const { output } = await runOcrAgent([ { base64, mimeType: file.type } ], apiKey, model, signal, consoleLogger)
+  const { output } = await runOcrAgent([ { base64, mimeType: file.type } ], apiKey, model, tier, signal, consoleLogger)
   return { text: output.text, language: output.language, visual_elements: output.visual_elements }
 }
 
@@ -73,7 +74,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     try {
       results = await Promise.all(
         files.map(async (file) => {
-          const result = await extractTextFromImage(file, config.key, config.model, abortRef.current!.signal)
+          const result = await extractTextFromImage(file, config.key, config.model, config.tier, abortRef.current!.signal)
           setOcrProgress(p => ({ ...p, done: p.done + 1 }))
           return result
         })
