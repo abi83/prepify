@@ -35,7 +35,7 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 `prisma/schema.prisma` is the source of truth for schema changes, applied via **Prisma migrations**. Generating a migration and applying one are different operations with different risk profiles — keep them separate:
 
 - **Generating** a migration (`prisma migrate dev`, or the diff-only `prisma migrate diff`) needs a database to diff against, but it can — and for anyone other than the human running it against their own configured dev environment, must — be a disposable, throwaway Postgres (a local Docker container is enough), never the shared Neon dev branch. This is safe for an agent to do directly: spin up a throwaway Postgres, point `DATABASE_URL_DIRECT` at it, run `prisma migrate dev --name <description>`, commit the resulting `prisma/migrations/.../migration.sql` in the same PR as the schema change, then discard the container. A PR that changes `prisma/schema.prisma` must include the matching migration file — CI enforces this (see `.github/workflows/check-migrations.yml`), diffing against a throwaway Postgres service container of its own.
-- **Applying** a migration to a real environment (`prisma migrate deploy`) only ever happens through the deploy pipeline (`.github/workflows/ci-cd.yml`), against the shared dev Neon branch or prod. Nobody — human or agent — runs `db:migrate`/`migrate deploy` against those directly outside of CI; that's what avoids racing another concurrent change on the one shared dev branch (no per-PR DB isolation yet — tracked at [#85](https://github.com/abi83/prepify/issues/85)).
+- **Applying** a migration to a real environment (`prisma migrate deploy`) only ever happens through the deploy pipeline (`.github/workflows/ci-cd.yml`), against the shared dev Neon branch or prod, automatically on merge. No human step is needed; engineers (human or agent) only edit `schema.prisma`, generate, and commit the migration. Nobody — owner included — runs `db:migrate`/`migrate deploy` against those directly outside of CI; that's what avoids racing another concurrent change on the one shared dev branch (no per-PR DB isolation yet — tracked at [#85](https://github.com/abi83/prepify/issues/85)).
 
 Setup to run the app locally: `gcloud auth login`, then `npm run dev`/`npm run db:migrate`/`npm run db:status` — each wraps the command via `scripts/with-secrets.sh`, which fetches app secrets (DB URLs, auth secret, Google OAuth creds) from Secret Manager and injects them into that child process only. No `.env.local` or direnv needed.
 
@@ -55,7 +55,7 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. Apply migrations if the ticket needs one — see Database Migrations above for who does this and how
+2. If the schema changes, generate and commit the migration — see Database Migrations above. Applying it is CI/CD's job, not a human's or an agent's
 3. Commit, push, open a PR — commit/PR/branch conventions are on the wiki's `Contributing` page
 4. Once reviewed and merged, close the GitHub issue
 
