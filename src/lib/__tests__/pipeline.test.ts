@@ -182,7 +182,7 @@ describe("runPipeline resume", () => {
     const result = await run()
 
     expect(buildFlashcard).toHaveBeenCalledTimes(1)
-    expect(buildFlashcard.mock.calls[0][5]).toEqual({ question: rejected, feedback: expect.stringContaining("overall") })
+    expect(buildFlashcard.mock.calls[0][6]).toEqual({ question: rejected, feedback: expect.stringContaining("overall") })
     expect(saveAttemptBuild).toHaveBeenCalledWith("run-1", 0, 2, rewritten, expect.anything())
     expect(result.questions).toEqual([ { ...rewritten, difficulty: "easy" } ])
   })
@@ -243,10 +243,10 @@ describe("runPipeline reviewer rejection", () => {
 
     const result = await run()
 
-    expect(buildFlashcard.mock.calls[1][5]).toEqual({ question: first, feedback: expect.stringContaining("overall") })
+    expect(buildFlashcard.mock.calls[1][6]).toEqual({ question: first, feedback: expect.stringContaining("overall") })
     expect(reviewQuestion).toHaveBeenCalledTimes(2)
     expect(reviewQuestion.mock.calls[1][0]).toBe(second)
-    expect(reviewQuestion.mock.calls[1]).toHaveLength(7) // no prior-review context passed
+    expect(reviewQuestion.mock.calls[1]).toHaveLength(8) // no prior-review context passed
     expect(result.questions).toEqual([ { ...second, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([ [ buildMeta2, reviewMeta2 ] ])
     expect(finishSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])
