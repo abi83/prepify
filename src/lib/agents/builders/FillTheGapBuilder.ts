@@ -56,6 +56,7 @@ export async function runFillTheGapBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
@@ -69,6 +70,7 @@ export async function runFillTheGapBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

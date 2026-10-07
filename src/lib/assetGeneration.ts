@@ -24,6 +24,7 @@ export async function generateAndSaveAssets(
   prepId: string,
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<void> {
@@ -38,7 +39,7 @@ export async function generateAndSaveAssets(
   await Promise.allSettled(
     pending.map(async ({ q, hint }) => {
       try {
-        const result = await routeAsset(hint, apiKey, model, signal, logger)
+        const result = await routeAsset(hint, apiKey, model, tier, signal, logger)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)

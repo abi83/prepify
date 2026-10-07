@@ -39,6 +39,7 @@ export async function runDiagramAgent(
   description: string,
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<AgentResult<string>> {
@@ -49,6 +50,7 @@ export async function runDiagramAgent(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

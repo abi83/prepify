@@ -18,6 +18,7 @@ interface Props {
   concepts: Concept[]
   apiKey: string
   model: string
+  tier: string
   initialVisibility: PrepVisibility
   initialGrade: number | null
   initialDiscipline: Discipline | null
@@ -35,6 +36,7 @@ export default function ShareModal({
   concepts,
   apiKey,
   model,
+  tier,
   initialVisibility,
   initialGrade,
   initialDiscipline,
@@ -66,7 +68,7 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, apiKey, model, ac.signal, consoleLogger).then(result => {
+    runPrepLabeler(concepts, apiKey, model, tier, ac.signal, consoleLogger).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)

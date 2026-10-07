@@ -130,6 +130,7 @@ export default function PrepPage({
           concepts={concepts}
           apiKey={getApiKey()?.key ?? ""}
           model={getApiKey()?.model ?? "gpt-5-nano"}
+          tier={getApiKey()?.tier ?? "flex"}
           initialVisibility={prep.visibility}
           initialGrade={prep.grade}
           initialDiscipline={disciplineFromEnum(prep.discipline)}
@@ -166,7 +167,7 @@ export default function PrepPage({
             <span className="text-xs text-muted-foreground">
               {prep.tokensUsed.toLocaleString()} tokens
               {getApiKey() && (
-                <> · ~{formatCost(estimateCost(prep.tokensUsed * 0.8, prep.tokensUsed * 0.2, getApiKey()!.model))}</>
+                <> · ~{formatCost(estimateCost(prep.tokensUsed * 0.8, prep.tokensUsed * 0.2, getApiKey()!.model, getApiKey()!.tier))}</>
               )}
             </span>
           )}

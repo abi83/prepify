@@ -49,6 +49,7 @@ export async function runFlashcardBuilder(
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
@@ -62,6 +63,7 @@ export async function runFlashcardBuilder(
     schema: responseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

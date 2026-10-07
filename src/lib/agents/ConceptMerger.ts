@@ -29,6 +29,7 @@ export async function runConceptMerger(
   concepts: Concept[],
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   logger: Logger,
@@ -46,6 +47,7 @@ export async function runConceptMerger(
     schema: mergerResponseSchema,
     apiKey,
     model,
+    tier,
     signal,
     logger,
   })

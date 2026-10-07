@@ -18,20 +18,21 @@ export async function routeAsset(
   hint: ActiveAssetHint,
   apiKey: string,
   model: string,
+  tier: string,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
   case "formula": {
-    const r = await runFormulaAgent(hint.description, apiKey, model, signal, logger)
+    const r = await runFormulaAgent(hint.description, apiKey, model, tier, signal, logger)
     return { output: { type: "formula", blob: r.output }, meta: r.meta }
   }
   case "molecule": {
-    const r = await runMoleculeAgent(hint.description, apiKey, model, signal, logger)
+    const r = await runMoleculeAgent(hint.description, apiKey, model, tier, signal, logger)
     return { output: { type: "molecule", blob: r.output }, meta: r.meta }
   }
   case "diagram": {
-    const r = await runDiagramAgent(hint.description, apiKey, model, signal, logger)
+    const r = await runDiagramAgent(hint.description, apiKey, model, tier, signal, logger)
     return { output: { type: "diagram", blob: r.output }, meta: r.meta }
   }
   case "table":

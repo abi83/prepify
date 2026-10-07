@@ -79,6 +79,7 @@ type BuilderFn = (
   task: QuestionTask,
   apiKey: string,
   model: string,
+  tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
@@ -114,6 +115,7 @@ export interface PipelineConfig {
   pages: Page[]
   apiKey: string
   model: string
+  tier: string
   /** ISO 639-1 language code detected from the source image (e.g. 'de', 'fr'). Defaults to 'en'. */
   language?: string
   /** Target number of questions to generate (default 10, range 5–20). */
@@ -130,7 +132,7 @@ export interface PipelineConfig {
 }
 
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
-  const { prepId, pages, apiKey, model, language = "en", questionCount, enabledTypes, difficultyMix, logger, onProgress, onMetaReady } = config
+  const { prepId, pages, apiKey, model, tier, language = "en", questionCount, enabledTypes, difficultyMix, logger, onProgress, onMetaReady } = config
   const signal = config.signal ?? new AbortController().signal
   let totalTokens = 0
 
@@ -149,7 +151,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     concepts = state.concepts
   } else {
     onProgress({ stage: "concepts" })
-    const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, language, signal, logger)
+    const { output, meta, chunkCount } = await runConceptExtractor(pages, apiKey, model, tier, language, signal, logger)
     totalTokens += meta.totalTokens
     void incrementPrepTokens(prepId, meta.totalTokens)
     void recordGenerationMeta("prep", prepId, meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
@@ -158,7 +160,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     // Skip merger on single-chunk runs — there's nothing to merge across.
     const deduped = deduplicateExact(output)
     const merged = chunkCount > 1
-      ? await runConceptMerger(deduped, apiKey, model, language, signal, logger).then(r => {
+      ? await runConceptMerger(deduped, apiKey, model, tier, language, signal, logger).then(r => {
         totalTokens += r.meta.totalTokens
         void incrementPrepTokens(prepId, r.meta.totalTokens)
         void recordGenerationMeta("prep", prepId, r.meta).catch(e => logger.warn("pipeline: failed to record GenerationMeta", { error: serializeError(e) }))
@@ -211,7 +213,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   let prepTitle: string | null = null
   let prepDescription: string | null = null
 
-  const namingPromise = runPrepNamer(concepts, apiKey, model, language, signal, logger)
+  const namingPromise = runPrepNamer(concepts, apiKey, model, tier, language, signal, logger)
     .then(r => {
       prepTitle = r.output.title
       prepDescription = r.output.description
@@ -316,7 +318,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
           if (resumeBuild && attemptNum === startAttemptNum) {
             built = { output: resumeBuild.question, meta: resumeBuild.meta }
           } else {
-            built = await BUILDERS[task.type](task, apiKey, model, language, signal, rewrite, logger)
+            built = await BUILDERS[task.type](task, apiKey, model, tier, language, signal, rewrite, logger)
             attemptMeta.push(built.meta)
             trackTokens(built.meta)
             await saveAttemptBuild(runId, taskIdx, attemptNum, built.output, built.meta)
@@ -329,7 +331,7 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
             }
           }
 
-          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, language, signal, logger)
+          const reviewed = await runQuestionReviewer(built.output, task, apiKey, model, tier, language, signal, logger)
           attemptMeta.push(reviewed.meta)
           trackTokens(reviewed.meta)
           await saveAttemptReview(runId, taskIdx, attemptNum, reviewed.output.review, reviewed.output.passed, reviewed.meta)
