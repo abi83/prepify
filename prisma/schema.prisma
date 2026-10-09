@@ -51,6 +51,7 @@ model Prep {
   attempts    Attempt[]
   pipelineRun PipelineRun?
   images      PrepImage[]
+  jobs        Job[]
 }
 
 enum PrepImageStatus {
@@ -61,16 +62,20 @@ enum PrepImageStatus {
 }
 
 model PrepImage {
-  id        String          @id @default(uuid())
-  prepId    String
-  gcsKey    String
-  status    PrepImageStatus @default(pending)
-  ocrResult Json?
-  error     String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @default(now())
+  id              String          @id @default(uuid())
+  prepId          String
+  gcsKey          String
+  status          PrepImageStatus @default(pending)
+  ocrResult       Json?
+  error           String?
+  // Null for rows OCR'd by the legacy pipeline (src/lib/prepImageOcr.ts) — only the `ocr`
+  // job (#270) sets this.
+  producedByJobId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @default(now())
 
-  prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  prep          Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  producedByJob Job? @relation(fields: [producedByJobId], references: [id], onDelete: SetNull)
 }
 
 model Question {
@@ -80,10 +85,14 @@ model Question {
   // Null only for rows created before difficulty tiers existed.
   difficulty String?
   content   Json
-  createdAt DateTime @default(now())
+  // Null for rows built by the legacy pipeline (src/lib/pipeline.ts) — only a `question`
+  // job (#273) sets this.
+  producedByJobId String?
+  createdAt       DateTime @default(now())
 
-  prep   Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
-  assets Asset[]
+  prep          Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  assets        Asset[]
+  producedByJob Job?    @relation(fields: [producedByJobId], references: [id], onDelete: SetNull)
 }
 
 model Attempt {
@@ -166,6 +175,11 @@ model GenerationMeta {
   // Billed but discarded: the call's output isn't the one that became the final Question.
   wasted           Boolean              @default(false)
   generatedAt      DateTime             @default(now())
+  // Null for rows recorded by the legacy pipeline — only a job-backed LLM call (#270) sets
+  // this. Replaces entityType/entityId as the cost link once the legacy pipeline is gone (#275).
+  jobId            String?
+
+  job Job? @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([entityType, entityId])
 }
@@ -178,4 +192,67 @@ model Asset {
   createdAt  DateTime @default(now())
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// Runtime-agnostic job model — see wiki ADR-Pipeline-Job-Model. Mirrors the `Job` discriminated
+// union in src/core/job.ts: `output`/`failureReason` are set by exactly one of `executed`/`failed`,
+// enforced by PrismaStore (src/repositories/jobRepository.ts), not by the database.
+enum JobStatus {
+  created
+  executed
+  failed
+}
+
+model Job {
+  id            String    @id @default(uuid())
+  prepId        String
+  // Not an enum: a new job type (#272, #273, ...) needs no schema change (ADR point 1).
+  type          String
+  status        JobStatus @default(created)
+  // Resolved ExecutionConfig (src/core/job.ts) — never an API key, which is supplied only at execution.
+  model         String
+  tier          String
+  timeoutMs     Int
+  maxRetries    Int
+  output        Json?
+  failureReason String?
+  createdBy     String
+  executedBy    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now())
+
+  prep              Prep             @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  inputs            JobInput[]
+  concepts          Concept[]
+  producedImages    PrepImage[]
+  producedQuestions Question[]
+  generationMetas   GenerationMeta[]
+}
+
+// Join table for a job's input entities (ADR point 4) — keeps the dependency graph queryable
+// without a job-to-job graph. `entityType` is a plain string, not an enum, for the same reason
+// as `Job.type`: a new input entity type needs no schema change.
+model JobInput {
+  id         String @id @default(uuid())
+  jobId      String
+  entityType String
+  entityId   String
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+}
+
+// Same shape as conceptSchema (src/types/pipeline.ts). Produced only by a `concepts` job
+// (#272) — no concept exists independently of the job that produced it.
+model Concept {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  importance      Float
+  misconceptions  String[]
+  producedByJobId String
+  createdAt       DateTime @default(now())
+
+  producedByJob Job @relation(fields: [producedByJobId], references: [id], onDelete: Cascade)
 }
