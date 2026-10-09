@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import type { ExecutionConfig } from "@/core/job"
 import { createInMemoryStore } from "@/core/inMemoryStore"
+import type { ExecutionConfig } from "@/core/job"
 import type { Llm, ProgressSink } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { MissingDependencyError, runJob } from "@/core/runJob"
