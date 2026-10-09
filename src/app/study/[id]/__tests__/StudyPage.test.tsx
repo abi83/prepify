@@ -23,7 +23,6 @@ function prep(overrides: Partial<Prep> = {}): Prep {
     id: "test-prep-id",
     userId: "owner-id",
     title: "Biology Basics",
-    pages: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     tokensUsed: 0,
     visibility: "link",

@@ -23,23 +23,23 @@ beforeEach(async () => {
 
 describe("createPrep / getPrep", () => {
   it("lets the owner read their own private prep", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     const found = await prepRepository.getPrep(OWNER, created.id)
     expect(found.id).toBe(created.id)
   })
 
   it("rejects a non-owner reading a private prep", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     await expect(prepRepository.getPrep(OTHER, created.id)).rejects.toThrow(ForbiddenError)
   })
 
   it("rejects an anonymous reader on a private prep", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     await expect(prepRepository.getPrep(null, created.id)).rejects.toThrow(ForbiddenError)
   })
 
   it("lets anyone read a public prep", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "Shared Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "Shared Prep", language: "en" })
     await prepRepository.updatePrep(OWNER, created.id, { visibility: "public" })
 
     const asOther = await prepRepository.getPrep(OTHER, created.id)
@@ -55,12 +55,12 @@ describe("createPrep / getPrep", () => {
 
 describe("updatePrep / deletePrep", () => {
   it("rejects updates from a non-owner", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     await expect(prepRepository.updatePrep(OTHER, created.id, { title: "Hijacked" })).rejects.toThrow(ForbiddenError)
   })
 
   it("rejects deletes from a non-owner and allows the owner to delete", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     await expect(prepRepository.deletePrep(OTHER, created.id)).rejects.toThrow(ForbiddenError)
     await prepRepository.deletePrep(OWNER, created.id)
     await expect(prepRepository.getPrep(OWNER, created.id)).rejects.toThrow(NotFoundError)
@@ -69,9 +69,9 @@ describe("updatePrep / deletePrep", () => {
 
 describe("listOwnedPreps", () => {
   it("only returns the given user's active preps", async () => {
-    const active = await prepRepository.createPrep(OWNER, { title: "Owner Prep", pages: [], language: "en" })
-    await prepRepository.createPrep(OWNER, { title: "Draft Prep", pages: [], language: "en" })
-    await prepRepository.createPrep(OTHER, { title: "Other Prep", pages: [], language: "en" })
+    const active = await prepRepository.createPrep(OWNER, { title: "Owner Prep", language: "en" })
+    await prepRepository.createPrep(OWNER, { title: "Draft Prep", language: "en" })
+    await prepRepository.createPrep(OTHER, { title: "Other Prep", language: "en" })
     await prisma.prep.update({ where: { id: active.id }, data: { isActive: true } })
 
     const owned = await prepRepository.listOwnedPreps(OWNER)
@@ -82,8 +82,8 @@ describe("listOwnedPreps", () => {
 
 describe("listPublicCatalog", () => {
   it("includes only active public preps, with question counts", async () => {
-    const priv = await prepRepository.createPrep(OWNER, { title: "Private", pages: [], language: "en" })
-    const pub = await prepRepository.createPrep(OWNER, { title: "Public", pages: [], language: "en" })
+    const priv = await prepRepository.createPrep(OWNER, { title: "Private", language: "en" })
+    const pub = await prepRepository.createPrep(OWNER, { title: "Public", language: "en" })
     await prepRepository.updatePrep(OWNER, pub.id, { visibility: "public" })
     await prisma.prep.update({ where: { id: pub.id }, data: { isActive: true } })
     await prisma.question.createMany({
@@ -102,7 +102,7 @@ describe("listPublicCatalog", () => {
 
 describe("incrementPrepTokens", () => {
   it("accumulates the token count", async () => {
-    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", pages: [], language: "en" })
+    const created = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
     await prepRepository.incrementPrepTokens(created.id, 100)
     await prepRepository.incrementPrepTokens(created.id, 50)
     const found = await prepRepository.getPrep(OWNER, created.id)

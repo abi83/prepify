@@ -1,14 +1,12 @@
-import type { Prisma } from "@prisma/client"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 
-import { updatePrep, deletePrep } from "@/actions/preps"
-import type { VisualElementOutput } from "@/lib/agents/OcrAgent"
-import { runOcrAgent } from "@/lib/agents/OcrAgent"
+import { updatePrep } from "@/actions/preps"
 import { getApiKey } from "@/lib/apiKey"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { consoleLogger } from "@/lib/logger"
+import type { OcrFileResult } from "@/lib/prepImageOcr"
+import { ocrImageFile } from "@/lib/prepImageOcr"
 import { cn } from "@/lib/utils"
-import type { Page } from "@/types/prep"
 
 import { FilePicker, type RecogniseArgs } from "./FilePicker"
 import { Button } from "./ui/button"
@@ -21,43 +19,14 @@ type Props = {
 
 type Phase = "ocr" | "saving" | "error"
 
-async function extractTextFromImage(
-  file: File,
-  apiKey: string,
-  model: string,
-  tier: string,
-  signal: AbortSignal,
-): Promise<{ text: string; language: string; visual_elements: VisualElementOutput[] }> {
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(",")[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-
-  const { output } = await runOcrAgent([ { base64, mimeType: file.type } ], apiKey, model, tier, signal, consoleLogger)
-  return { text: output.text, language: output.language, visual_elements: output.visual_elements }
-}
-
 export default function UploadModal({ onClose, onDone }: Props) {
   const abortRef = useRef<AbortController | null>(null)
-  // Set when OCR starts; used to delete the draft if we abort before saving.
-  const pendingPrepIdRef = useRef<string | null>(null)
-  const savedRef = useRef(false)
 
   const [ phase, setPhase ] = useState<Phase | null>(null)
   const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
 
-  useEffect(() => {
-    return () => {
-      if (!savedRef.current && pendingPrepIdRef.current) {
-        void deletePrep(pendingPrepIdRef.current)
-      }
-    }
-  }, [])
-
-  async function handleRecognise({ prepId, files, uploadKeys }: RecogniseArgs) {
+  async function handleRecognise({ prepId, files, images }: RecogniseArgs) {
     const config = getApiKey()
     if (!config) {
       setPhase("error")
@@ -65,39 +34,22 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    pendingPrepIdRef.current = prepId
     abortRef.current = new AbortController()
     setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
 
-    let results: { text: string; language: string; visual_elements: VisualElementOutput[] }[]
-    try {
-      results = await Promise.all(
-        files.map(async (file) => {
-          const result = await extractTextFromImage(file, config.key, config.model, config.tier, abortRef.current!.signal)
-          setOcrProgress(p => ({ ...p, done: p.done + 1 }))
-          return result
-        })
-      )
-    } catch (err) {
-      setPhase("error")
-      const msg = err instanceof Error ? err.message : ""
-      setErrorMsg(
-        msg.startsWith("low_confidence")
-          ? "One of the images is too blurry or dark to read reliably. Please replace it with a clearer photo."
-          : "OCR failed. Please try again."
-      )
-      return
-    }
+    const results = await Promise.all(
+      files.map(async (file, i) => {
+        const image = images[i]
+        if (!image) return null
+        const result = await ocrImageFile(file, image.id, config.key, config.model, config.tier, abortRef.current!.signal, consoleLogger)
+        setOcrProgress(p => ({ ...p, done: p.done + 1 }))
+        return result
+      })
+    )
 
-    const pages: Page[] = results.map((r, i) => ({
-      page: i + 1,
-      text: r.text,
-      visual_elements: r.visual_elements,
-      ...(uploadKeys[i] !== null ? { gcsKey: uploadKeys[i] as string } : {}),
-    }))
-
-    const combinedText = pages.map(p => p.text).join("\n\n")
+    const succeeded = results.filter((r): r is OcrFileResult => r !== null)
+    const combinedText = succeeded.map(r => r.text).join("\n\n")
 
     if (!combinedText.trim()) {
       setPhase("error")
@@ -111,26 +63,19 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    const language = results[0]?.language ?? "en"
+    const language = succeeded[0].language
     setPhase("saving")
 
     try {
-      savedRef.current = true
-      await updatePrep(prepId, { pages: pages as unknown as Prisma.InputJsonValue, language, isActive: true })
+      await updatePrep(prepId, { language, isActive: true })
       onDone(prepId)
     } catch {
-      savedRef.current = false
       setPhase("error")
       setErrorMsg("Failed to save. Please try again.")
     }
   }
 
   function handleRetry() {
-    // Draft from the failed attempt is now orphaned — clean it up before re-showing the picker.
-    if (!savedRef.current && pendingPrepIdRef.current) {
-      void deletePrep(pendingPrepIdRef.current)
-      pendingPrepIdRef.current = null
-    }
     setPhase(null)
     setErrorMsg("")
   }

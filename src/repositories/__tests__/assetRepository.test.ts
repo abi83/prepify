@@ -30,14 +30,14 @@ async function makeQuestion(userId: string, prepId: string) {
 
 describe("insert", () => {
   it("lets the owner insert an asset via the question/prep chain", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const question = await makeQuestion(OWNER, prep.id)
     const asset = await assetRepository.insert(OWNER, question.id, "formula", "<svg></svg>")
     expect(asset.questionId).toBe(question.id)
   })
 
   it("rejects a non-owner", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const question = await makeQuestion(OWNER, prep.id)
     await expect(assetRepository.insert(OTHER, question.id, "formula", "<svg></svg>")).rejects.toThrow(ForbiddenError)
   })
@@ -45,7 +45,7 @@ describe("insert", () => {
 
 describe("listByQuestionIds", () => {
   it("is visible to the owner and to anyone once the prep is shared, but not while private", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const question = await makeQuestion(OWNER, prep.id)
     await assetRepository.insert(OWNER, question.id, "formula", "<svg></svg>")
 

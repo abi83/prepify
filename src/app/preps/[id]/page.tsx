@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { listMyAssets } from "@/actions/assets"
 import { listMyAttempts } from "@/actions/attempts"
 import { getExistingRunSummary, getConcepts } from "@/actions/pipeline"
+import { listMyPrepImages } from "@/actions/prepImages"
 import { getMyPrep } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
@@ -42,11 +43,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const [ questions, attempts, runSummary, concepts ] = await Promise.all([
+  const [ questions, attempts, runSummary, concepts, images ] = await Promise.all([
     listMyQuestions(id),
     listMyAttempts(id),
     getExistingRunSummary(id),
     getConcepts(id),
+    listMyPrepImages(id),
   ])
 
   const assets = questions.length > 0 ? await listMyAssets(questions.map(q => q.id)) : []
@@ -59,6 +61,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       assets={assets}
       runSummary={runSummary}
       concepts={concepts ?? []}
+      images={images}
     />
   )
 }

@@ -37,9 +37,6 @@ model Prep {
   id         String          @id @default(uuid())
   userId     String
   title      String
-  // TODO(#41): opaque JSON today; #41's resilient-upload work may want
-  // per-page status tracking, which would need this as its own model.
-  pages      Json?
   createdAt  DateTime        @default(now())
   tokensUsed Int             @default(0)
   visibility PrepVisibility  @default(private)
@@ -53,6 +50,27 @@ model Prep {
   questions   Question[]
   attempts    Attempt[]
   pipelineRun PipelineRun?
+  images      PrepImage[]
+}
+
+enum PrepImageStatus {
+  pending
+  processing
+  done
+  failed
+}
+
+model PrepImage {
+  id        String          @id @default(uuid())
+  prepId    String
+  gcsKey    String
+  status    PrepImageStatus @default(pending)
+  ocrResult Json?
+  error     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now())
+
+  prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
 }
 
 model Question {
