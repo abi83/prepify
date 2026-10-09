@@ -69,10 +69,11 @@ agents:
       - NotebookEdit
   # The coder does the most work per run, so it gets a longer timeout and turn budget.
   coder:
-    max_turns: 75
+    max_turns: 100
     timeout_minutes: 30
     allowed_tools:
       - Bash(npx prisma migrate dev:*)
+      - Bash(make lint:*)
     disallowed_tools:
       - Task
       - ScheduleWakeup
