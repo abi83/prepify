@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
-import { listMyPreps, createPrep, deletePrep } from "@/actions/preps"
+import { createPrepImage } from "@/actions/prepImages"
+import { listMyPreps, createPrep } from "@/actions/preps"
 import { getUploadSignedUrl } from "@/actions/uploads"
 
 import { Button } from "./ui/button"
@@ -10,10 +11,12 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024
 
 type UploadStatus = "uploading" | "done" | "error"
 
+export type UploadedImage = { id: string; gcsKey: string }
+
 export type RecogniseArgs = {
   prepId: string
   files: File[]
-  uploadKeys: (string | null)[]
+  images: (UploadedImage | null)[]
 }
 
 type Props = {
@@ -24,8 +27,7 @@ export function FilePicker({ onRecognise }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const draftRef = useRef<Promise<string> | null>(null)
-  const recognisedRef = useRef(false)
-  const uploadMapRef = useRef(new Map<File, Promise<string | null>>())
+  const uploadMapRef = useRef(new Map<File, Promise<UploadedImage | null>>())
   const nextPageIndexRef = useRef(0)
 
   const [ files, setFiles ] = useState<File[]>([])
@@ -39,14 +41,6 @@ export function FilePicker({ onRecognise }: Props) {
     setPreviews(urls)
     return () => urls.forEach(u => URL.revokeObjectURL(u))
   }, [ files ])
-
-  useEffect(() => {
-    return () => {
-      if (!recognisedRef.current && draftRef.current) {
-        draftRef.current.then(id => void deletePrep(id)).catch(() => {})
-      }
-    }
-  }, [])
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return
@@ -76,7 +70,7 @@ export function FilePicker({ onRecognise }: Props) {
 
     if (draftRef.current === null) {
       draftRef.current = listMyPreps()
-        .then(existing => createPrep({ title: `Prep #${existing.length + 1}`, pages: [], language: null }))
+        .then(existing => createPrep({ title: `Prep #${existing.length + 1}`, language: null }))
         .then(prep => prep.id)
     }
 
@@ -84,19 +78,21 @@ export function FilePicker({ onRecognise }: Props) {
       const pageIndex = nextPageIndexRef.current++
       setUploadStatuses(prev => new Map(prev).set(file, "uploading"))
       const promise = draftRef.current!
-        .then(prepId => getUploadSignedUrl(prepId, pageIndex, file.type))
-        .then(({ signedUrl, key, contentLengthRange }) =>
-          fetch(signedUrl, {
+        .then(async (prepId) => {
+          const { signedUrl, key, contentLengthRange } = await getUploadSignedUrl(prepId, pageIndex, file.type)
+          const r = await fetch(signedUrl, {
             method: "PUT",
             body: file,
             headers: { "Content-Type": file.type, "x-goog-content-length-range": contentLengthRange },
           })
-            .then(r => {
-              const status: UploadStatus = r.ok ? "done" : "error"
-              setUploadStatuses(prev => new Map(prev).set(file, status))
-              return r.ok ? key : null
-            })
-        )
+          if (!r.ok) {
+            setUploadStatuses(prev => new Map(prev).set(file, "error"))
+            return null
+          }
+          const image = await createPrepImage(prepId, key)
+          setUploadStatuses(prev => new Map(prev).set(file, "done"))
+          return { id: image.id, gcsKey: key }
+        })
         .catch(() => {
           setUploadStatuses(prev => new Map(prev).set(file, "error"))
           return null
@@ -127,12 +123,11 @@ export function FilePicker({ onRecognise }: Props) {
       return
     }
 
-    const uploadKeys = await Promise.all(
+    const images = await Promise.all(
       files.map(f => uploadMapRef.current.get(f) ?? Promise.resolve(null))
     )
 
-    recognisedRef.current = true
-    onRecognise({ prepId, files, uploadKeys })
+    onRecognise({ prepId, files, images })
   }
 
   const canAddMore = files.length < MAX_IMAGES

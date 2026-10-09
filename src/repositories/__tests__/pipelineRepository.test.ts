@@ -25,14 +25,14 @@ beforeEach(async () => {
 
 describe("loadOrCreateRun", () => {
   it("creates a run for the owner and reuses it on a second call", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const first = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     const second = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     expect(second.runId).toBe(first.runId)
   })
 
   it("rejects a non-owner, even when the prep is shared", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await prepRepository.updatePrep(OWNER, prep.id, { visibility: "public" })
     await expect(pipelineRepository.loadOrCreateRun(OTHER, prep.id)).rejects.toThrow(ForbiddenError)
   })
@@ -40,7 +40,7 @@ describe("loadOrCreateRun", () => {
 
 describe("run progression", () => {
   it("saves concepts, tasks, and a finished slot, then summarizes progress", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
 
     await pipelineRepository.saveConcepts(OWNER, runId, [ concept ])
@@ -62,7 +62,7 @@ describe("run progression", () => {
   })
 
   it("resumes a slot at the first missing step: build persisted but not reviewed", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
 
@@ -79,7 +79,7 @@ describe("run progression", () => {
   })
 
   it("resumes a rejected attempt into a second, rewritten attempt", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
 
@@ -99,7 +99,7 @@ describe("run progression", () => {
   })
 
   it("marks a slot failed — terminal, excluded from completedSlots", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
 
@@ -113,7 +113,7 @@ describe("run progression", () => {
   })
 
   it("rejects saving a second build for an attempt that already has one", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
     await pipelineRepository.saveAttemptBuild(OWNER, runId, 0, 1, flashcard("a"), meta())
@@ -122,7 +122,7 @@ describe("run progression", () => {
   })
 
   it("rejects saving a second review for an attempt that already has one", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
     await pipelineRepository.saveAttemptBuild(OWNER, runId, 0, 1, flashcard("a"), meta())
@@ -134,7 +134,7 @@ describe("run progression", () => {
 
 describe("loadOrCreateRun data integrity", () => {
   it("throws instead of silently returning a contentless question for a finished row with a null question", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
     // Simulate corrupt data a normal write path here can't produce (buggy migration, direct DB write).
@@ -146,7 +146,7 @@ describe("loadOrCreateRun data integrity", () => {
 
 describe("deleteRun", () => {
   it("removes the run and cascades its question slots", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const { runId } = await pipelineRepository.loadOrCreateRun(OWNER, prep.id)
     await pipelineRepository.saveQuestionTasksAndInitSlots(OWNER, runId, [ task ])
 

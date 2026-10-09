@@ -53,6 +53,14 @@ export async function getUploadSignedUrl(
   return { key, signedUrl, contentLengthRange }
 }
 
+/** Deletes a prep's uploaded page images from GCS. Called by `deletePrep` before/with the DB
+ *  delete — the caller is responsible for having already checked ownership of the prep. */
+export async function deletePrepObjects(gcsKeys: string[]): Promise<void> {
+  await Promise.all(
+    gcsKeys.map(key => storage.bucket(config.GCS_BUCKET_NAME).file(key).delete({ ignoreNotFound: true }))
+  )
+}
+
 export async function getReadSignedUrl(prepId: string, gcsKey: string): Promise<string> {
   const userId = await requireUserId()
   await prepRepository.getPrep(userId, prepId)

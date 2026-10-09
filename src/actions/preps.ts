@@ -3,7 +3,9 @@
 import type { Prep } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
+import { deletePrepObjects } from "@/actions/uploads"
 import { requireUserId } from "@/lib/currentUser"
+import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import type { CatalogEntry, CreatePrepInput, UpdatePrepInput } from "@/repositories/prepRepository"
 
@@ -38,7 +40,10 @@ export async function updatePrep(id: string, data: UpdatePrepInput): Promise<Pre
 }
 
 export async function deletePrep(id: string): Promise<void> {
-  await prepRepository.deletePrep(await requireUserId(), id)
+  const userId = await requireUserId()
+  const images = await prepImageRepository.listImages(userId, id)
+  await deletePrepObjects(images.map(i => i.gcsKey))
+  await prepRepository.deletePrep(userId, id)
   revalidatePath("/preps")
 }
 

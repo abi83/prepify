@@ -1,15 +1,16 @@
 import type { Prep } from "@prisma/client"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { getSignedUrlMock } = vi.hoisted(() => ({
+const { getSignedUrlMock, deleteMock } = vi.hoisted(() => ({
   getSignedUrlMock: vi.fn().mockResolvedValue([ "https://signed.example/read" ]),
+  deleteMock: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("@google-cloud/storage", () => ({
   Storage: vi.fn().mockImplementation(function Storage() {
     return {
       bucket: vi.fn().mockReturnValue({
-        file: vi.fn().mockReturnValue({ getSignedUrl: getSignedUrlMock }),
+        file: vi.fn().mockReturnValue({ getSignedUrl: getSignedUrlMock, delete: deleteMock }),
       }),
     }
   }),
@@ -19,7 +20,7 @@ vi.mock("@/lib/env", () => ({ config: { GCS_BUCKET_NAME: "test-bucket" } }))
 vi.mock("@/lib/currentUser", () => ({ requireUserId: vi.fn() }))
 vi.mock("@/repositories/prepRepository", () => ({ getPrep: vi.fn() }))
 
-import { getReadSignedUrl } from "@/actions/uploads"
+import { deletePrepObjects, getReadSignedUrl } from "@/actions/uploads"
 import { requireUserId } from "@/lib/currentUser"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
@@ -34,6 +35,7 @@ function prep(overrides: Partial<Prep> = {}): Prep {
 beforeEach(() => {
   vi.clearAllMocks()
   getSignedUrlMock.mockResolvedValue([ "https://signed.example/read" ])
+  deleteMock.mockResolvedValue(undefined)
 })
 
 describe("getReadSignedUrl", () => {
@@ -61,5 +63,14 @@ describe("getReadSignedUrl", () => {
 
     await expect(getReadSignedUrl("prep-1", "prep-pages/prep-1/page-0.jpg")).rejects.toThrow(ForbiddenError)
     expect(getSignedUrlMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("deletePrepObjects", () => {
+  it("deletes every given GCS key, ignoring ones already gone", async () => {
+    await deletePrepObjects([ "prep-pages/prep-1/page-0.jpg", "prep-pages/prep-1/page-1.jpg" ])
+
+    expect(deleteMock).toHaveBeenCalledTimes(2)
+    expect(deleteMock).toHaveBeenCalledWith({ ignoreNotFound: true })
   })
 })

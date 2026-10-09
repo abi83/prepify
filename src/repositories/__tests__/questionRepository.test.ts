@@ -41,7 +41,7 @@ beforeEach(async () => {
 
 describe("insertMany", () => {
   it("lets the owner insert questions", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const saved = await questionRepository.insertMany(OWNER, prep.id, [
       { type: "flashcard", difficulty: "easy", content: { front: "a", back: "b" } },
     ])
@@ -51,14 +51,14 @@ describe("insertMany", () => {
   })
 
   it("rejects a non-owner inserting questions", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await expect(
       questionRepository.insertMany(OTHER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
     ).rejects.toThrow(ForbiddenError)
   })
 
   it("fails fast when questionMeta length doesn't match questions length", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await expect(
       questionRepository.insertMany(
         OWNER,
@@ -70,7 +70,7 @@ describe("insertMany", () => {
   })
 
   it("records a GenerationMeta row per meta, against the newly created question's id", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const saved = await questionRepository.insertMany(
       OWNER,
       prep.id,
@@ -94,7 +94,7 @@ describe("insertMany", () => {
   })
 
   it("skips recording a GenerationMeta row for a meta with no tokens", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const saved = await questionRepository.insertMany(
       OWNER,
       prep.id,
@@ -109,19 +109,19 @@ describe("insertMany", () => {
 
 describe("listByPrep", () => {
   it("is visible to the owner", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
     const questions = await questionRepository.listByPrep(OWNER, prep.id)
     expect(questions).toHaveLength(1)
   })
 
   it("rejects an anonymous reader when the parent prep is private", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await expect(questionRepository.listByPrep(null, prep.id)).rejects.toThrow(ForbiddenError)
   })
 
   it("is visible to anyone when the parent prep is public", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await prepRepository.updatePrep(OWNER, prep.id, { visibility: "public" })
     await questionRepository.insertMany(OWNER, prep.id, [ { type: "flashcard", difficulty: "easy", content: {} } ])
 

@@ -27,7 +27,7 @@ export default function PageSection({ prepId, page }: { prepId: string; page: Pa
   const hasVisuals = page.visual_elements.length > 0
 
   useEffect(() => {
-    if (!open || !page.gcsKey || imageUrl) return
+    if (!open || imageUrl) return
 
     let ignore = false
     getReadSignedUrl(prepId, page.gcsKey).then(url => {

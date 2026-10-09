@@ -23,7 +23,7 @@ beforeEach(async () => {
 
 describe("insert / listForPrep", () => {
   it("lets a user read their own attempts", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await attemptRepository.insert(OWNER, prep.id, "quiz", 4, 5)
 
     const attempts = await attemptRepository.listForPrep(OWNER, prep.id)
@@ -32,7 +32,7 @@ describe("insert / listForPrep", () => {
   })
 
   it("never returns another user's attempts, even for the prep owner", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", pages: [], language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await prepRepository.updatePrep(OWNER, prep.id, { visibility: "public" })
     await attemptRepository.insert(OTHER, prep.id, "test", 3, 5)
 

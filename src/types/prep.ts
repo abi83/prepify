@@ -1,3 +1,5 @@
+import { z } from "zod"
+
 export const STUDY_TABS = [ "cards", "quiz", "test" ] as const
 export type StudyTab = (typeof STUDY_TABS)[number]
 
@@ -24,6 +26,22 @@ export type VisualElement = {
 export type Page = {
   page: number
   text: string
-  gcsKey?: string
+  gcsKey: string
   visual_elements: VisualElement[]
 }
+
+const visualElementSchema: z.ZodType<VisualElement> = z.object({
+  type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
+  description: z.string(),
+  content: z.string(),
+  caption: z.string().nullable(),
+  context: z.string().nullable(),
+  confidence: z.number(),
+})
+
+/** Shape written to `PrepImage.ocrResult` once OCR for that image finishes successfully. */
+export const ocrResultSchema = z.object({
+  text: z.string(),
+  visual_elements: z.array(visualElementSchema),
+})
+export type OcrResult = z.infer<typeof ocrResultSchema>

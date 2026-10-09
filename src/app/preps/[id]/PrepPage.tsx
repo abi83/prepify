@@ -1,6 +1,6 @@
 "use client"
 
-import type { Prep, Question, Attempt, Asset } from "@prisma/client"
+import type { Prep, Question, Attempt, Asset, PrepImage } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useState } from "react"
@@ -17,7 +17,7 @@ import { formatDate } from "@/lib/format"
 import { estimateCost, formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
 import type { Concept } from "@/types/pipeline"
-import { parseStudyTab, type StudyTab, type Page } from "@/types/prep"
+import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
 import GenerationPanel from "./GenerationPanel"
@@ -32,6 +32,7 @@ interface Props {
   assets: Asset[]
   runSummary: import("@/repositories/pipelineRepository").PartialRunSummary | null
   concepts: Concept[]
+  images: PrepImage[]
 }
 
 export default function PrepPage({
@@ -41,6 +42,7 @@ export default function PrepPage({
   assets,
   runSummary,
   concepts,
+  images,
 }: Props) {
   const router = useRouter()
   const { searchParams, set: setUrlParams } = useUrlParams()
@@ -70,7 +72,9 @@ export default function PrepPage({
   const tab = parseStudyTab(searchParams.get("tab"))
   function setTab(next: StudyTab) { setUrlParams({ tab: next }) }
 
-  const pages = (prep.pages as unknown as Page[]) ?? []
+  const pages: Page[] = images
+    .filter(img => img.status === "done")
+    .map((img, i) => ({ page: i + 1, gcsKey: img.gcsKey, ...ocrResultSchema.parse(img.ocrResult) }))
   const hasQuestions = questions.length > 0
   const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== "flashcard")
