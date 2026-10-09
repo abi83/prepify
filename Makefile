@@ -16,6 +16,8 @@ ifdef CI
 endif
 
 test:
+	npm run lint
+	npm run typecheck
 	npm test
 
 build:
