@@ -1,7 +1,7 @@
 # Entry points the interns coder/reviewer pipeline runs before opening or
 # updating a PR.
 
-.PHONY: setup test build
+.PHONY: setup lint test build
 
 setup:
 	npm ci
@@ -15,10 +15,12 @@ ifdef CI
 	docker exec migrate-db createdb -U postgres shadow
 endif
 
-test:
+lint:
 	npm run db:generate
 	npm run lint
 	npm run typecheck
+
+test: lint
 	npm test
 
 build:

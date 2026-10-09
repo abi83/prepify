@@ -73,6 +73,7 @@ agents:
     timeout_minutes: 30
     allowed_tools:
       - Bash(npx prisma migrate dev:*)
+      - Bash(make lint:*)
     disallowed_tools:
       - Task
       - ScheduleWakeup
