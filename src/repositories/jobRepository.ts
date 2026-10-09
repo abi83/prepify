@@ -1,20 +1,29 @@
-import { Prisma, type Job as JobRow } from "@prisma/client"
+import { Prisma, type Job as JobRow, type PrepDiscipline } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus } from "@/core/job"
 import type { Store } from "@/core/ports"
 import type { AgentMeta } from "@/lib/agent"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
+import type { Concept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
 
 import { ForbiddenError, NotFoundError } from "./errors"
 
-/** Looks up which Prep owns a job input entity. `prepImage` is the only input entity type
- *  any job produces today (ADR point 4) — a new input entity type (#272/#273) adds a branch
- *  here, not a schema change. */
+/** Looks up which Prep owns a job input entity (ADR point 4). `prepImage` (produced by the
+ *  `ocr` job, #270) and `concept` (produced by the `concepts` job, #272 — via its
+ *  `producedByJob`, since `Concept` has no direct `prepId`) are the only input entity types
+ *  any job produces today — a new one (#273's questions) adds a branch here, not a schema change. */
 async function findInputOwner(entityId: string): Promise<{ entityType: string; prepId: string } | null> {
   const image = await prisma.prepImage.findUnique({ where: { id: entityId }, select: { prepId: true } })
   if (image) return { entityType: "prepImage", prepId: image.prepId }
+
+  const concept = await prisma.concept.findUnique({
+    where: { id: entityId },
+    select: { producedByJob: { select: { prepId: true } } },
+  })
+  if (concept) return { entityType: "concept", prepId: concept.producedByJob.prepId }
+
   return null
 }
 
@@ -114,11 +123,11 @@ export function createPrismaStore(): Store {
 
     async existingIds(actorId: string, ids: string[]): Promise<Set<string>> {
       if (ids.length === 0) return new Set()
-      const images = await prisma.prepImage.findMany({
-        where: { id: { in: ids }, prep: { userId: actorId } },
-        select: { id: true },
-      })
-      return new Set(images.map(i => i.id))
+      const [ images, concepts ] = await Promise.all([
+        prisma.prepImage.findMany({ where: { id: { in: ids }, prep: { userId: actorId } }, select: { id: true } }),
+        prisma.concept.findMany({ where: { id: { in: ids }, producedByJob: { prep: { userId: actorId } } }, select: { id: true } }),
+      ])
+      return new Set([ ...images.map(i => i.id), ...concepts.map(c => c.id) ])
     },
 
     async commitJob<TOutput>(
@@ -155,5 +164,47 @@ export async function recordOcrOutcome(jobId: string, imageId: string, result: O
       data: { ocrResult: result as unknown as Prisma.InputJsonValue, producedByJobId: jobId },
     }),
     prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", image.prepId, meta), jobId } }),
+  ])
+}
+
+/**
+ * Persists the `concepts` job's output: creates one `Concept` row per merged concept and
+ * records each LLM call's cost against the job. `imageId` is only used to resolve the owning
+ * Prep for the `GenerationMeta` rows. No ownership check — same precedent as `recordOcrOutcome`.
+ */
+export async function recordConceptsOutcome(jobId: string, imageId: string, concepts: Concept[], metas: AgentMeta[]): Promise<void> {
+  const image = await prisma.prepImage.findUnique({ where: { id: imageId }, select: { prepId: true } })
+  if (!image) throw new NotFoundError(`PrepImage ${imageId} not found`)
+
+  await prisma.$transaction([
+    prisma.concept.createMany({ data: concepts.map(c => ({ ...c, producedByJobId: jobId })) }),
+    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", image.prepId, meta), jobId } })),
+  ])
+}
+
+export interface PrepMetaResult {
+  title: string
+  description: string
+  grade: number | null
+  discipline: PrepDiscipline | null
+}
+
+/**
+ * Persists the `prep.meta` job's output: writes title/description/grade/discipline straight
+ * onto the target `Prep` row (resolved through the input concept's `producedByJob`) and
+ * records each LLM call's cost against the job. No ownership check — same precedent as
+ * `recordOcrOutcome`.
+ */
+export async function recordPrepMetaOutcome(jobId: string, conceptId: string, result: PrepMetaResult, metas: AgentMeta[]): Promise<void> {
+  const concept = await prisma.concept.findUnique({
+    where: { id: conceptId },
+    select: { producedByJob: { select: { prepId: true } } },
+  })
+  if (!concept) throw new NotFoundError(`Concept ${conceptId} not found`)
+  const { prepId } = concept.producedByJob
+
+  await prisma.$transaction([
+    prisma.prep.update({ where: { id: prepId }, data: result }),
+    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", prepId, meta), jobId } })),
   ])
 }
