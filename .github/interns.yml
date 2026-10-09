@@ -71,6 +71,8 @@ agents:
   coder:
     max_turns: 75
     timeout_minutes: 30
+    allowed_tools:
+      - Bash(npx prisma migrate dev:*)
     disallowed_tools:
       - Task
       - ScheduleWakeup
