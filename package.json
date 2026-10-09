@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "scripts/with-secrets.sh next dev",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
+    "pretest": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

@@ -55,7 +55,7 @@ All work is tracked via **GitHub Issues** on this repo. When the user says "tick
 ### Implementation flow
 For every ticket/feature, in order:
 1. Create a branch, implement the code changes
-2. If the schema changes, generate and commit the migration — see Database Migrations above. Applying it is CI/CD's job, not a human's or an agent's
+2. If the schema changes, generate and commit the migration — see Database Migrations above. Applying it is CI/CD's job, not a human's or an agent's. The Prisma client regenerates on `npm test`/`npm run build`; don't run `prisma generate` by hand
 3. Commit, push, open a PR — commit/PR/branch conventions are on the wiki's `Contributing` page
 4. Once reviewed and merged, close the GitHub issue
 
@@ -83,7 +83,7 @@ The GitHub wiki (separate repo, cloned locally at `../prepify.wiki`) is a high-l
 
 ## Development
 
-Before pushing, run the same checks CI gates on: `npm test` and `npm run build`. Lint/typecheck aren't wired into CI yet — testing strategy beyond that is a placeholder pending #78.
+Before pushing, run the same checks CI gates on: `npm test` and `npm run build`. After a schema change, run `npm test` first so the client matches the schema. Lint/typecheck aren't wired into CI yet — testing strategy beyond that is a placeholder pending #78.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
