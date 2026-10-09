@@ -16,9 +16,11 @@ ifdef CI
 endif
 
 test:
+	npm run db:generate
 	npm run lint
 	npm run typecheck
 	npm test
 
 build:
+	npm run db:generate
 	npm run build

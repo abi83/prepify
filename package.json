@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "scripts/with-secrets.sh next dev",
-    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
@@ -13,7 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
-    "typecheck": "prisma generate && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "db:migrate": "scripts/with-secrets.sh prisma migrate dev",
     "db:status": "scripts/with-secrets.sh prisma migrate status",
