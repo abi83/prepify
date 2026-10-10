@@ -55,6 +55,7 @@ vi.mock("@/lib/agents/QuestionReviewer", async importOriginal => ({
 import type { AgentMeta } from "@/lib/agent"
 import { consoleLogger } from "@/lib/logger"
 import { runPipeline } from "@/lib/pipeline"
+import { noopSampler } from "@/lib/sampler/noopSampler"
 import type { PipelineSlotState } from "@/repositories/pipelineRepository"
 import type { PipelineAttempt } from "@/types/pipeline"
 import type { GeneratedQuestion } from "@/types/questions"
@@ -89,7 +90,7 @@ function singleSlotRun(slot = pendingSlot()) {
 }
 
 function run() {
-  return runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger, onProgress: vi.fn() })
+  return runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger, sampler: noopSampler, onProgress: vi.fn() })
 }
 
 /** Every `metas` argument recordGenerationMetaMany was called with, wasted calls only, flattened in call order. */
@@ -246,7 +247,7 @@ describe("runPipeline reviewer rejection", () => {
     expect(buildFlashcard.mock.calls[1][6]).toEqual({ question: first, feedback: expect.stringContaining("overall") })
     expect(reviewQuestion).toHaveBeenCalledTimes(2)
     expect(reviewQuestion.mock.calls[1][0]).toBe(second)
-    expect(reviewQuestion.mock.calls[1]).toHaveLength(8) // no prior-review context passed
+    expect(reviewQuestion.mock.calls[1]).toHaveLength(9) // no prior-review context passed
     expect(result.questions).toEqual([ { ...second, difficulty: "easy" } ])
     expect(result.questionMeta).toEqual([ [ buildMeta2, reviewMeta2 ] ])
     expect(finishSlot).toHaveBeenCalledWith("run-1", 0, second, [ buildMeta2, reviewMeta2 ])
@@ -330,7 +331,7 @@ describe("runPipeline progress events", () => {
       .mockResolvedValueOnce({ output: reviewedOutput(true), meta: meta() })
 
     const events: string[] = []
-    await runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger, onProgress: e => events.push(e.stage) })
+    await runPipeline({ prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger, sampler: noopSampler, onProgress: e => events.push(e.stage) })
 
     expect(events).toContain("rewriting")
     expect(events[events.length - 1]).toBe("done")
@@ -350,6 +351,7 @@ describe("runPipeline progress events", () => {
     const craftEvents: Array<{ done: number; total: number }> = []
     await runPipeline({
       prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger,
+      sampler: noopSampler,
       onProgress: e => { if (e.stage === "crafting") craftEvents.push({ done: e.done, total: e.total }) },
     })
 
@@ -372,6 +374,7 @@ describe("runPipeline progress events", () => {
     const rewriteEvents: Array<{ done: number; total: number }> = []
     await runPipeline({
       prepId: "prep-1", pages: [], apiKey: "key", model: "model", tier: "flex", logger: consoleLogger,
+      sampler: noopSampler,
       onProgress: e => { if (e.stage === "rewriting") rewriteEvents.push({ done: e.done, total: e.total }) },
     })
 

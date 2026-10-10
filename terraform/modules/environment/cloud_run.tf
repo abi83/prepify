@@ -49,6 +49,11 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
+        name  = "SAMPLE_RATE"
+        value = var.environment == "dev" ? "1" : "0.02"
+      }
+
+      env {
         name = "DATABASE_URL_POOLING"
         value_source {
           secret_key_ref {

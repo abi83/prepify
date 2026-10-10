@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import { singleChoiceContentSchema } from "@/types/questions"
 import type { SingleChoiceContent } from "@/types/questions"
@@ -62,6 +63,7 @@ export async function runSingleChoiceBuilder(
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<{ type: "single_choice"; content: SingleChoiceContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -74,6 +76,7 @@ export async function runSingleChoiceBuilder(
     tier,
     signal,
     logger,
+    sampler,
   })
   return { output: { type: "single_choice", content: result.output.content }, meta: result.meta }
 }

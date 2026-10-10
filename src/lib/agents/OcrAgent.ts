@@ -5,6 +5,7 @@ import type { AgentImage } from "@/lib/agent"
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
 import type { SupportedLanguage } from "@/lib/config"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 
 const visualElementSchema = z.object({
   type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
@@ -58,6 +59,7 @@ export async function runOcrAgent(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: "ocr",
@@ -69,6 +71,7 @@ export async function runOcrAgent(
     tier,
     signal,
     logger,
+    sampler,
   })
 
   if (result.output.confidence < MIN_PAGE_CONFIDENCE) {

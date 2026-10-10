@@ -5,6 +5,7 @@ import { updatePrep } from "@/actions/preps"
 import { runPrepLabeler, DISCIPLINES, type Discipline } from "@/lib/agents/PrepLabeler"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
 import { consoleLogger } from "@/lib/logger"
+import { clientSampler } from "@/lib/sampler/clientSampler"
 import type { Concept } from "@/types/pipeline"
 
 import { Button } from "./ui/button"
@@ -68,7 +69,7 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, apiKey, model, tier, ac.signal, consoleLogger).then(result => {
+    runPrepLabeler(concepts, apiKey, model, tier, ac.signal, consoleLogger, clientSampler).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)
