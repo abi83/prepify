@@ -38,3 +38,30 @@ resource "google_storage_bucket" "this" {
     prevent_destroy = true
   }
 }
+
+# Separate from google_storage_bucket.this: samples contain user photos/OCR
+# text, so they get a flat 90-day delete lifecycle in both envs rather than
+# this.this's dev/prod split (90 days / 3 years).
+resource "google_storage_bucket" "samples" {
+  project                     = google_project.this.project_id
+  name                        = "${var.project_id}-samples"
+  location                    = var.region
+  storage_class               = "STANDARD"
+  uniform_bucket_level_access = true
+  force_destroy               = false
+
+  lifecycle_rule {
+    condition {
+      age = 90
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  depends_on = [google_project_service.this]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}

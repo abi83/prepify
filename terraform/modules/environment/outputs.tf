@@ -6,6 +6,10 @@ output "storage_bucket" {
   value = google_storage_bucket.this.name
 }
 
+output "samples_bucket" {
+  value = google_storage_bucket.samples.name
+}
+
 output "neon_project_id" {
   value = neon_project.this.id
 }
