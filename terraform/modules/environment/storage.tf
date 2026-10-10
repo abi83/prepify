@@ -9,8 +9,20 @@ resource "google_storage_bucket" "this" {
   uniform_bucket_level_access = true
   force_destroy               = false
 
-  retention_policy {
-    retention_period = 94608000 # 3 years
+  # Auto-delete, not retain: a retention_policy blocks deletion/overwrite
+  # until the object reaches that age, which is the opposite of intent — see #285.
+  lifecycle_rule {
+    condition {
+      age = var.environment == "dev" ? 90 : 1095 # dev: 90 days, prod: 3 years
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  # Recoverable window for accidental delete/overwrite, same in both envs.
+  soft_delete_policy {
+    retention_duration_seconds = 7776000 # 90 days
   }
 
   cors {
