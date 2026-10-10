@@ -38,6 +38,8 @@ env_vars=(
   "AUTH_GOOGLE_CLIENT_SECRET=$auth_google_client_secret"
   # Not a secret — deterministic from terraform/modules/environment/storage.tf.
   "GCS_BUCKET_NAME=${project}-storage"
+  "SAMPLES_BUCKET_NAME=${project}-samples"
+  "SAMPLE_RATE=1"
 )
 
 exec env "${env_vars[@]}" "$@"

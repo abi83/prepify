@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 
 const responseSchema = z.object({
   latex: z.string(),
@@ -28,6 +29,7 @@ export async function runFormulaAgent(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "FormulaAgent",
@@ -39,6 +41,7 @@ export async function runFormulaAgent(
     tier,
     signal,
     logger,
+    sampler,
   })
 
   const { latex, is_chemical } = result.output

@@ -17,6 +17,7 @@ import { runJob } from "@/core/runJob"
 import { createPrepMetaJobDefinition } from "@/lib/jobs/prepMetaJob"
 import { consoleLogger } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
+import { noopSampler } from "@/lib/sampler/noopSampler"
 import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepRepository from "@/repositories/prepRepository"
@@ -69,7 +70,7 @@ describe("prep.meta job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
 
-    const definition = createPrepMetaJobDefinition([ CONCEPT ], "en", consoleLogger)
+    const definition = createPrepMetaJobDefinition([ CONCEPT ], "en", consoleLogger, noopSampler)
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

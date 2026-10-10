@@ -4,7 +4,10 @@ import { z, ZodSchema } from "zod"
 
 import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "./config"
 import type { Logger } from "./logger"
+import { serializeError } from "./logger"
 import { computeCost } from "./pricing"
+import { hashPrompt } from "./sampler/promptHash"
+import type { Sampler } from "./sampler/schema"
 
 /**
  * App-shaped usage/cost data for one agent call — never OpenAI's raw `usage` object.
@@ -63,6 +66,7 @@ interface RunAgentConfig<T> {
   tier?: string
   signal: AbortSignal
   logger: Logger
+  sampler: Sampler
 }
 
 function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.ChatCompletionContentPart[] {
@@ -103,6 +107,19 @@ function isNonRetryable(err: unknown): boolean {
     return err.status === 400 || err.status === 401 || err.status === 403
   }
   return false
+}
+
+async function recordSample<T>(config: RunAgentConfig<T>, output: T, meta: AgentMeta): Promise<void> {
+  await config.sampler.record({
+    executionId: crypto.randomUUID(),
+    agent: config.name,
+    systemPrompt: config.systemPrompt,
+    promptHash: await hashPrompt(config.systemPrompt),
+    input: { textContent: config.userContent.textContent, images: config.userContent.images ?? [] },
+    output: z.json().parse(output),
+    meta,
+    timestamp: new Date().toISOString(),
+  })
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
@@ -159,6 +176,10 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       }
 
       config.logger.debug(`agent:${name}`, meta as Record<string, unknown>)
+
+      // A failed sample write must not fail the run.
+      void recordSample(config, validated, meta).catch(e =>
+        config.logger.warn(`agent:${name}: failed to record sample`, { error: serializeError(e) }))
 
       return { output: validated, meta }
     } catch (err) {

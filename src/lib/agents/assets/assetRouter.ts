@@ -1,6 +1,7 @@
 import type { AgentResult } from "@/lib/agent"
 import { EMPTY_AGENT_META } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { AssetHint, AssetType } from "@/types/questions"
 
 import { runDiagramAgent } from "./DiagramAgent"
@@ -21,18 +22,19 @@ export async function routeAsset(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
   case "formula": {
-    const r = await runFormulaAgent(hint.description, apiKey, model, tier, signal, logger)
+    const r = await runFormulaAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
     return { output: { type: "formula", blob: r.output }, meta: r.meta }
   }
   case "molecule": {
-    const r = await runMoleculeAgent(hint.description, apiKey, model, tier, signal, logger)
+    const r = await runMoleculeAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
     return { output: { type: "molecule", blob: r.output }, meta: r.meta }
   }
   case "diagram": {
-    const r = await runDiagramAgent(hint.description, apiKey, model, tier, signal, logger)
+    const r = await runDiagramAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
     return { output: { type: "diagram", blob: r.output }, meta: r.meta }
   }
   case "table":

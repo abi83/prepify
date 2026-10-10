@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import type { GeneratedQuestion, QuestionType } from "@/types/questions"
 
@@ -127,6 +128,7 @@ export async function runQuestionReviewer(
   language: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<{ review: Review; passed: boolean }>> {
   const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({
@@ -142,6 +144,7 @@ export async function runQuestionReviewer(
     tier,
     signal,
     logger,
+    sampler,
   })
   return { output: { review: result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
 }

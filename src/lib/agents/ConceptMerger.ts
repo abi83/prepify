@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { Concept } from "@/types/pipeline"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
@@ -33,6 +34,7 @@ export async function runConceptMerger(
   language: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<Concept[]>> {
   if (concepts.length === 0) return { output: [], meta: EMPTY_AGENT_META }
 
@@ -50,6 +52,7 @@ export async function runConceptMerger(
     tier,
     signal,
     logger,
+    sampler,
   })
 
   const conceptByName = new Map(concepts.map(c => [ c.name, c ]))

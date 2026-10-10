@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 
 const responseSchema = z.object({
   molecules: z.array(z.object({
@@ -31,6 +32,7 @@ export async function runMoleculeAgent(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "MoleculeAgent",
@@ -42,6 +44,7 @@ export async function runMoleculeAgent(
     tier,
     signal,
     logger,
+    sampler,
   })
 
   const blob = buildMoleculeBlob(result.output.molecules)
