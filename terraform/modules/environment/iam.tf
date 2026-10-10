@@ -48,6 +48,14 @@ resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
+# Write-only: the runtime SA writes samples for later offline analysis but
+# never reads/lists/deletes them back, unlike the uploads bucket above.
+resource "google_storage_bucket_iam_member" "runtime_samples_writer" {
+  bucket = google_storage_bucket.samples.name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.run_runtime.email}"
+}
+
 # Allows storage.buckets.get — needed for bucket.exists() in the readyz probe.
 resource "google_storage_bucket_iam_member" "runtime_bucket_reader" {
   bucket = google_storage_bucket.this.name
