@@ -50,6 +50,9 @@ The list will be capped at 20 entries — prioritise by importance if you have m
 
 export interface ConceptExtractorResult extends AgentResult<Concept[]> {
   chunkCount: number
+  /** One entry per chunk call — `meta` above sums these for existing callers (pipeline.ts);
+   *  the `concepts` job (#272) needs per-call granularity to record one GenerationMeta row per call. */
+  metas: AgentMeta[]
 }
 
 function serializePage(page: Page): string {
@@ -99,6 +102,7 @@ export async function runConceptExtractor(
 
   let meta: AgentMeta = EMPTY_AGENT_META
   const allConcepts: Concept[] = []
+  const metas: AgentMeta[] = []
 
   for (const chunk of chunks) {
     const result = await runAgent({
@@ -114,6 +118,7 @@ export async function runConceptExtractor(
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
     allConcepts.push(...filtered)
+    metas.push(result.meta)
     meta = {
       model: result.meta.model,
       tier: result.meta.tier,
@@ -127,5 +132,5 @@ export async function runConceptExtractor(
     }
   }
 
-  return { output: allConcepts, meta, chunkCount: chunks.length }
+  return { output: allConcepts, meta, chunkCount: chunks.length, metas }
 }

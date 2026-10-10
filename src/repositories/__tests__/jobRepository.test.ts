@@ -34,6 +34,21 @@ async function makeImage(userId: string) {
   return { prep, image }
 }
 
+async function makeConcept(userId: string) {
+  const prep = await prepRepository.createPrep(userId, { title: "Prep", language: "en" })
+  const conceptsJob = await prisma.job.create({
+    data: {
+      prepId: prep.id, type: "concepts", status: "executed",
+      model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0,
+      createdBy: userId, output: [],
+    },
+  })
+  const concept = await prisma.concept.create({
+    data: { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id },
+  })
+  return { prep, concept }
+}
+
 describe("createJob", () => {
   it("creates a job owned by the actor, with its inputs recorded", async () => {
     const { image } = await makeImage(OWNER)
@@ -49,6 +64,18 @@ describe("createJob", () => {
 
   it("rejects an input id that doesn't resolve to any known entity", async () => {
     await expect(store.createJob(OWNER, "ocr", [ "does-not-exist" ], CONFIG)).rejects.toThrow(NotFoundError)
+  })
+
+  it("resolves a Concept input via its producing job's Prep", async () => {
+    const { concept } = await makeConcept(OWNER)
+    const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
+
+    expect(job).toMatchObject({ type: "prep.meta", status: "created", inputIds: [ concept.id ] })
+  })
+
+  it("rejects an actor who doesn't own a Concept input's Prep", async () => {
+    const { concept } = await makeConcept(OWNER)
+    await expect(store.createJob(OTHER, "prep.meta", [ concept.id ], CONFIG)).rejects.toThrow(ForbiddenError)
   })
 })
 
@@ -71,6 +98,15 @@ describe("existingIds", () => {
 
     const resolved = await store.existingIds(OWNER, [ image.id, otherImage.id, "does-not-exist" ])
     expect(resolved).toEqual(new Set([ image.id ]))
+  })
+
+  it("resolves Concept ids alongside PrepImage ids, scoped to the actor", async () => {
+    const { image } = await makeImage(OWNER)
+    const { concept } = await makeConcept(OWNER)
+    const { concept: otherConcept } = await makeConcept(OTHER)
+
+    const resolved = await store.existingIds(OWNER, [ image.id, concept.id, otherConcept.id, "does-not-exist" ])
+    expect(resolved).toEqual(new Set([ image.id, concept.id ]))
   })
 })
 
