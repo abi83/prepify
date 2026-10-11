@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import type { GeneratedQuestion, QuestionType } from "@/types/questions"
 
@@ -122,13 +121,11 @@ function formatConcepts(task: QuestionTask): string {
 export async function runQuestionReviewer(
   question: GeneratedQuestion,
   task: QuestionTask,
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<{ review: Review; passed: boolean }>> {
   const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({
@@ -139,12 +136,10 @@ export async function runQuestionReviewer(
       review => hasValidDistractorShape(task.type, review.scores),
       { message: `distractorQuality must be ${hasDistractors(task.type) ? "a number" : "null"} for type "${task.type}"` },
     ),
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
   return { output: { review: result.output, passed: passesReview(result.output.scores) }, meta: result.meta }
 }

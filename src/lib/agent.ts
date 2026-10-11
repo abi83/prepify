@@ -1,33 +1,14 @@
-import OpenAI from "openai"
-import { zodResponseFormat } from "openai/helpers/zod"
 import { z, ZodSchema } from "zod"
 
+import { NonRetryableLlmError, type AgentDeps, type LlmContentPart } from "@/core/ports"
+import type { AgentMeta, Sampler } from "@/core/sampler"
+
 import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "./config"
-import type { Logger } from "./logger"
 import { serializeError } from "./logger"
 import { computeCost } from "./pricing"
 import { hashPrompt } from "./sampler/promptHash"
-import type { Sampler } from "./sampler/schema"
 
-/**
- * App-shaped usage/cost data for one agent call — never OpenAI's raw `usage` object.
- * This is what gets persisted as a `GenerationMeta` row (see src/types/generationMeta.ts)
- * and what callers use for progress/cost display. Nothing downstream of `runAgent`
- * should read an OpenAI response shape directly.
- */
-export const agentMetaSchema = z.object({
-  model: z.string(),
-  tier: z.string(),
-  promptTokens: z.number(),
-  cachedTokens: z.number(),
-  completionTokens: z.number(),
-  totalTokens: z.number(),
-  costUsd: z.number(),
-  toolCalls: z.number(),
-  executionMs: z.number(),
-})
-
-export type AgentMeta = z.infer<typeof agentMetaSchema>
+export type { AgentMeta }
 
 export interface AgentResult<T> {
   output: T
@@ -61,21 +42,16 @@ interface RunAgentConfig<T> {
   systemPrompt: string
   userContent: AgentInput
   schema: ZodSchema<T>
-  apiKey: string
   model?: string
   tier?: string
   signal: AbortSignal
-  logger: Logger
-  sampler: Sampler
+  deps: AgentDeps
 }
 
-function buildUserContent({ textContent, images }: AgentInput): string | OpenAI.ChatCompletionContentPart[] {
+function buildUserContent({ textContent, images }: AgentInput): string | LlmContentPart[] {
   if (!images?.length) return textContent
   return [
-    ...images.map(img => ({
-      type: "image_url" as const,
-      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
-    })),
+    ...images.map(img => ({ type: "image" as const, mimeType: img.mimeType, base64: img.base64 })),
     { type: "text" as const, text: textContent },
   ]
 }
@@ -102,15 +78,8 @@ function backoffMs(attempt: number): number {
   return Math.round(base * jitter)
 }
 
-function isNonRetryable(err: unknown): boolean {
-  if (err instanceof OpenAI.APIError) {
-    return err.status === 400 || err.status === 401 || err.status === 403
-  }
-  return false
-}
-
-async function recordSample<T>(config: RunAgentConfig<T>, output: T, meta: AgentMeta): Promise<void> {
-  await config.sampler.record({
+async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, output: T, meta: AgentMeta): Promise<void> {
+  await sampler.record({
     executionId: crypto.randomUUID(),
     agent: config.name,
     systemPrompt: config.systemPrompt,
@@ -123,11 +92,10 @@ async function recordSample<T>(config: RunAgentConfig<T>, output: T, meta: Agent
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, apiKey, model = "gpt-5-nano", tier = "flex", signal } = config
+  const { name, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", signal, deps } = config
+  const { llm, logger, sampler } = deps
 
-  const timeout = AGENT_TIMEOUT_MS[name] ?? DEFAULT_AGENT_TIMEOUT_MS
-  // maxRetries: 0 — the backoff loop below is the only retry path; the SDK must not add a second one under it.
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true, timeout, maxRetries: 0 })
+  const timeoutMs = AGENT_TIMEOUT_MS[name] ?? DEFAULT_AGENT_TIMEOUT_MS
 
   let lastError: unknown
 
@@ -135,33 +103,30 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
     const t0 = performance.now()
 
     try {
-      const response = await client.chat.completions.create(
+      const response = await llm.complete(
         {
           model,
+          tier,
+          timeoutMs,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: buildUserContent(userContent) },
           ],
-          response_format: zodResponseFormat(schema, config.name),
-          service_tier: tier as OpenAI.ChatCompletionCreateParams["service_tier"],
+          responseFormat: { name, schema },
         },
-        { signal }
+        signal,
       )
 
       const executionMs = Math.round(performance.now() - t0)
-      const usage = response.usage
-      const message = response.choices[0]?.message
 
-      const rawText = sanitizeLLMText(message?.content ?? "")
+      const rawText = sanitizeLLMText(response.content)
       const parsed = JSON.parse(rawText)
 
       // Zod validation — model is constrained to match the schema via Structured Outputs,
       // so this is a cheap type-safety assertion rather than a real fallback path.
       const validated = schema.parse(parsed)
 
-      const promptTokens = usage?.prompt_tokens ?? 0
-      const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0
-      const completionTokens = usage?.completion_tokens ?? 0
+      const { promptTokens, cachedTokens, completionTokens } = response
 
       const meta: AgentMeta = {
         model,
@@ -169,22 +134,22 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         promptTokens,
         cachedTokens,
         completionTokens,
-        totalTokens: usage?.total_tokens ?? promptTokens + completionTokens,
+        totalTokens: promptTokens + completionTokens,
         costUsd: computeCost({ promptTokens, cachedTokens, completionTokens }, model, tier),
-        toolCalls: message?.tool_calls?.length ?? 0,
+        toolCalls: 0,
         executionMs,
       }
 
-      config.logger.debug(`agent:${name}`, meta as Record<string, unknown>)
+      logger.debug(`agent:${name}`, meta as Record<string, unknown>)
 
       // A failed sample write must not fail the run.
-      void recordSample(config, validated, meta).catch(e =>
-        config.logger.warn(`agent:${name}: failed to record sample`, { error: serializeError(e) }))
+      void recordSample(sampler, config, validated, meta).catch(e =>
+        logger.warn(`agent:${name}: failed to record sample`, { error: serializeError(e) }))
 
       return { output: validated, meta }
     } catch (err) {
       lastError = err
-      if (isNonRetryable(err) || (err instanceof Error && err.name === "AbortError")) {
+      if (err instanceof NonRetryableLlmError || (err instanceof Error && err.name === "AbortError")) {
         throw err
       }
       if (attempt < MAX_ATTEMPTS) {

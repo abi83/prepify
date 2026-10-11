@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { updatePrep } from "@/actions/preps"
 import { runPrepLabeler, DISCIPLINES, type Discipline } from "@/lib/agents/PrepLabeler"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
+import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import type { Concept } from "@/types/pipeline"
@@ -69,7 +70,7 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, apiKey, model, tier, ac.signal, consoleLogger, clientSampler).then(result => {
+    runPrepLabeler(concepts, model, tier, ac.signal, { llm: new OpenAiLlm({ apiKey }), logger: consoleLogger, sampler: clientSampler }).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)

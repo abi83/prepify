@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 
 const responseSchema = z.object({
   molecules: z.array(z.object({
@@ -27,24 +26,20 @@ const smilesDrawerJs = "https://unpkg.com/smiles-drawer@1.1.23/dist/smiles-drawe
 
 export async function runMoleculeAgent(
   description: string,
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "MoleculeAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate SMILES for: ${description}` },
     schema: responseSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 
   const blob = buildMoleculeBlob(result.output.molecules)

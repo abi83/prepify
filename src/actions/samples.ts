@@ -1,9 +1,9 @@
 "use server"
 
+import { agentSampleSchema, type AgentSample } from "@/core/sampler"
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
 import { writeSample } from "@/lib/sampler/gcsSampleStore"
-import { agentSampleSchema, type AgentSample } from "@/lib/sampler/schema"
 
 // Just under the 12mb server-action body limit in next.config.ts.
 const MAX_SAMPLE_BYTES = 11 * 1024 * 1024

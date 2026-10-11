@@ -72,7 +72,7 @@ describe("prep.meta job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
 
-    const definition = createPrepMetaJobDefinition([ CONCEPT ], "en", consoleLogger, noopSampler)
+    const definition = createPrepMetaJobDefinition([ CONCEPT ], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

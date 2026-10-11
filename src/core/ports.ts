@@ -1,4 +1,11 @@
+import type { ZodType } from "zod"
+
+import type { AgentImage } from "@/lib/agent"
+import type { PrepState } from "@/lib/planner"
+
 import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
+import type { Logger } from "./logger"
+import type { Sampler } from "./sampler"
 
 /**
  * Job persistence, actor-scoped — every method takes the acting user's id and is responsible
@@ -33,17 +40,22 @@ export interface Store {
   ): Promise<boolean>
 }
 
+export type LlmContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; mimeType: string; base64: string }
+
 export interface LlmMessage {
   role: "system" | "user"
-  content: string
+  content: string | LlmContentPart[]
 }
 
 export interface LlmRequest {
-  apiKey: string
   model: string
   tier: string
   timeoutMs: number
   messages: LlmMessage[]
+  /** The completion must be JSON matching `schema`; `name` labels it for the provider. */
+  responseFormat: { name: string; schema: ZodType }
 }
 
 export interface LlmResponse {
@@ -53,8 +65,16 @@ export interface LlmResponse {
   completionTokens: number
 }
 
-/** OpenAI-compatible completion port — replaces the direct `new OpenAI(...)` construction
- *  in `src/lib/agent.ts`, so job `run` implementations never import the `openai` SDK directly. */
+/** Thrown by an `Llm` when retrying the same request cannot succeed (bad request, bad key, forbidden). */
+export class NonRetryableLlmError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message)
+    this.name = "NonRetryableLlmError"
+  }
+}
+
+/** Structured-completion port — agents never construct a provider SDK client, so each runtime
+ *  supplies its own adapter. Throws `NonRetryableLlmError` for failures that must not be retried. */
 export interface Llm {
   complete(request: LlmRequest, signal: AbortSignal): Promise<LlmResponse>
 }
@@ -62,3 +82,29 @@ export interface Llm {
 export interface ProgressSink {
   report(update: { done: number; total: number }): void
 }
+
+/** The `PrepImage` fields jobs read. */
+export interface PrepImageRef {
+  id: string
+  gcsKey: string
+  ocrResult: unknown
+}
+
+/** What a runtime fetches to build job inputs — the browser adapter wraps server actions. */
+export interface PrepData {
+  loadState(prepId: string): Promise<PrepState>
+  listImages(prepId: string): Promise<PrepImageRef[]>
+  downloadImage(prepId: string, gcsKey: string): Promise<AgentImage>
+}
+
+export interface Ports {
+  store: Store
+  llm: Llm
+  logger: Logger
+  sampler: Sampler
+  progress: ProgressSink
+  data: PrepData
+}
+
+/** What agents (and the job definitions that call them) depend on. */
+export type AgentDeps = Pick<Ports, "llm" | "logger" | "sampler">

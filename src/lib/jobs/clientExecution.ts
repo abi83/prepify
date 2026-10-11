@@ -1,16 +1,15 @@
 import * as jobActions from "@/actions/jobs"
-import { listMyPrepImages } from "@/actions/prepImages"
-import { loadMyPrepState } from "@/actions/prepState"
-import { getReadSignedUrl } from "@/actions/uploads"
 import type { ExecutionConfig, Job, QuestionSpec } from "@/core/job"
-import type { Llm, ProgressSink, Store } from "@/core/ports"
+import type { Logger } from "@/core/logger"
+import type { AgentDeps, PrepData, ProgressSink, Store } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
+import type { Sampler } from "@/core/sampler"
 import { DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
-import type { Logger } from "@/lib/logger"
+import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
-import type { Sampler } from "@/lib/sampler/schema"
 import { ocrResultSchema, type Page } from "@/types/prep"
 
+import { browserPrepData } from "./browserPrepData"
 import { createConceptsJobDefinition } from "./conceptsJob"
 import { createJobs, executePrep, runJobs, type ExecutionDeps, type ExecutionParams } from "./execution"
 import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
@@ -52,18 +51,6 @@ const actionStore: Store = {
   commitJob: (_actorId, jobId, fromStatus, outcome) => jobActions.commitJob(jobId, fromStatus, outcome),
 }
 
-/** Jobs call the agents directly (they hold the BYOK key), so the `Llm` port is never reached. */
-const unusedLlm: Llm = { complete: () => { throw new Error("The Llm port is not used by job definitions") } }
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(",")[1])
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
 /** Pages up to `maxChars` of text in total; later pages are dropped. */
 function truncatePages(pages: Page[], maxChars: number): Page[] {
   let charCount = 0
@@ -82,10 +69,14 @@ interface DefinitionOptions {
   sampler: Sampler
 }
 
+interface DefinitionPorts extends AgentDeps {
+  data: PrepData
+}
+
 /** Builds each job type's definition, fetching the inputs its `run` needs. */
-function createDefinitionFor({ prepId, language, maxChars, logger, sampler }: DefinitionOptions): ExecutionDeps["definitionFor"] {
+function createDefinitionFor({ prepId, language, maxChars }: DefinitionOptions, { data, ...deps }: DefinitionPorts): ExecutionDeps["definitionFor"] {
   async function conceptsFor(job: Job) {
-    const { concepts } = await loadMyPrepState(prepId)
+    const { concepts } = await data.loadState(prepId)
     return job.inputIds.map(id => {
       const concept = concepts.find(c => c.id === id)
       if (!concept) throw new Error(`Concept ${id} not found for job ${job.id}`)
@@ -96,24 +87,23 @@ function createDefinitionFor({ prepId, language, maxChars, logger, sampler }: De
   return async (job): Promise<JobDefinition<unknown>> => {
     switch (job.type) {
     case OCR_JOB_TYPE: {
-      const image = (await listMyPrepImages(prepId)).find(i => i.id === job.inputIds[0])
+      const image = (await data.listImages(prepId)).find(i => i.id === job.inputIds[0])
       if (!image) throw new Error(`PrepImage ${job.inputIds[0]} not found for job ${job.id}`)
-      const blob = await fetch(await getReadSignedUrl(prepId, image.gcsKey)).then(r => r.blob())
-      return createOcrJobDefinition([ { base64: await blobToBase64(blob), mimeType: blob.type } ], logger, sampler)
+      return createOcrJobDefinition([ await data.downloadImage(prepId, image.gcsKey) ], deps)
     }
     case CONCEPTS_JOB_TYPE: {
-      const images = await listMyPrepImages(prepId)
+      const images = await data.listImages(prepId)
       const pages: Page[] = job.inputIds.map((id, i) => {
         const image = images.find(img => img.id === id)
         if (!image) throw new Error(`PrepImage ${id} not found for job ${job.id}`)
         return { page: i + 1, gcsKey: image.gcsKey, ...ocrResultSchema.parse(image.ocrResult) }
       })
-      return createConceptsJobDefinition(truncatePages(pages, maxChars), language, logger, sampler)
+      return createConceptsJobDefinition(truncatePages(pages, maxChars), language, deps)
     }
     case PREP_META_JOB_TYPE:
-      return createPrepMetaJobDefinition(await conceptsFor(job), language, logger, sampler)
+      return createPrepMetaJobDefinition(await conceptsFor(job), language, deps)
     case QUESTION_JOB_TYPE:
-      return createQuestionJobDefinition(await conceptsFor(job), language, logger, sampler)
+      return createQuestionJobDefinition(await conceptsFor(job), language, deps)
     default:
       throw new Error(`Unknown job type "${job.type}"`)
     }
@@ -155,13 +145,15 @@ function createRunner(options: GenerationParams): Runner {
     progress.report({ done: 0, total: nextTotal })
   }
 
-  const definitionFor = createDefinitionFor(options)
+  const llm = new OpenAiLlm({ apiKey: options.apiKey })
+  const data = browserPrepData
+  const definitionFor = createDefinitionFor(options, { llm, logger: options.logger, sampler: options.sampler, data })
   const deps: ExecutionDeps = {
     store: actionStore,
-    llm: unusedLlm,
+    llm,
     progress,
     loadState: async prepId => {
-      const state = await loadMyPrepState(prepId)
+      const state = await data.loadState(prepId)
       const specs = nextJobs(state, options.target)
       if (specs.length > 0) startStage(stageOf(specs[0].type), specs.length)
       return state

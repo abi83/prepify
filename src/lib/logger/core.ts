@@ -1,8 +1,9 @@
 import { readFileSync } from "fs"
 import path from "path"
 
+import type { FormatArgs, LogFields, LogLevel, Logger, TraceContext } from "@/core/logger"
+
 import { formatGcp } from "./gcp"
-import type { FormatArgs, LogFields, LogLevel, Logger, TraceContext } from "./types"
 
 export const APP_VERSION = (() => {
   try {

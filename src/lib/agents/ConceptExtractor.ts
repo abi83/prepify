@@ -1,7 +1,7 @@
-import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
+import type { AgentDeps } from "@/core/ports"
+import type { AgentMeta } from "@/core/sampler"
+import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
 import { CHUNK_SIZE } from "@/lib/config"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import { conceptsResponseSchema } from "@/types/pipeline"
 import type { Concept } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
@@ -91,13 +91,11 @@ function chunkPages(pages: Page[], chunkSize: number): string[] {
 
 export async function runConceptExtractor(
   pages: Page[],
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
@@ -112,12 +110,10 @@ export async function runConceptExtractor(
       systemPrompt: SYSTEM_PROMPT + langInstruction,
       userContent: { textContent: `Source text:\n\n${chunk}` },
       schema: conceptsResponseSchema,
-      apiKey,
       model,
       tier,
       signal,
-      logger,
-      sampler,
+      deps,
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
     allConcepts.push(...filtered)

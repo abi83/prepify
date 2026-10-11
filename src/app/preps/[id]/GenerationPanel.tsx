@@ -19,6 +19,7 @@ import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
+import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
@@ -114,7 +115,13 @@ export default function GenerationPanel({
       const savedQuestions = await listMyQuestions(prepId)
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger, clientSampler)
+        void generateAndSaveAssets(
+          savedQuestions,
+          keyConfig.model,
+          keyConfig.tier,
+          abortRef.current.signal,
+          { llm: new OpenAiLlm({ apiKey: keyConfig.key }), logger: consoleLogger, sampler: clientSampler },
+        )
       }
 
       const [ freshPrep, tokensAfter ] = await Promise.all([ getMyPrep(prepId), getPrepTokens(prepId) ])

@@ -63,7 +63,7 @@ describe("concepts job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "concepts", [ image.id ], CONFIG)
 
-    const definition = createConceptsJobDefinition([], "en", consoleLogger, noopSampler)
+    const definition = createConceptsJobDefinition([], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

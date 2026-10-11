@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import { sortingContentSchema } from "@/types/questions"
 import type { SortingContent } from "@/types/questions"
@@ -55,14 +54,12 @@ function formatConcepts(concepts: QuestionTask["concepts"]): string {
 
 export async function runSortingBuilder(
   task: QuestionTask,
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<{ type: "sorting"; content: SortingContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -70,12 +67,10 @@ export async function runSortingBuilder(
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "no-distractors")}${rewriteInstructions(rewrite)}` },
     schema: responseSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
   return { output: { type: "sorting", content: result.output.content }, meta: result.meta }
 }

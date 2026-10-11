@@ -1,4 +1,4 @@
-import type { AgentSample, Sampler } from "./schema"
+import type { AgentSample, Sampler } from "@/core/sampler"
 
 /** Keeps a `rate` (0–1) fraction of executions and hands them to `write`. */
 export function createRateSampler(

@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 
 const responseSchema = z.object({
   latex: z.string(),
@@ -24,24 +23,20 @@ Return JSON: { "latex": "...", "is_chemical": false }`
 
 export async function runFormulaAgent(
   description: string,
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "FormulaAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate LaTeX for: ${description}` },
     schema: responseSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 
   const { latex, is_chemical } = result.output

@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { Concept } from "@/types/pipeline"
 
 export const DISCIPLINES = [
@@ -58,12 +57,10 @@ Return JSON: { "grade": <integer 1–13 or null>, "discipline": <discipline stri
 
 export async function runPrepLabeler(
   concepts: Concept[],
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<PrepLabel>> {
   const conceptList = concepts
     .sort((a, b) => b.importance - a.importance)
@@ -76,11 +73,9 @@ export async function runPrepLabeler(
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepLabelSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 }

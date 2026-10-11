@@ -49,7 +49,7 @@ describe("ocr job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
 
-    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], consoleLogger, noopSampler)
+    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

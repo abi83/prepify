@@ -1,10 +1,10 @@
 import { Storage } from "@google-cloud/storage"
 
+import type { AgentSample, Sampler, StoredSample } from "@/core/sampler"
 import { config } from "@/lib/env"
 import { APP_VERSION } from "@/lib/logger/core"
 
 import { createRateSampler } from "./rateSampler"
-import type { AgentSample, Sampler, StoredSample } from "./schema"
 
 const storage = new Storage()
 
