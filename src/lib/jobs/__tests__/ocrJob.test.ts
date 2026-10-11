@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+vi.mock("@/lib/currentUser", () => ({ requireUserId: async () => "user-owner" }))
+
 vi.mock("@/lib/prisma", async () => {
   const { createPglitePrisma } = await import("@/test/pglitePrisma")
   return { prisma: await createPglitePrisma() }
@@ -65,6 +67,6 @@ describe("ocr job", () => {
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(1)
-    expect(metas[0]).toMatchObject({ entityType: "prep", entityId: prep.id, promptTokens: 10, completionTokens: 5 })
+    expect(metas[0]).toMatchObject({ jobId: job.id, promptTokens: 10, completionTokens: 5 })
   })
 })

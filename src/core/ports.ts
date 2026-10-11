@@ -1,9 +1,8 @@
 import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 
 /**
- * Job persistence, actor-scoped like `assertOwnsRun(userId, ...)` in
- * `pipelineRepository.ts` — every method takes the acting user's id and is responsible for
- * its own ownership checks.
+ * Job persistence, actor-scoped — every method takes the acting user's id and is responsible
+ * for its own ownership checks.
  */
 export interface Store {
   getJob<TOutput = unknown>(actorId: string, jobId: string): Promise<Job<TOutput> | null>

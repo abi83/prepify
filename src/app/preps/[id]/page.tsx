@@ -3,9 +3,9 @@ import { notFound, redirect } from "next/navigation"
 
 import { listMyAssets } from "@/actions/assets"
 import { listMyAttempts } from "@/actions/attempts"
-import { getExistingRunSummary, getConcepts } from "@/actions/pipeline"
 import { listMyPrepImages } from "@/actions/prepImages"
-import { getMyPrep } from "@/actions/preps"
+import { getMyPrep, getPrepTokens } from "@/actions/preps"
+import { getMyPrepProgress, loadMyPrepState } from "@/actions/prepState"
 import { listMyQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
 import { Button } from "@/components/ui/button"
@@ -43,11 +43,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const [ questions, attempts, runSummary, concepts, images ] = await Promise.all([
+  const [ questions, attempts, progress, tokensUsed, state, images ] = await Promise.all([
     listMyQuestions(id),
     listMyAttempts(id),
-    getExistingRunSummary(id),
-    getConcepts(id),
+    getMyPrepProgress(id),
+    getPrepTokens(id),
+    loadMyPrepState(id),
     listMyPrepImages(id),
   ])
 
@@ -59,8 +60,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       questions={questions}
       attempts={attempts}
       assets={assets}
-      runSummary={runSummary}
-      concepts={concepts ?? []}
+      progress={progress}
+      tokensUsed={tokensUsed}
+      concepts={state.concepts}
       images={images}
     />
   )

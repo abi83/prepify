@@ -2,11 +2,12 @@
 
 import type { Prep, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { useState, useRef } from "react"
 
-import { getExistingRunSummary } from "@/actions/pipeline"
-import { getMyPrep, updatePrep } from "@/actions/preps"
-import { insertQuestions } from "@/actions/questions"
+import { getMyPrep, getPrepTokens } from "@/actions/preps"
+import { getMyPrepProgress } from "@/actions/prepState"
+import { listMyQuestions } from "@/actions/questions"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -17,12 +18,11 @@ import { generateAndSaveAssets } from "@/lib/assetGeneration"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
+import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
 import { consoleLogger } from "@/lib/logger"
-import { runPipeline, TextTooLongError } from "@/lib/pipeline"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
-import type { PartialRunSummary } from "@/repositories/pipelineRepository"
-import type { PipelineProgressEvent } from "@/types/pipeline"
+import type { PrepProgress } from "@/repositories/prepStateRepository"
 import type { Page } from "@/types/prep"
 import type { QuestionType } from "@/types/questions"
 
@@ -33,7 +33,7 @@ interface Props {
   pages: Page[]
   language: string
   prepTitle: string
-  initialRunSummary: PartialRunSummary | null
+  initialProgress: PrepProgress | null
   hasQuestions: boolean
   onTitleReady: (title: string) => void
   onComplete: (questions: Question[], freshPrep: Prep) => void
@@ -44,20 +44,16 @@ export default function GenerationPanel({
   pages,
   language,
   prepTitle,
-  initialRunSummary,
+  initialProgress,
   hasQuestions,
   onTitleReady,
   onComplete,
 }: Props) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
-  const [ pipelineProgress, setPipelineProgress ] = useState<PipelineProgressEvent | null>(null)
-  const [ craftProgress, setCraftProgress ] = useState<{ done: number; total: number } | null>(null)
-  const [ rewriteProgress, setRewriteProgress ] = useState<{ done: number; total: number } | null>(null)
-  const [ reviewProgress, setReviewProgress ] = useState<{ done: number; total: number } | null>(null)
-  const [ titleReady, setTitleReady ] = useState(false)
-  const [ failedCount, setFailedCount ] = useState(0)
-  const [ runSummary, setRunSummary ] = useState<PartialRunSummary | null>(initialRunSummary)
+  const [ progress, setProgress ] = useState<GenerationProgress | null>(null)
+  const [ prepProgress, setPrepProgress ] = useState<PrepProgress | null>(initialProgress)
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
@@ -67,9 +63,8 @@ export default function GenerationPanel({
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
 
-  async function refreshRunSummary() {
-    const s = await getExistingRunSummary(prepId)
-    setRunSummary(s)
+  async function refreshProgress() {
+    setPrepProgress(await getMyPrepProgress(prepId))
   }
 
   function toggleLocalType(type: QuestionType) {
@@ -80,75 +75,60 @@ export default function GenerationPanel({
     })
   }
 
-  async function runGeneration(pagesToProcess: Page[]) {
+  async function runGeneration() {
     const keyConfig = getApiKey()!
     setGenError(null)
-    setPipelineProgress(null)
-    setCraftProgress(null)
-    setRewriteProgress(null)
-    setReviewProgress(null)
-    setTitleReady(false)
-    setFailedCount(0)
+    setProgress(null)
     abortRef.current = new AbortController()
     genStartRef.current = performance.now()
     setGenPhase("running")
 
+    let titleNotified = false
     try {
-      const result = await runPipeline({
+      const actorId = session?.user.id
+      if (!actorId) throw new Error("Not signed in")
+      const tokensBefore = await getPrepTokens(prepId)
+      await runJobGeneration({
+        actorId,
         prepId,
-        pages: pagesToProcess,
         apiKey: keyConfig.key,
         model: keyConfig.model,
         tier: keyConfig.tier,
         language,
-        questionCount: localConfig.questionCount,
-        enabledTypes: localConfig.enabledTypes,
-        difficultyMix: localConfig.difficultyMix,
+        maxChars: BYOK_TEXT_HARD_LIMIT,
+        target: localConfig,
         signal: abortRef.current.signal,
         logger: consoleLogger,
         sampler: clientSampler,
-        onProgress: (event) => {
-          setPipelineProgress(event)
-          if (event.stage === "crafting") setCraftProgress({ done: event.done, total: event.total })
-          if (event.stage === "rewriting") setRewriteProgress({ done: event.done, total: event.total })
-          if (event.stage === "reviewing") setReviewProgress({ done: event.done, total: event.total })
-          if (event.stage === "done") setFailedCount(event.failed)
-        },
-        onMetaReady: (title, description) => {
-          void updatePrep(prepId, { title, description })
-          onTitleReady(title)
-          setTitleReady(true)
+        onProgress: event => {
+          setProgress(event)
+          // The `prep.meta` job has committed by the time questions start.
+          if (event.stage === "questions" && !titleNotified) {
+            titleNotified = true
+            void getMyPrep(prepId).then(fresh => onTitleReady(fresh.title))
+          }
         },
       })
 
       const elapsed = Math.round(performance.now() - genStartRef.current)
-      const savedQuestions = await insertQuestions(
-        prepId,
-        result.questions.map(q => ({ type: q.type, difficulty: q.difficulty, content: q.content })),
-        result.questionMeta,
-      )
+      const savedQuestions = await listMyQuestions(prepId)
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger, clientSampler)
+        void generateAndSaveAssets(savedQuestions, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger, clientSampler)
       }
 
-      const freshPrep = await getMyPrep(prepId)
+      const [ freshPrep, tokensAfter ] = await Promise.all([ getMyPrep(prepId), getPrepTokens(prepId) ])
       onComplete(savedQuestions, freshPrep)
 
       setGenMs(elapsed)
-      setTotalTokens(result.totalTokens)
+      setTotalTokens(tokensAfter - tokensBefore)
       setGenPhase("done")
-      await refreshRunSummary()
+      await refreshProgress()
       router.refresh()
     } catch (e: unknown) {
-      if (e instanceof TextTooLongError) {
-        setTextTooLong({ length: e.length })
-        setGenPhase("idle")
-        return
-      }
       if ((e as Error).name !== "AbortError") setGenError((e as Error).message)
       setGenPhase("idle")
-      await refreshRunSummary()
+      await refreshProgress()
     }
   }
 
@@ -158,28 +138,27 @@ export default function GenerationPanel({
       router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
       return
     }
-    await runGeneration(pages)
+    const length = pages.reduce((sum, p) => sum + p.text.length, 0)
+    if (length > BYOK_TEXT_HARD_LIMIT) {
+      setTextTooLong({ length })
+      return
+    }
+    await runGeneration()
   }
 
   async function handleConfirmTruncate() {
     setTextTooLong(null)
-    let charCount = 0
-    const truncated = pages.filter(p => {
-      if (charCount >= BYOK_TEXT_HARD_LIMIT) return false
-      charCount += p.text.length
-      return true
-    })
-    await runGeneration(truncated)
+    await runGeneration()
   }
 
   const isRunning = genPhase === "running"
-  const hasPartialRun = runSummary !== null
+  const hasPartialRun = prepProgress !== null
 
   if (hasQuestions && genPhase === "idle") return null
 
   const checklistRows = isRunning
-    ? rowsFromProgress(pipelineProgress, craftProgress, rewriteProgress, reviewProgress, titleReady)
-    : hasPartialRun ? rowsFromSummary(runSummary, prepTitle) : null
+    ? rowsFromProgress(progress)
+    : hasPartialRun ? rowsFromSummary(prepProgress, prepTitle) : null
 
   return (
     <>
@@ -212,7 +191,7 @@ export default function GenerationPanel({
                   <Button variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button>
                 ) : (
                   <Button onClick={handleGenerate}>
-                    {hasPartialRun && (runSummary.completedSlots > 0 || runSummary.failedSlots > 0) ? "Resume generation" : "Start generation"}
+                    {hasPartialRun && (prepProgress.completedQuestions > 0 || prepProgress.failedQuestions > 0) ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
@@ -294,11 +273,12 @@ export default function GenerationPanel({
         </div>
       )}
 
-      {genPhase === "done" && failedCount > 0 && (
+      {genPhase === "done" && prepProgress && prepProgress.failedQuestions > 0 && (
         <div className="text-xs text-error">
-          {failedCount} question{failedCount === 1 ? "" : "s"} failed review twice and {failedCount === 1 ? "was" : "were"} skipped.
+          {prepProgress.failedQuestions} question{prepProgress.failedQuestions === 1 ? "" : "s"} failed review twice and {prepProgress.failedQuestions === 1 ? "was" : "were"} skipped.
         </div>
       )}
+
     </>
   )
 }

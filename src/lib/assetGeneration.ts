@@ -2,7 +2,6 @@ import type { Question } from "@prisma/client"
 
 import { insertAsset } from "@/actions/assets"
 import { recordGenerationMeta } from "@/actions/generationMeta"
-import { incrementPrepTokens } from "@/actions/preps"
 import type { Sampler } from "@/lib/sampler/schema"
 import type { AssetHint } from "@/types/questions"
 
@@ -22,7 +21,6 @@ function extractAssetHint(question: Question): AssetHint | null {
  */
 export async function generateAndSaveAssets(
   questions: Question[],
-  prepId: string,
   apiKey: string,
   model: string,
   tier: string,
@@ -41,15 +39,14 @@ export async function generateAndSaveAssets(
   await Promise.allSettled(
     pending.map(async ({ q, hint }) => {
       try {
+        const jobId = q.producedByJobId
+        if (!jobId) throw new Error(`Question ${q.id} has no producing job to record asset cost against`)
         const result = await routeAsset(hint, apiKey, model, tier, signal, logger, sampler)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)
 
-        if (result.meta.totalTokens > 0) {
-          void incrementPrepTokens(prepId, result.meta.totalTokens)
-        }
-        void recordGenerationMeta("question", q.id, result.meta).catch(e => logger.warn("assets: failed to record GenerationMeta", { error: serializeError(e) }))
+        void recordGenerationMeta(jobId, result.meta).catch(e => logger.warn("assets: failed to record GenerationMeta", { error: serializeError(e) }))
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           logger.warn("assets: failed to generate asset", { questionId: q.id, error: serializeError(e) })

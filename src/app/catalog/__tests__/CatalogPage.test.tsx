@@ -26,7 +26,6 @@ function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
     userId: "owner-1",
     title: "Untitled",
     createdAt: new Date("2026-01-15T00:00:00Z"),
-    tokensUsed: 0,
     visibility: "public",
     grade: null,
     discipline: null,

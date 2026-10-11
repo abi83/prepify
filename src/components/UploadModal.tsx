@@ -1,13 +1,16 @@
+import { useSession } from "next-auth/react"
 import { useRef, useState } from "react"
 
+import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
 import { getApiKey } from "@/lib/apiKey"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { getGenerationConfig } from "@/lib/generationConfig"
+import { runOcr } from "@/lib/jobs/clientExecution"
 import { consoleLogger } from "@/lib/logger"
-import type { OcrFileResult } from "@/lib/prepImageOcr"
-import { ocrImageFile } from "@/lib/prepImageOcr"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
+import { ocrResultSchema } from "@/types/prep"
 
 import { FilePicker, type RecogniseArgs } from "./FilePicker"
 import { Button } from "./ui/button"
@@ -21,17 +24,24 @@ type Props = {
 type Phase = "ocr" | "saving" | "error"
 
 export default function UploadModal({ onClose, onDone }: Props) {
+  const { data: session } = useSession()
   const abortRef = useRef<AbortController | null>(null)
 
   const [ phase, setPhase ] = useState<Phase | null>(null)
   const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
 
-  async function handleRecognise({ prepId, files, images }: RecogniseArgs) {
+  async function handleRecognise({ prepId, files }: RecogniseArgs) {
     const config = getApiKey()
     if (!config) {
       setPhase("error")
       setErrorMsg("No API key configured. Please set one in Settings.")
+      return
+    }
+    const actorId = session?.user.id
+    if (!actorId) {
+      setPhase("error")
+      setErrorMsg("You are not signed in.")
       return
     }
 
@@ -39,20 +49,32 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
 
-    const results = await Promise.all(
-      files.map(async (file, i) => {
-        const image = images[i]
-        if (!image) return null
-        const result = await ocrImageFile(file, image.id, config.key, config.model, config.tier, abortRef.current!.signal, consoleLogger, clientSampler)
-        setOcrProgress(p => ({ ...p, done: p.done + 1 }))
-        return result
+    let language: string | null
+    try {
+      language = await runOcr({
+        actorId,
+        prepId,
+        apiKey: config.key,
+        model: config.model,
+        tier: config.tier,
+        target: getGenerationConfig(),
+        signal: abortRef.current.signal,
+        logger: consoleLogger,
+        sampler: clientSampler,
+        onProgress: event => {
+          if (event.stage === "ocr") setOcrProgress({ done: event.done, total: event.total })
+        },
       })
-    )
+    } catch (e) {
+      setPhase("error")
+      setErrorMsg(e instanceof Error ? e.message : "OCR failed")
+      return
+    }
 
-    const succeeded = results.filter((r): r is OcrFileResult => r !== null)
-    const combinedText = succeeded.map(r => r.text).join("\n\n")
+    const images = await listMyPrepImages(prepId)
+    const combinedText = images.map(image => ocrResultSchema.parse(image.ocrResult).text).join("\n\n")
 
-    if (!combinedText.trim()) {
+    if (language === null || !combinedText.trim()) {
       setPhase("error")
       setErrorMsg("No text detected in any image. Please try clearer photos.")
       return
@@ -64,7 +86,6 @@ export default function UploadModal({ onClose, onDone }: Props) {
       return
     }
 
-    const language = succeeded[0].language
     setPhase("saving")
 
     try {

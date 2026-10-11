@@ -47,12 +47,10 @@ export async function deletePrep(id: string): Promise<void> {
   revalidatePath("/preps")
 }
 
-/** Fire-and-forget from the client pipeline as generation progresses — no revalidation needed. */
-export async function incrementPrepTokens(id: string, delta: number): Promise<void> {
-  await prepRepository.incrementPrepTokens(id, delta)
+export async function getPrepTokens(id: string): Promise<number> {
+  return prepRepository.getPrepTokens(await requireUserId(), id)
 }
 
 export async function getTotalTokens(): Promise<number> {
-  const preps = await prepRepository.listOwnedPreps(await requireUserId())
-  return preps.reduce((sum, p) => sum + p.tokensUsed, 0)
+  return prepRepository.getOwnedTokens(await requireUserId())
 }

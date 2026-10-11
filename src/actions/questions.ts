@@ -1,12 +1,9 @@
 "use server"
 
 import type { Question } from "@prisma/client"
-import { revalidatePath } from "next/cache"
 
-import type { AgentMeta } from "@/lib/agent"
 import { requireUserId } from "@/lib/currentUser"
 import * as questionRepository from "@/repositories/questionRepository"
-import type { CreateQuestionInput } from "@/repositories/questionRepository"
 
 export async function listMyQuestions(prepId: string): Promise<Question[]> {
   return questionRepository.listByPrep(await requireUserId(), prepId)
@@ -14,14 +11,4 @@ export async function listMyQuestions(prepId: string): Promise<Question[]> {
 
 export async function listSharedQuestions(prepId: string): Promise<Question[]> {
   return questionRepository.listByPrep(null, prepId)
-}
-
-export async function insertQuestions(
-  prepId: string,
-  questions: CreateQuestionInput[],
-  questionMeta: AgentMeta[][],
-): Promise<Question[]> {
-  const saved = await questionRepository.insertMany(await requireUserId(), prepId, questions, questionMeta)
-  revalidatePath(`/preps/${prepId}`)
-  return saved
 }

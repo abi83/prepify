@@ -160,6 +160,20 @@ export function createPrismaStore(): Store {
   }
 }
 
+/** A prep's `created`/`failed` jobs, oldest first — what "resume" re-executes. */
+export async function listUnfinishedJobs(actorId: string, prepId: string): Promise<Job[]> {
+  const prep = await prisma.prep.findUnique({ where: { id: prepId } })
+  if (!prep) throw new NotFoundError(`Prep ${prepId} not found`)
+  if (prep.userId !== actorId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${actorId}`)
+
+  const rows = await prisma.job.findMany({
+    where: { prepId, status: { in: [ "created", "failed" ] } },
+    include: { inputs: true },
+    orderBy: { createdAt: "asc" },
+  })
+  return rows.map(row => toJob(row))
+}
+
 /**
  * Persists the `ocr` job's output: writes the OCR text/visual elements straight onto the
  * target `PrepImage` row (ADR point 6, no staging) and records the LLM call's cost against
@@ -167,30 +181,24 @@ export function createPrismaStore(): Store {
  * authorized the job via `Store`, same as `generationMetaRepository.record`.
  */
 export async function recordOcrOutcome(jobId: string, imageId: string, result: OcrResult, meta: AgentMeta): Promise<void> {
-  const image = await prisma.prepImage.findUnique({ where: { id: imageId }, select: { prepId: true } })
-  if (!image) throw new NotFoundError(`PrepImage ${imageId} not found`)
-
   await prisma.$transaction([
     prisma.prepImage.update({
       where: { id: imageId },
       data: { ocrResult: result as unknown as Prisma.InputJsonValue, producedByJobId: jobId },
     }),
-    prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", image.prepId, meta), jobId } }),
+    prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) }),
   ])
 }
 
 /**
  * Persists the `concepts` job's output: creates one `Concept` row per merged concept and
- * records each LLM call's cost against the job. `imageId` is only used to resolve the owning
- * Prep for the `GenerationMeta` rows. No ownership check — same precedent as `recordOcrOutcome`.
+ * records each LLM call's cost against the job. No ownership check — same precedent as
+ * `recordOcrOutcome`.
  */
-export async function recordConceptsOutcome(jobId: string, imageId: string, concepts: Concept[], metas: AgentMeta[]): Promise<void> {
-  const image = await prisma.prepImage.findUnique({ where: { id: imageId }, select: { prepId: true } })
-  if (!image) throw new NotFoundError(`PrepImage ${imageId} not found`)
-
+export async function recordConceptsOutcome(jobId: string, concepts: Concept[], metas: AgentMeta[]): Promise<void> {
   await prisma.$transaction([
     prisma.concept.createMany({ data: concepts.map(c => ({ ...c, producedByJobId: jobId })) }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", image.prepId, meta), jobId } })),
+    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
   ])
 }
 
@@ -217,23 +225,17 @@ export async function recordPrepMetaOutcome(jobId: string, conceptId: string, re
 
   await prisma.$transaction([
     prisma.prep.update({ where: { id: prepId }, data: result }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", prepId, meta), jobId } })),
+    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
   ])
 }
 
 /**
  * Records LLM calls whose output didn't become the job's result (`wasted: true`) — called as
- * each attempt is rejected or errors, so a later failure can't leave them unrecorded. Linked
- * by `jobId`; the owning Prep is read off the job row. No ownership check — same precedent as
- * `recordOcrOutcome`.
+ * each attempt is rejected or errors, so a later failure can't leave them unrecorded. No
+ * ownership check — same precedent as `recordOcrOutcome`.
  */
 export async function recordWastedCalls(jobId: string, metas: AgentMeta[]): Promise<void> {
-  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { prepId: true } })
-  if (!job) throw new NotFoundError(`Job ${jobId} not found`)
-
-  await prisma.generationMeta.createMany({
-    data: metas.map(meta => ({ ...toGenerationMeta("prep", job.prepId, meta, true), jobId })),
-  })
+  await prisma.generationMeta.createMany({ data: metas.map(meta => toGenerationMeta(jobId, meta, true)) })
 }
 
 /**
@@ -251,6 +253,6 @@ export async function recordQuestionOutcome(
 
   await prisma.$transaction([
     prisma.question.create({ data: { ...question, prepId: job.prepId, producedByJobId: jobId } }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", job.prepId, meta), jobId } })),
+    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
   ])
 }
