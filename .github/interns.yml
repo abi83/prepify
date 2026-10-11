@@ -74,6 +74,9 @@ agents:
     allowed_tools:
       - Bash(npx prisma migrate dev:*)
       - Bash(make lint:*)
+      - Bash(npx prisma generate:*)
+      - Bash(npx vitest run:*)
+      - Bash(npx eslint:*)
     disallowed_tools:
       - Task
       - ScheduleWakeup
