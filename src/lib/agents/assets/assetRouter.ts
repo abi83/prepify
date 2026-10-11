@@ -1,7 +1,6 @@
+import type { AgentDeps } from "@/core/ports"
 import type { AgentResult } from "@/lib/agent"
 import { EMPTY_AGENT_META } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { AssetHint, AssetType } from "@/types/questions"
 
 import { runDiagramAgent } from "./DiagramAgent"
@@ -17,24 +16,22 @@ export type ActiveAssetHint = AssetHint & { needed: true; type: AssetType; descr
 
 export async function routeAsset(
   hint: ActiveAssetHint,
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<AssetOutput>> {
   switch (hint.type) {
   case "formula": {
-    const r = await runFormulaAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
+    const r = await runFormulaAgent(hint.description, model, tier, signal, deps)
     return { output: { type: "formula", blob: r.output }, meta: r.meta }
   }
   case "molecule": {
-    const r = await runMoleculeAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
+    const r = await runMoleculeAgent(hint.description, model, tier, signal, deps)
     return { output: { type: "molecule", blob: r.output }, meta: r.meta }
   }
   case "diagram": {
-    const r = await runDiagramAgent(hint.description, apiKey, model, tier, signal, logger, sampler)
+    const r = await runDiagramAgent(hint.description, model, tier, signal, deps)
     return { output: { type: "diagram", blob: r.output }, meta: r.meta }
   }
   case "table":

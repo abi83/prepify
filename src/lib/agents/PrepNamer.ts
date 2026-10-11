@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { Concept } from "@/types/pipeline"
 
 const prepNameSchema = z.object({
@@ -27,13 +26,11 @@ Return JSON: { "title": "...", "description": "..." }`
 
 export async function runPrepNamer(
   concepts: Concept[],
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<{ title: string; description: string }>> {
   const conceptList = concepts
     .sort((a, b) => b.importance - a.importance)
@@ -48,11 +45,9 @@ export async function runPrepNamer(
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepNameSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 }

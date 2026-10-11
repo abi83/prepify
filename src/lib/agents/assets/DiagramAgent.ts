@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 
 const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
@@ -38,24 +37,20 @@ const beautifulMermaidEsm = "https://esm.sh/beautiful-mermaid@1.1.3"
 
 export async function runDiagramAgent(
   description: string,
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "DiagramAgent",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
     schema: responseSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 
   const blob = buildDiagramBlob(result.output.dsl)

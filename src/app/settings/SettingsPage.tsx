@@ -1,7 +1,6 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import OpenAI from "openai"
 import { useState, useEffect } from "react"
 
 import { getTotalTokens } from "@/actions/preps"
@@ -17,6 +16,7 @@ import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from "@/lib/generationConfig"
+import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { estimateCost, formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
 import type { QuestionType } from "@/types/questions"
@@ -85,15 +85,10 @@ export default function SettingsPage() {
     if (!keyValue.trim()) return
     setTestState("testing")
     try {
-      const client = new OpenAI({ apiKey: keyValue.trim(), dangerouslyAllowBrowser: true })
-      await client.models.list()
-      setTestState("ok")
-    } catch (err) {
-      if (err instanceof OpenAI.APIError && (err.status === 401 || err.status === 403)) {
-        setTestState("invalid_key")
-      } else {
-        setTestState("error")
-      }
+      const valid = await new OpenAiLlm({ apiKey: keyValue.trim() }).isKeyValid()
+      setTestState(valid ? "ok" : "invalid_key")
+    } catch {
+      setTestState("error")
     }
   }
 

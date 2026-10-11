@@ -64,7 +64,7 @@ async function makeConcept(userId: string) {
 }
 
 async function execute(jobId: string) {
-  const definition = createQuestionJobDefinition([ CONCEPT ], "en", consoleLogger, noopSampler)
+  const definition = createQuestionJobDefinition([ CONCEPT ], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
   return runJob(
     definition,
     { store: createPrismaStore(), llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -97,7 +97,7 @@ describe("question job", () => {
 
     const result = await execute(job.id)
     expect(result).toMatchObject({ committed: true, status: "executed" })
-    expect(runBuilder.mock.calls[1][6]).toMatchObject({ question: QUESTION })
+    expect(runBuilder.mock.calls[1][5]).toMatchObject({ question: QUESTION })
 
     const questions = await prisma.question.findMany({ where: { producedByJobId: job.id } })
     expect(questions).toHaveLength(1)

@@ -1,8 +1,7 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { Concept } from "@/types/pipeline"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
@@ -28,13 +27,11 @@ const mergerResponseSchema = z.object({
 
 export async function runConceptMerger(
   concepts: Concept[],
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<Concept[]>> {
   if (concepts.length === 0) return { output: [], meta: EMPTY_AGENT_META }
 
@@ -47,12 +44,10 @@ export async function runConceptMerger(
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: JSON.stringify(payload) },
     schema: mergerResponseSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 
   const conceptByName = new Map(concepts.map(c => [ c.name, c ]))
@@ -60,7 +55,7 @@ export async function runConceptMerger(
   const merged: Concept[] = result.output.groups.flatMap(group => {
     const members = group.flatMap(name => {
       if (!nameSet.has(name)) {
-        logger.warn("ConceptMerger: unmatched name in response, skipping", { name })
+        deps.logger.warn("ConceptMerger: unmatched name in response, skipping", { name })
         return []
       }
       return [ conceptByName.get(name)! ]

@@ -1,11 +1,10 @@
 import * as jobActions from "@/actions/jobs"
+import type { AgentDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import type { AgentMeta } from "@/lib/agent"
 import { BUILDERS } from "@/lib/agents/builders"
 import type { RewriteInput } from "@/lib/agents/builders/rewrite"
 import { reviewFeedback, runQuestionReviewer } from "@/lib/agents/QuestionReviewer"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { Concept, QuestionTask } from "@/types/pipeline"
 import { difficultySchema, questionTypeSchema, type GeneratedQuestion } from "@/types/questions"
 
@@ -18,7 +17,7 @@ import { QUESTION_JOB_TYPE } from "./jobTypes"
  * errored attempt's calls are recorded `wasted` as it ends, and the passing attempt's calls
  * are recorded with the `Question` row. Exhausting the attempts fails the job.
  */
-export function createQuestionJobDefinition(concepts: Concept[], language: string, logger: Logger, sampler: Sampler): JobDefinition<GeneratedQuestion> {
+export function createQuestionJobDefinition(concepts: Concept[], language: string, deps: AgentDeps): JobDefinition<GeneratedQuestion> {
   return {
     type: QUESTION_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<GeneratedQuestion> {
@@ -37,10 +36,10 @@ export function createQuestionJobDefinition(concepts: Concept[], language: strin
         let built: GeneratedQuestion
         let review: Awaited<ReturnType<typeof runQuestionReviewer>>
         try {
-          const build = await BUILDERS[task.type](task, ctx.apiKey, model, tier, language, ctx.signal, rewrite, logger, sampler)
+          const build = await BUILDERS[task.type](task, model, tier, language, ctx.signal, rewrite, deps)
           attemptMetas.push(build.meta)
           built = build.output
-          review = await runQuestionReviewer(built, task, ctx.apiKey, model, tier, language, ctx.signal, logger, sampler)
+          review = await runQuestionReviewer(built, task, model, tier, language, ctx.signal, deps)
           attemptMetas.push(review.meta)
         } catch (e) {
           await jobActions.recordWastedCalls(ctx.job.id, attemptMetas)

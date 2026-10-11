@@ -1,11 +1,10 @@
 import { z } from "zod"
 
+import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { AgentImage } from "@/lib/agent"
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
 import type { SupportedLanguage } from "@/lib/config"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 
 const visualElementSchema = z.object({
   type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
@@ -54,24 +53,20 @@ function assertSupportedLanguage(code: string): asserts code is SupportedLanguag
 
 export async function runOcrAgent(
   images: AgentImage[],
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: "ocr",
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: USER_PROMPT, images },
     schema: ocrSchema,
-    apiKey,
     model,
     tier,
     signal,
-    logger,
-    sampler,
+    deps,
   })
 
   if (result.output.confidence < MIN_PAGE_CONFIDENCE) {

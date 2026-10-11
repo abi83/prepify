@@ -2,11 +2,10 @@ import type { Question } from "@prisma/client"
 
 import { insertAsset } from "@/actions/assets"
 import { recordGenerationMeta } from "@/actions/generationMeta"
-import type { Sampler } from "@/lib/sampler/schema"
+import type { AgentDeps } from "@/core/ports"
 import type { AssetHint } from "@/types/questions"
 
 import { routeAsset, type ActiveAssetHint } from "./agents/assets/assetRouter"
-import type { Logger } from "./logger"
 import { serializeError } from "./logger"
 
 function extractAssetHint(question: Question): AssetHint | null {
@@ -21,13 +20,12 @@ function extractAssetHint(question: Question): AssetHint | null {
  */
 export async function generateAndSaveAssets(
   questions: Question[],
-  apiKey: string,
   model: string,
   tier: string,
   signal: AbortSignal,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ): Promise<void> {
+  const { logger } = deps
   const pending = questions
     .map(q => ({ q, hint: extractAssetHint(q) }))
     .filter((x): x is { q: Question; hint: ActiveAssetHint } =>
@@ -41,7 +39,7 @@ export async function generateAndSaveAssets(
       try {
         const jobId = q.producedByJobId
         if (!jobId) throw new Error(`Question ${q.id} has no producing job to record asset cost against`)
-        const result = await routeAsset(hint, apiKey, model, tier, signal, logger, sampler)
+        const result = await routeAsset(hint, model, tier, signal, deps)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)

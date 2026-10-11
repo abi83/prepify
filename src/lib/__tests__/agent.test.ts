@@ -1,26 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
-const createMock = vi.fn()
-const constructorMock = vi.fn()
-
-vi.mock("openai", async importOriginal => {
-  const actual = await importOriginal<typeof import("openai")>()
-  class MockOpenAI {
-    chat = { completions: { create: createMock } }
-    constructor(options: unknown) {
-      constructorMock(options)
-    }
-  }
-  return { ...actual, default: MockOpenAI }
-})
-
+import { NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
+import type { Sampler } from "@/core/sampler"
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
 import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
 import { consoleLogger } from "@/lib/logger"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
-import type { Sampler } from "@/lib/sampler/schema"
 
 describe("sanitizeLLMText", () => {
   it("passes through clean text unchanged", () => {
@@ -52,41 +39,86 @@ describe("sanitizeLLMText", () => {
 describe("runAgent", () => {
   const schema = z.object({ answer: z.string() })
 
+  const complete = vi.fn<Llm["complete"]>()
+  const llm: Llm = { complete }
+
   beforeEach(() => {
-    createMock.mockReset()
-    constructorMock.mockReset()
-    createMock.mockResolvedValue({
-      choices: [ { message: { content: JSON.stringify({ answer: "ok" }), tool_calls: [] } } ],
-      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, prompt_tokens_details: { cached_tokens: 0 } },
-    })
+    complete.mockReset()
+    complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 10, cachedTokens: 0, completionTokens: 5 })
   })
 
-  async function run(name: string, sampler: Sampler = noopSampler) {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  async function run(name: string, sampler: Sampler = noopSampler, userContent: Parameters<typeof runAgent>[0]["userContent"] = { textContent: "hello" }) {
     return runAgent({
       name,
       systemPrompt: "system",
-      userContent: { textContent: "hello" },
+      userContent,
       schema,
-      apiKey: "key",
       signal: new AbortController().signal,
-      logger: consoleLogger,
-      sampler,
+      deps: { llm, logger: consoleLogger, sampler },
     })
   }
 
-  it("constructs the OpenAI client with maxRetries: 0 — runAgent owns retries, not the SDK", async () => {
-    await run("SomeAgent")
-    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0 }))
-  })
+  function lastRequest(): LlmRequest {
+    return complete.mock.calls[complete.mock.calls.length - 1][0]
+  }
 
   it("resolves the configured timeout for a listed agent name", async () => {
     await run("ocr")
-    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ timeout: AGENT_TIMEOUT_MS.ocr }))
+    expect(lastRequest().timeoutMs).toBe(AGENT_TIMEOUT_MS.ocr)
   })
 
   it("falls back to the default timeout for an agent name not in the lookup", async () => {
     await run("SomeUnlistedAgent")
-    expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ timeout: DEFAULT_AGENT_TIMEOUT_MS }))
+    expect(lastRequest().timeoutMs).toBe(DEFAULT_AGENT_TIMEOUT_MS)
+  })
+
+  it("builds app-shaped meta from the port's token counts", async () => {
+    const { meta } = await run("SomeAgent")
+    expect(meta).toMatchObject({ promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15 })
+  })
+
+  it("passes images through the port as image parts ahead of the text", async () => {
+    await run("ocr", noopSampler, { textContent: "read this", images: [ { base64: "ZmFrZQ==", mimeType: "image/png" } ] })
+    expect(lastRequest().messages[1].content).toEqual([
+      { type: "image", mimeType: "image/png", base64: "ZmFrZQ==" },
+      { type: "text", text: "read this" },
+    ])
+  })
+
+  describe("retries", () => {
+    it("retries a retryable error and returns the later success", async () => {
+      vi.useFakeTimers()
+      complete.mockRejectedValueOnce(new Error("503"))
+
+      const result = run("SomeAgent")
+      await vi.runAllTimersAsync()
+
+      await expect(result).resolves.toMatchObject({ output: { answer: "ok" } })
+      expect(complete).toHaveBeenCalledTimes(2)
+    })
+
+    it("gives up after three attempts and throws the last error", async () => {
+      vi.useFakeTimers()
+      complete.mockRejectedValue(new Error("503"))
+
+      const result = run("SomeAgent")
+      const assertion = expect(result).rejects.toThrow("503")
+      await vi.runAllTimersAsync()
+
+      await assertion
+      expect(complete).toHaveBeenCalledTimes(3)
+    })
+
+    it("does not retry a non-retryable error", async () => {
+      complete.mockRejectedValue(new NonRetryableLlmError("bad key"))
+
+      await expect(run("SomeAgent")).rejects.toBeInstanceOf(NonRetryableLlmError)
+      expect(complete).toHaveBeenCalledOnce()
+    })
   })
 
   describe("sampling", () => {

@@ -1,6 +1,5 @@
+import type { AgentDeps } from "@/core/ports"
 import type { AgentResult } from "@/lib/agent"
-import type { Logger } from "@/lib/logger"
-import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import type { GeneratedQuestion, QuestionType } from "@/types/questions"
 
@@ -13,14 +12,12 @@ import { runSortingBuilder } from "./SortingBuilder"
 
 export type BuilderFn = (
   task: QuestionTask,
-  apiKey: string,
   model: string,
   tier: string,
   language: string,
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
-  logger: Logger,
-  sampler: Sampler,
+  deps: AgentDeps,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
 export const BUILDERS: Record<QuestionType, BuilderFn> = {
