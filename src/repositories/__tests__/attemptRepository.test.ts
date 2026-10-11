@@ -14,8 +14,6 @@ const OTHER = "user-other"
 
 beforeEach(async () => {
   await prisma.attempt.deleteMany()
-  await prisma.pipelineQuestion.deleteMany()
-  await prisma.pipelineRun.deleteMany()
   await prisma.asset.deleteMany()
   await prisma.question.deleteMany()
   await prisma.prep.deleteMany()

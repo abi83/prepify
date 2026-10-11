@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+vi.mock("@/lib/currentUser", () => ({ requireUserId: async () => "user-owner" }))
+
 vi.mock("@/lib/prisma", async () => {
   const { createPglitePrisma } = await import("@/test/pglitePrisma")
   return { prisma: await createPglitePrisma() }
@@ -79,7 +81,7 @@ describe("concepts job", () => {
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(3)
-    expect(metas[0]).toMatchObject({ entityType: "prep", entityId: prep.id, promptTokens: 10 })
+    expect(metas[0]).toMatchObject({ jobId: job.id, promptTokens: 10 })
   })
 
   it("rejects a non-owner actor", async () => {

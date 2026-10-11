@@ -1,4 +1,4 @@
-import type { Prep, PrepDiscipline, PrepVisibility } from "@prisma/client"
+import type { Prep, PrepDiscipline, PrepVisibility, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 
@@ -65,8 +65,17 @@ export async function deletePrep(userId: string, id: string): Promise<void> {
   await prisma.prep.delete({ where: { id } })
 }
 
-/** Called internally after LLM generation — not a user-facing mutation, so no ownership check. */
-export async function incrementPrepTokens(id: string, delta: number): Promise<void> {
-  if (delta <= 0) return
-  await prisma.prep.update({ where: { id }, data: { tokensUsed: { increment: delta } } })
+/** Prompt + completion tokens over every LLM call matching `where`, wasted calls included (cached tokens are a subset of prompt). */
+async function sumTokens(where: Prisma.GenerationMetaWhereInput): Promise<number> {
+  const { _sum } = await prisma.generationMeta.aggregate({ where, _sum: { promptTokens: true, completionTokens: true } })
+  return (_sum.promptTokens ?? 0) + (_sum.completionTokens ?? 0)
+}
+
+export async function getPrepTokens(userId: string | null, id: string): Promise<number> {
+  await getPrep(userId, id)
+  return sumTokens({ job: { prepId: id } })
+}
+
+export function getOwnedTokens(userId: string): Promise<number> {
+  return sumTokens({ job: { prep: { userId, isActive: true } } })
 }

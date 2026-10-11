@@ -1,14 +1,8 @@
-import type { GenerationEntityType } from "@prisma/client"
-
 import type { AgentMeta } from "@/lib/agent"
 
-/** Entities #194 covers today. Concepts get their own value once #48 makes them first-class. */
-export type { GenerationEntityType }
-
-/** One row of `GenerationMeta` — the polymorphic per-call usage/cost record for an entity. */
+/** One row of `GenerationMeta` — the per-call usage/cost record for a job. */
 export interface GenerationMetaRecord {
-  entityType: GenerationEntityType
-  entityId: string
+  jobId: string
   model: string
   tier: string
   promptTokens: number
@@ -21,15 +15,9 @@ export interface GenerationMetaRecord {
 }
 
 /** Pure mapping from an agent call's app-shaped meta to a persistable GenerationMeta record. */
-export function toGenerationMeta(
-  entityType: GenerationEntityType,
-  entityId: string,
-  meta: AgentMeta,
-  wasted = false,
-): GenerationMetaRecord {
+export function toGenerationMeta(jobId: string, meta: AgentMeta, wasted = false): GenerationMetaRecord {
   return {
-    entityType,
-    entityId,
+    jobId,
     model: meta.model,
     tier: meta.tier,
     promptTokens: meta.promptTokens,

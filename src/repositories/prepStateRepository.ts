@@ -1,6 +1,6 @@
-import type { Prep } from "@prisma/client"
+import type { JobStatus, Prep } from "@prisma/client"
 
-import { PREP_META_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 
@@ -18,6 +18,31 @@ export async function loadPrepState(prepId: string): Promise<PrepState> {
     concepts: concepts.map(({ id, name, description, importance, misconceptions }) => ({ id, name, description, importance, misconceptions })),
     prepMetaDone: prepMetaJobs > 0,
     questionCount,
+  }
+}
+
+export interface PrepProgress {
+  hasConcepts: boolean
+  totalQuestions: number // question jobs created so far, any status
+  completedQuestions: number // executed
+  failedQuestions: number // failed, until resume re-executes them
+}
+
+/** What generation has done so far, for the UI. Null until the first job past OCR exists — uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
+export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
+  const [ conceptCount, questionJobs, otherJobs ] = await Promise.all([
+    prisma.concept.count({ where: { producedByJob: { prepId } } }),
+    prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
+    prisma.job.count({ where: { prepId, type: { notIn: [ OCR_JOB_TYPE, QUESTION_JOB_TYPE ] } } }),
+  ])
+  if (otherJobs === 0 && questionJobs.length === 0) return null
+
+  const countOf = (status: JobStatus) => questionJobs.find(group => group.status === status)?._count ?? 0
+  return {
+    hasConcepts: conceptCount > 0,
+    totalQuestions: questionJobs.reduce((sum, group) => sum + group._count, 0),
+    completedQuestions: countOf("executed"),
+    failedQuestions: countOf("failed"),
   }
 }
 

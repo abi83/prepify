@@ -23,7 +23,6 @@ export type BuilderFn = (
   sampler: Sampler,
 ) => Promise<AgentResult<GeneratedQuestion>>
 
-// Mirrors the map in pipeline.ts, which stays untouched until the legacy pipeline is removed (#275).
 export const BUILDERS: Record<QuestionType, BuilderFn> = {
   flashcard: runFlashcardBuilder as BuilderFn,
   single_choice: runSingleChoiceBuilder as BuilderFn,

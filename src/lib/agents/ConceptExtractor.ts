@@ -51,8 +51,8 @@ The list will be capped at 20 entries — prioritise by importance if you have m
 
 export interface ConceptExtractorResult extends AgentResult<Concept[]> {
   chunkCount: number
-  /** One entry per chunk call — `meta` above sums these for existing callers (pipeline.ts);
-   *  the `concepts` job (#272) needs per-call granularity to record one GenerationMeta row per call. */
+  /** One entry per chunk call — `meta` above sums these; the `concepts` job
+   *  (#272) needs per-call granularity to record one GenerationMeta row per call. */
   metas: AgentMeta[]
 }
 

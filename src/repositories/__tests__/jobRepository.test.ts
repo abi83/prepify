@@ -8,7 +8,7 @@ vi.mock("@/lib/prisma", async () => {
 import type { ExecutionConfig } from "@/core/job"
 import { prisma } from "@/lib/prisma"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
-import { createPrismaStore } from "@/repositories/jobRepository"
+import { createPrismaStore, listUnfinishedJobs } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 
@@ -135,6 +135,23 @@ describe("commitJob", () => {
 
     expect([ first, second ].filter(Boolean)).toHaveLength(1)
     expect([ first, second ].filter(c => !c)).toHaveLength(1)
+  })
+
+  it("lists a prep's created and failed jobs, not executed ones", async () => {
+    const { prep, image } = await makeImage(OWNER)
+    const created = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+    const failed = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+    await store.commitJob(OWNER, failed.id, "created", { status: "failed", failureReason: "boom" })
+    const executed = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+    await store.commitJob(OWNER, executed.id, "created", { status: "executed", output: "hi" })
+
+    const jobs = await listUnfinishedJobs(OWNER, prep.id)
+    expect(jobs.map(j => j.id).sort()).toEqual([ created.id, failed.id ].sort())
+  })
+
+  it("refuses to list a non-owner's unfinished jobs", async () => {
+    const { prep } = await makeImage(OWNER)
+    await expect(listUnfinishedJobs(OTHER, prep.id)).rejects.toThrow(ForbiddenError)
   })
 
   it("rejects a non-owner actor", async () => {

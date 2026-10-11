@@ -9,7 +9,7 @@ import type { PlanTarget } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { listUnfinishedPreps, loadPrepState } from "@/repositories/prepStateRepository"
+import { getPrepProgress, listUnfinishedPreps, loadPrepState } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"
@@ -46,5 +46,33 @@ describe("prepStateRepository", () => {
     const preps = await listUnfinishedPreps(OWNER, TARGET)
     expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
     expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1 })
+  })
+
+  describe("getPrepProgress", () => {
+    const addJob = (prepId: string, type: string, status: "created" | "executed" | "failed") => prisma.job.create({
+      data: {
+        prepId, type, status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
+        ...(status === "executed" ? { output: [] } : {}),
+        ...(status === "failed" ? { failureReason: "boom" } : {}),
+      },
+    })
+
+    it("is null while only OCR jobs exist", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      await addJob(prep.id, "ocr", "executed")
+      expect(await getPrepProgress(prep.id)).toBeNull()
+    })
+
+    it("counts question jobs by status and reports whether concepts exist", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      const conceptsJob = await addJob(prep.id, "concepts", "executed")
+      await prisma.concept.create({ data: { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+      await addJob(prep.id, "question", "executed")
+      await addJob(prep.id, "question", "executed")
+      await addJob(prep.id, "question", "failed")
+      await addJob(prep.id, "question", "created")
+
+      expect(await getPrepProgress(prep.id)).toEqual({ hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
+    })
   })
 })

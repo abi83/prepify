@@ -1,3 +1,4 @@
+import * as jobActions from "@/actions/jobs"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import type { AgentMeta } from "@/lib/agent"
 import { BUILDERS } from "@/lib/agents/builders"
@@ -5,7 +6,6 @@ import type { RewriteInput } from "@/lib/agents/builders/rewrite"
 import { reviewFeedback, runQuestionReviewer } from "@/lib/agents/QuestionReviewer"
 import type { Logger } from "@/lib/logger"
 import type { Sampler } from "@/lib/sampler/schema"
-import * as jobRepository from "@/repositories/jobRepository"
 import type { Concept, QuestionTask } from "@/types/pipeline"
 import { difficultySchema, questionTypeSchema, type GeneratedQuestion } from "@/types/questions"
 
@@ -43,16 +43,16 @@ export function createQuestionJobDefinition(concepts: Concept[], language: strin
           review = await runQuestionReviewer(built, task, ctx.apiKey, model, tier, language, ctx.signal, logger, sampler)
           attemptMetas.push(review.meta)
         } catch (e) {
-          await jobRepository.recordWastedCalls(ctx.job.id, attemptMetas)
+          await jobActions.recordWastedCalls(ctx.job.id, attemptMetas)
           throw e
         }
 
         if (review.output.passed) {
-          await jobRepository.recordQuestionOutcome(ctx.job.id, { type: task.type, difficulty: task.difficulty, content: built }, attemptMetas)
+          await jobActions.recordQuestionOutcome(ctx.job.id, { type: task.type, difficulty: task.difficulty, content: built }, attemptMetas)
           return built
         }
 
-        await jobRepository.recordWastedCalls(ctx.job.id, attemptMetas)
+        await jobActions.recordWastedCalls(ctx.job.id, attemptMetas)
         rewrite = { question: built, feedback: reviewFeedback(review.output.review) }
       }
 

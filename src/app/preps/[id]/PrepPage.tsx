@@ -16,6 +16,7 @@ import { disciplineFromEnum, disciplineToEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
 import { estimateCost, formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
+import type { PrepProgress } from "@/repositories/prepStateRepository"
 import type { Concept } from "@/types/pipeline"
 import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
@@ -30,7 +31,8 @@ interface Props {
   questions: Question[]
   attempts: Attempt[]
   assets: Asset[]
-  runSummary: import("@/repositories/pipelineRepository").PartialRunSummary | null
+  progress: PrepProgress | null
+  tokensUsed: number
   concepts: Concept[]
   images: PrepImage[]
 }
@@ -40,7 +42,8 @@ export default function PrepPage({
   questions: initialQuestions,
   attempts,
   assets,
-  runSummary,
+  progress,
+  tokensUsed,
   concepts,
   images,
 }: Props) {
@@ -73,7 +76,7 @@ export default function PrepPage({
   function setTab(next: StudyTab) { setUrlParams({ tab: next }) }
 
   const pages: Page[] = images
-    .filter(img => img.status === "done")
+    .filter(img => img.ocrResult !== null)
     .map((img, i) => ({ page: i + 1, gcsKey: img.gcsKey, ...ocrResultSchema.parse(img.ocrResult) }))
   const hasQuestions = questions.length > 0
   const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
@@ -116,7 +119,7 @@ export default function PrepPage({
           <DialogHeader>
             <DialogTitle>Delete prep?</DialogTitle>
             <DialogDescription>
-              This will permanently delete <strong>{prep.title}</strong> and all its questions, attempts, and pipeline data.
+              This will permanently delete <strong>{prep.title}</strong> and all its questions, attempts, and generation data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -167,11 +170,11 @@ export default function PrepPage({
             <p className="text-sm text-muted-foreground">{prep.description}</p>
           )}
           <span className="text-sm text-muted-foreground">{formatDate(prep.createdAt)}</span>
-          {prep.tokensUsed > 0 && (
+          {tokensUsed > 0 && (
             <span className="text-xs text-muted-foreground">
-              {prep.tokensUsed.toLocaleString()} tokens
+              {tokensUsed.toLocaleString()} tokens
               {getApiKey() && (
-                <> · ~{formatCost(estimateCost(prep.tokensUsed * 0.8, prep.tokensUsed * 0.2, getApiKey()!.model, getApiKey()!.tier))}</>
+                <> · ~{formatCost(estimateCost(tokensUsed * 0.8, tokensUsed * 0.2, getApiKey()!.model, getApiKey()!.tier))}</>
               )}
             </span>
           )}
@@ -186,7 +189,7 @@ export default function PrepPage({
           pages={pages}
           language={prep.language ?? "en"}
           prepTitle={prep.title}
-          initialRunSummary={runSummary}
+          initialProgress={progress}
           hasQuestions={hasQuestions}
           onTitleReady={title => setPrep(p => ({ ...p, title }))}
           onComplete={(savedQuestions, freshPrep) => {

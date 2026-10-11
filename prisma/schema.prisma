@@ -38,7 +38,6 @@ model Prep {
   userId     String
   title      String
   createdAt  DateTime        @default(now())
-  tokensUsed Int             @default(0)
   visibility PrepVisibility  @default(private)
   grade      Int?
   discipline PrepDiscipline?
@@ -49,7 +48,6 @@ model Prep {
 
   questions   Question[]
   attempts    Attempt[]
-  pipelineRun PipelineRun?
   images      PrepImage[]
   jobs        Job[]
 }
@@ -68,8 +66,7 @@ model PrepImage {
   status          PrepImageStatus @default(pending)
   ocrResult       Json?
   error           String?
-  // Null for rows OCR'd by the legacy pipeline (src/lib/prepImageOcr.ts) — only the `ocr`
-  // job (#270) sets this.
+  // Set by the `ocr` job (#270); null until then, or if that job is deleted.
   producedByJobId String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now())
@@ -85,8 +82,7 @@ model Question {
   // Null only for rows created before difficulty tiers existed.
   difficulty String?
   content   Json
-  // Null for rows built by the legacy pipeline (src/lib/pipeline.ts) — only a `question`
-  // job (#273) sets this.
+  // Set by the `question` job (#273); null only if that job is deleted.
   producedByJobId String?
   createdAt       DateTime @default(now())
 
@@ -107,63 +103,10 @@ model Attempt {
   prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
 }
 
-// Optional, not 1:1 with Prep: created lazily when generation starts
-// (pipelineStore.loadOrCreateRun), not at prep creation.
-model PipelineRun {
-  id        String   @id @default(uuid())
-  prepId    String   @unique
-  // TODO(#41): concepts as first-class citizens may want their own model
-  // instead of opaque JSON.
-  concepts      Json?
-  questionTasks Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-
-  prep      Prep               @relation(fields: [prepId], references: [id], onDelete: Cascade)
-  questions PipelineQuestion[]
-}
-
-enum PipelineQuestionStatus {
-  pending
-  finished
-  failed
-}
-
-model PipelineQuestion {
-  id        String                 @id @default(uuid())
-  runId     String
-  taskIndex Int
-  task      Json
-  status    PipelineQuestionStatus @default(pending)
-  // Per-attempt build/review state, in attempt order — lets crash-resume continue from the
-  // last completed step (build, or build+review) instead of redoing the whole slot. Shape:
-  // { attemptNum, build: {question, meta}, review: {review, passed, meta} | null }[].
-  // `status: pending` with a non-empty attempts array means resumable; `failed` is terminal
-  // (max attempts exhausted) and is never retried on resume.
-  attempts  Json                   @default("[]")
-  // Final question + its build/review AgentMeta, set once status = finished.
-  question  Json?
-  meta      Json?
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @default(now())
-
-  run PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-  @@unique([runId, taskIndex])
-}
-
-enum GenerationEntityType {
-  prep
-  question
-}
-
-// Polymorphic (entityType + entityId) rather than per-entity FKs: usage/cost needs to
-// aggregate across an entity's own generation calls today, and across related entities
-// (e.g. total cost for a Prep across all its Questions) once that reporting lands (#31).
+// One row per LLM call, linked to the job it ran for; a Prep's usage/cost is the sum over its jobs (#31).
 model GenerationMeta {
-  id               String               @id @default(uuid())
-  entityType       GenerationEntityType
-  entityId         String
+  id               String   @id @default(uuid())
+  jobId            String
   model            String
   tier             String
   promptTokens     Int
@@ -173,15 +116,12 @@ model GenerationMeta {
   toolCalls        Int
   executionMs      Int
   // Billed but discarded: the call's output isn't the one that became the final Question.
-  wasted           Boolean              @default(false)
-  generatedAt      DateTime             @default(now())
-  // Null for rows recorded by the legacy pipeline — only a job-backed LLM call (#270) sets
-  // this. Replaces entityType/entityId as the cost link once the legacy pipeline is gone (#275).
-  jobId            String?
+  wasted           Boolean  @default(false)
+  generatedAt      DateTime @default(now())
 
-  job Job? @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  @@index([entityType, entityId])
+  @@index([jobId])
 }
 
 model Asset {
