@@ -8,6 +8,10 @@ wiki:
   enabled: true
   url: abi83/prepify.wiki
 
+# Also auto-proceed to the coder on size L (interns default: XS, S, M).
+auto_proceed:
+  L: true
+
 agents:
   coder:
     max_turns: 100
