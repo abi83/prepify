@@ -1,25 +1,20 @@
 import { Storage } from "@google-cloud/storage"
 
-import type { AgentSample, Sampler, StoredSample } from "@/core/sampler"
+import type { AgentSample, Sampler } from "@/core/sampler"
 import { config } from "@/lib/env"
-import { APP_VERSION } from "@/lib/logger/core"
 
 import { createRateSampler } from "./rateSampler"
+import { serializeSample } from "./storedSample"
 
 const storage = new Storage()
 
-/** `samples/{agent}/{promptHash}/{yyyy-mm-dd}/{executionId}.json` — one object per sample, GCS has no append. */
-export function sampleObjectKey(sample: AgentSample): string {
-  return `samples/${sample.agent}/${sample.promptHash}/${sample.timestamp.slice(0, 10)}/${sample.executionId}.json`
-}
-
 /** Unconditional write — the keep/drop decision is made by the caller. */
 export async function writeSample(sample: AgentSample): Promise<void> {
-  const stored: StoredSample = { ...sample, appVersion: APP_VERSION }
+  const { key, body } = serializeSample(sample)
   await storage
     .bucket(config.SAMPLES_BUCKET_NAME)
-    .file(sampleObjectKey(sample))
-    .save(JSON.stringify(stored), { contentType: "application/json" })
+    .file(key)
+    .save(body, { contentType: "application/json" })
 }
 
 /** Server-side sampler: keeps `SAMPLE_RATE` of executions. */
