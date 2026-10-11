@@ -9,27 +9,6 @@ wiki:
   url: abi83/prepify.wiki
 
 agents:
-  # Shrink an agent's list only once you've confirmed it needs the tool — this is a security ceiling, not a convenience knob.
-  refiner:
-    disallowed_tools:
-      - Bash
-      - Task
-      - ScheduleWakeup
-      - WebSearch
-      - WebFetch
-      - Write
-      - Edit
-      - NotebookEdit
-  estimator:
-    disallowed_tools:
-      - Bash
-      - Task
-      - ScheduleWakeup
-      - WebSearch
-      - WebFetch
-      - Write
-      - Edit
-      - NotebookEdit
   coder:
     max_turns: 100
     allowed_tools:
@@ -38,18 +17,3 @@ agents:
       - Bash(npx prisma generate:*)
       - Bash(npx vitest run:*)
       - Bash(npx eslint:*)
-    disallowed_tools:
-      - Task
-      - ScheduleWakeup
-      - WebSearch
-      - WebFetch
-      - NotebookEdit
-  reviewer:
-    disallowed_tools:
-      - Task
-      - ScheduleWakeup
-      - WebSearch
-      - WebFetch
-      - Write
-      - Edit
-      - NotebookEdit
