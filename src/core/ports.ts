@@ -97,6 +97,9 @@ export interface PrepData {
   downloadImage(prepId: string, gcsKey: string): Promise<AgentImage>
 }
 
+/** A prep's `created`/`failed` jobs, oldest first — what "resume" re-executes. Actor-scoped like `Store`. */
+export type ListUnfinishedJobs = (actorId: string, prepId: string) => Promise<Job[]>
+
 export interface Ports {
   store: Store
   llm: Llm

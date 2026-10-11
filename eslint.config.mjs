@@ -79,6 +79,7 @@ const config = [
       "src/lib/agents/**/*.ts",
       "src/lib/jobs/*Job.ts",
       "src/lib/jobs/execution.ts",
+      "src/lib/jobs/generation.ts",
       "src/lib/jobs/jobTypes.ts",
     ],
     ignores: [ "**/__tests__/**" ],
