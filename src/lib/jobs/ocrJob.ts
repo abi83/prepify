@@ -5,7 +5,7 @@ import type { Logger } from "@/lib/logger"
 import type { Sampler } from "@/lib/sampler/schema"
 import * as jobRepository from "@/repositories/jobRepository"
 
-export const OCR_JOB_TYPE = "ocr"
+import { OCR_JOB_TYPE } from "./jobTypes"
 
 /**
  * One job per `PrepImage` row — `inputIds[0]` is that row's id. `images` must already be

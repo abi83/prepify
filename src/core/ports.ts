@@ -1,4 +1,4 @@
-import type { Job, JobOutcome, JobStatus } from "./job"
+import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 
 /**
  * Job persistence, actor-scoped like `assertOwnsRun(userId, ...)` in
@@ -13,6 +13,7 @@ export interface Store {
     type: string,
     inputIds: string[],
     config: Job["config"],
+    question?: QuestionSpec,
   ): Promise<Job<TOutput>>
 
   /** Returns the subset of `ids` that exist and are resolvable by this actor — used to

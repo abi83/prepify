@@ -8,7 +8,7 @@ import * as jobRepository from "@/repositories/jobRepository"
 import type { Concept } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 
-export const CONCEPTS_JOB_TYPE = "concepts"
+import { CONCEPTS_JOB_TYPE } from "./jobTypes"
 
 /**
  * One job per set of `PrepImage` ids — `inputIds` are those rows' ids. `pages` must already be

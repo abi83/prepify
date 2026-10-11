@@ -214,6 +214,9 @@ model Job {
   tier          String
   timeoutMs     Int
   maxRetries    Int
+  // A `question` job's task spec (#273) — not entities, so JobInput can't carry them. Null for other job types.
+  questionType  String?
+  difficulty    String?
   output        Json?
   failureReason String?
   createdBy     String
