@@ -5,7 +5,7 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import type { ExecutionConfig } from "@/core/job"
+import type { ExecutionConfig, JobOutcome } from "@/core/job"
 import { prisma } from "@/lib/prisma"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
 import { createPrismaStore, listUnfinishedJobs } from "@/repositories/jobRepository"
@@ -16,6 +16,13 @@ const OWNER = "user-owner"
 const OTHER = "user-other"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
+
+const META = { model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
+const FAILED: JobOutcome<unknown> = { status: "failed", failureReason: "boom", wastedMetas: [] }
+
+function executedOcr(text: string): Extract<JobOutcome<unknown>, { status: "executed" }> {
+  return { status: "executed", output: { text, visual_elements: [] }, metas: [ META ], wastedMetas: [] }
+}
 
 const store = createPrismaStore()
 
@@ -115,13 +122,13 @@ describe("commitJob", () => {
     const { image } = await makeImage(OWNER)
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
 
-    const failed = await store.commitJob(OWNER, job.id, "created", { status: "failed", failureReason: "boom" })
+    const failed = await store.commitJob(OWNER, job.id, "created", FAILED)
     expect(failed).toBe(true)
     expect(await store.getJob(OWNER, job.id)).toMatchObject({ status: "failed", failureReason: "boom", output: null })
 
-    const executed = await store.commitJob(OWNER, job.id, "failed", { status: "executed", output: "hi" })
+    const executed = await store.commitJob(OWNER, job.id, "failed", executedOcr("hi"))
     expect(executed).toBe(true)
-    expect(await store.getJob(OWNER, job.id)).toMatchObject({ status: "executed", output: "hi", failureReason: null })
+    expect(await store.getJob(OWNER, job.id)).toMatchObject({ status: "executed", output: { text: "hi" }, failureReason: null })
   })
 
   it("commits only the winner of a concurrent race on the same job", async () => {
@@ -129,21 +136,62 @@ describe("commitJob", () => {
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
 
     const [ first, second ] = await Promise.all([
-      store.commitJob(OWNER, job.id, "created", { status: "executed", output: "A" }),
-      store.commitJob(OWNER, job.id, "created", { status: "executed", output: "B" }),
+      store.commitJob(OWNER, job.id, "created", executedOcr("A")),
+      store.commitJob(OWNER, job.id, "created", executedOcr("B")),
     ])
 
     expect([ first, second ].filter(Boolean)).toHaveLength(1)
     expect([ first, second ].filter(c => !c)).toHaveLength(1)
+    expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(1)
+  })
+
+  it("writes no domain rows when it loses the commit race", async () => {
+    const { image } = await makeImage(OWNER)
+    const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+    await store.commitJob(OWNER, job.id, "created", executedOcr("winner"))
+
+    const lost = await store.commitJob(OWNER, job.id, "created", { ...executedOcr("loser"), wastedMetas: [ META ] })
+    expect(lost).toBe(false)
+
+    const reloaded = await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })
+    expect(reloaded.ocrResult).toEqual({ text: "winner", visual_elements: [] })
+    expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(1)
+  })
+
+  it("leaves no partial domain rows when the commit fails", async () => {
+    const { image } = await makeImage(OWNER)
+    const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+
+    // The OCR row is written, then the invalid meta fails the transaction.
+    const invalidMeta = { ...META, promptTokens: "x" as unknown as number }
+    await expect(
+      store.commitJob(OWNER, job.id, "created", { ...executedOcr("doomed"), metas: [ invalidMeta ] })
+    ).rejects.toThrow()
+
+    expect(await store.getJob(OWNER, job.id)).toMatchObject({ status: "created" })
+    const reloaded = await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })
+    expect(reloaded.ocrResult).toBeNull()
+    expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(0)
+  })
+
+  it("persists a failed outcome's wasted metas", async () => {
+    const { image } = await makeImage(OWNER)
+    const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+
+    await store.commitJob(OWNER, job.id, "created", { ...FAILED, wastedMetas: [ META ] })
+
+    const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
+    expect(metas).toHaveLength(1)
+    expect(metas[0].wasted).toBe(true)
   })
 
   it("lists a prep's created and failed jobs, not executed ones", async () => {
     const { prep, image } = await makeImage(OWNER)
     const created = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
     const failed = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
-    await store.commitJob(OWNER, failed.id, "created", { status: "failed", failureReason: "boom" })
+    await store.commitJob(OWNER, failed.id, "created", FAILED)
     const executed = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
-    await store.commitJob(OWNER, executed.id, "created", { status: "executed", output: "hi" })
+    await store.commitJob(OWNER, executed.id, "created", executedOcr("hi"))
 
     const jobs = await listUnfinishedJobs(OWNER, prep.id)
     expect(jobs.map(j => j.id).sort()).toEqual([ created.id, failed.id ].sort())
@@ -158,7 +206,7 @@ describe("commitJob", () => {
     const { image } = await makeImage(OWNER)
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
     await expect(
-      store.commitJob(OTHER, job.id, "created", { status: "executed", output: "hi" })
+      store.commitJob(OTHER, job.id, "created", executedOcr("hi"))
     ).rejects.toThrow(ForbiddenError)
   })
 })

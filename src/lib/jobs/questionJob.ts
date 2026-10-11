@@ -1,6 +1,6 @@
-import * as jobActions from "@/actions/jobs"
+import type { JobRunResult } from "@/core/job"
 import type { AgentDeps } from "@/core/ports"
-import type { JobDefinition, JobRunContext } from "@/core/runJob"
+import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
 import type { AgentMeta } from "@/lib/agent"
 import { BUILDERS } from "@/lib/agents/builders"
 import type { RewriteInput } from "@/lib/agents/builders/rewrite"
@@ -14,13 +14,13 @@ import { QUESTION_JOB_TYPE } from "./jobTypes"
  * One job per task — `inputIds` are the `Concept` ids the task covers, its type/difficulty
  * come from `ctx.job.question`. `concepts` must already be fetched by the caller. Runs the
  * build → review → rewrite loop for at most `maxRetries + 1` attempts; each rejected or
- * errored attempt's calls are recorded `wasted` as it ends, and the passing attempt's calls
- * are recorded with the `Question` row. Exhausting the attempts fails the job.
+ * errored attempt's calls travel as `wastedMetas` (on failure, inside a `JobRunError`), the
+ * passing attempt's calls as `metas`. Exhausting the attempts fails the job.
  */
 export function createQuestionJobDefinition(concepts: Concept[], language: string, deps: AgentDeps): JobDefinition<GeneratedQuestion> {
   return {
     type: QUESTION_JOB_TYPE,
-    async run(ctx: JobRunContext): Promise<GeneratedQuestion> {
+    async run(ctx: JobRunContext): Promise<JobRunResult<GeneratedQuestion>> {
       const { model, tier, maxRetries } = ctx.job.config
       if (!ctx.job.question) throw new Error(`Job ${ctx.job.id} has no questionType/difficulty`)
       const task: QuestionTask = {
@@ -30,6 +30,7 @@ export function createQuestionJobDefinition(concepts: Concept[], language: strin
       }
 
       const maxAttempts = maxRetries + 1
+      const wastedMetas: AgentMeta[] = []
       let rewrite: RewriteInput | undefined
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const attemptMetas: AgentMeta[] = []
@@ -42,20 +43,16 @@ export function createQuestionJobDefinition(concepts: Concept[], language: strin
           review = await runQuestionReviewer(built, task, model, tier, language, ctx.signal, deps)
           attemptMetas.push(review.meta)
         } catch (e) {
-          await jobActions.recordWastedCalls(ctx.job.id, attemptMetas)
-          throw e
+          throw new JobRunError([ ...wastedMetas, ...attemptMetas ], e)
         }
 
-        if (review.output.passed) {
-          await jobActions.recordQuestionOutcome(ctx.job.id, { type: task.type, difficulty: task.difficulty, content: built }, attemptMetas)
-          return built
-        }
+        if (review.output.passed) return { output: built, metas: attemptMetas, wastedMetas }
 
-        await jobActions.recordWastedCalls(ctx.job.id, attemptMetas)
+        wastedMetas.push(...attemptMetas)
         rewrite = { question: built, feedback: reviewFeedback(review.output.review) }
       }
 
-      throw new Error(`No passing review after ${maxAttempts} attempt(s)`)
+      throw new JobRunError(wastedMetas, new Error(`No passing review after ${maxAttempts} attempt(s)`))
     },
   }
 }

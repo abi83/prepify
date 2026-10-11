@@ -1,4 +1,4 @@
-import type { PrepDiscipline } from "@prisma/client"
+import type { PrepDisciplineId } from "@/types/prep"
 
 import type { Discipline } from "./agents/PrepLabeler"
 
@@ -7,7 +7,7 @@ import type { Discipline } from "./agents/PrepLabeler"
  * app-facing code (LLM prompts, UI labels) uses the human-readable form
  * ('Social Studies') that the enum's `@map` stores in the DB.
  */
-const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
+const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDisciplineId> = {
   "History": "History",
   "Geography": "Geography",
   "Literature": "Literature",
@@ -30,12 +30,12 @@ const DISCIPLINE_TO_ENUM: Record<Discipline, PrepDiscipline> = {
 
 const ENUM_TO_DISCIPLINE = Object.fromEntries(
   Object.entries(DISCIPLINE_TO_ENUM).map(([ label, value ]) => [ value, label ]),
-) as Record<PrepDiscipline, Discipline>
+) as Record<PrepDisciplineId, Discipline>
 
-export function disciplineToEnum(discipline: Discipline | null): PrepDiscipline | null {
+export function disciplineToEnum(discipline: Discipline | null): PrepDisciplineId | null {
   return discipline ? DISCIPLINE_TO_ENUM[discipline] : null
 }
 
-export function disciplineFromEnum(discipline: PrepDiscipline | null): Discipline | null {
+export function disciplineFromEnum(discipline: PrepDisciplineId | null): Discipline | null {
   return discipline ? ENUM_TO_DISCIPLINE[discipline] : null
 }

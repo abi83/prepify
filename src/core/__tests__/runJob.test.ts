@@ -24,7 +24,7 @@ function ports(overrides: Partial<{ llm: Llm; progress: ProgressSink }> = {}) {
 }
 
 function succeeding<TOutput>(type: string, output: TOutput): JobDefinition<TOutput> {
-  return { type, run: async () => output }
+  return { type, run: async () => ({ output, metas: [], wastedMetas: [] }) }
 }
 
 function abortError(): Error {
@@ -83,7 +83,7 @@ describe("runJob", () => {
       type: "slow",
       run: async (ctx: JobRunContext) => {
         await abortableDelay(10_000, ctx.signal)
-        return "done"
+        return { output: "done", metas: [], wastedMetas: [] }
       },
     }
 

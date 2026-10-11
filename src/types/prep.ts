@@ -1,6 +1,12 @@
 import { z } from "zod"
 
-export const STUDY_TABS = [ "cards", "quiz", "test" ] as const
+/** Identifier-safe discipline values stored on `Prep.discipline`; mirrors the Prisma `PrepDiscipline` enum. */
+export type PrepDisciplineId =
+  | "History" | "Geography" | "Literature" | "SocialStudies" | "Economics" | "PhilosophyEthics"
+  | "Biology" | "Chemistry" | "Physics" | "Mathematics" | "ComputerScience"
+  | "English" | "French" | "German" | "Spanish" | "Italian" | "Latin" | "Russian"
+
+export const STUDY_TABS =[ "cards", "quiz", "test" ] as const
 export type StudyTab = (typeof STUDY_TABS)[number]
 
 export function isStudyTab(value: string): value is StudyTab {

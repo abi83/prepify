@@ -1,4 +1,4 @@
-import * as jobActions from "@/actions/jobs"
+import type { JobRunResult } from "@/core/job"
 import type { AgentDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptExtractor } from "@/lib/agents/ConceptExtractor"
@@ -12,12 +12,12 @@ import { CONCEPTS_JOB_TYPE } from "./jobTypes"
 /**
  * One job per set of `PrepImage` ids — `inputIds` are those rows' ids. `pages` must already be
  * fetched by the caller (OCR text per page); this wraps the extractor → dedupe → merger chain
- * (merger skipped on a single chunk) and the write of the resulting `Concept` rows.
+ * (merger skipped on a single chunk).
  */
 export function createConceptsJobDefinition(pages: Page[], language: string, deps: AgentDeps): JobDefinition<Concept[]> {
   return {
     type: CONCEPTS_JOB_TYPE,
-    async run(ctx: JobRunContext): Promise<Concept[]> {
+    async run(ctx: JobRunContext): Promise<JobRunResult<Concept[]>> {
       const { model, tier } = ctx.job.config
 
       const extracted = await runConceptExtractor(pages, model, tier, language, ctx.signal, deps)
@@ -31,8 +31,7 @@ export function createConceptsJobDefinition(pages: Page[], language: string, dep
         concepts = merged.output
       }
 
-      await jobActions.recordConceptsOutcome(ctx.job.id, concepts, metas)
-      return concepts
+      return { output: concepts, metas, wastedMetas: [] }
     },
   }
 }

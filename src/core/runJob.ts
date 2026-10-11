@@ -1,4 +1,6 @@
-import type { ExecutionConfig, JobOutcome, QuestionSpec } from "./job"
+import type { AgentMeta } from "@/lib/agent"
+
+import type { ExecutionConfig, JobOutcome, JobRunResult, QuestionSpec } from "./job"
 import type { Llm, ProgressSink, Store } from "./ports"
 
 export class JobNotFoundError extends Error {
@@ -14,6 +16,15 @@ export class MissingDependencyError extends Error {
   constructor(public readonly jobId: string, public readonly missingIds: string[]) {
     super(`Job ${jobId} is missing dependencies: ${missingIds.join(", ")}`)
     this.name = "MissingDependencyError"
+  }
+}
+
+/** Thrown by a `run` that made wasted LLM calls before failing, so they still reach the
+ *  failed outcome. `cause` is the underlying error. */
+export class JobRunError extends Error {
+  constructor(public readonly wastedMetas: AgentMeta[], public readonly cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.name = "JobRunError"
   }
 }
 
@@ -42,7 +53,7 @@ export interface JobRunContext {
  *  status bookkeeping are handled generically by `runJob`, the same for every type. */
 export interface JobDefinition<TOutput> {
   type: string
-  run(ctx: JobRunContext): Promise<TOutput>
+  run(ctx: JobRunContext): Promise<JobRunResult<TOutput>>
 }
 
 export type RunJobResult<TOutput> =
@@ -103,10 +114,15 @@ export async function runJob<TOutput>(
 
   let outcome: JobOutcome<TOutput>
   try {
-    outcome = { status: "executed", output: await definition.run(context) }
+    outcome = { status: "executed", ...await definition.run(context) }
   } catch (e) {
-    if (isAbort(signal, e)) throw e
-    outcome = { status: "failed", failureReason: e instanceof Error ? e.message : String(e) }
+    const cause = e instanceof JobRunError ? e.cause : e
+    if (isAbort(signal, cause)) throw cause
+    outcome = {
+      status: "failed",
+      failureReason: cause instanceof Error ? cause.message : String(cause),
+      wastedMetas: e instanceof JobRunError ? e.wastedMetas : [],
+    }
   }
 
   const committed = await store.commitJob(actorId, jobId, job.status, outcome)

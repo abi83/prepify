@@ -1,13 +1,14 @@
-import { Prisma, type Job as JobRow, type PrepDiscipline } from "@prisma/client"
+import { Prisma, type Job as JobRow } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import type { Store } from "@/core/ports"
-import type { AgentMeta } from "@/lib/agent"
+import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
 import type { Concept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
-import type { Difficulty } from "@/types/questions"
+import { difficultySchema, type GeneratedQuestion } from "@/types/questions"
 
 import { ForbiddenError, NotFoundError } from "./errors"
 
@@ -148,14 +149,19 @@ export function createPrismaStore(): Store {
       fromStatus: JobStatus,
       outcome: JobOutcome<TOutput>,
     ): Promise<boolean> {
-      await assertOwnsJob(actorId, jobId)
+      const job = await assertOwnsJob(actorId, jobId)
 
       const data = outcome.status === "executed"
         ? { status: "executed" as const, output: outcome.output as Prisma.InputJsonValue, failureReason: null, executedBy: actorId, updatedAt: new Date() }
         : { status: "failed" as const, output: Prisma.JsonNull, failureReason: outcome.failureReason, executedBy: actorId, updatedAt: new Date() }
 
-      const result = await prisma.job.updateMany({ where: { id: jobId, status: fromStatus }, data })
-      return result.count === 1
+      return prisma.$transaction(async tx => {
+        const result = await tx.job.updateMany({ where: { id: jobId, status: fromStatus }, data })
+        if (result.count !== 1) return false
+
+        await writeDomainRows(tx, job, outcome)
+        return true
+      })
     },
   }
 }
@@ -174,85 +180,62 @@ export async function listUnfinishedJobs(actorId: string, prepId: string): Promi
   return rows.map(row => toJob(row))
 }
 
-/**
- * Persists the `ocr` job's output: writes the OCR text/visual elements straight onto the
- * target `PrepImage` row (ADR point 6, no staging) and records the LLM call's cost against
- * the job. No ownership check — called from inside a job's `run`, after `runJob` has already
- * authorized the job via `Store`, same as `generationMetaRepository.record`.
- */
-export async function recordOcrOutcome(jobId: string, imageId: string, result: OcrResult, meta: AgentMeta): Promise<void> {
-  await prisma.$transaction([
-    prisma.prepImage.update({
-      where: { id: imageId },
-      data: { ocrResult: result as unknown as Prisma.InputJsonValue, producedByJobId: jobId },
-    }),
-    prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) }),
-  ])
+type JobWithInputs = JobRow & { inputs: { entityId: string }[] }
+
+/** Runs inside `commitJob`'s transaction, after the conditional status update won. */
+const DOMAIN_WRITERS: Record<string, (tx: Prisma.TransactionClient, job: JobWithInputs, output: never) => Promise<unknown>> = {
+  [OCR_JOB_TYPE]: writeOcrOutput,
+  [CONCEPTS_JOB_TYPE]: writeConceptsOutput,
+  [PREP_META_JOB_TYPE]: writePrepMetaOutput,
+  [QUESTION_JOB_TYPE]: writeQuestionOutput,
 }
 
-/**
- * Persists the `concepts` job's output: creates one `Concept` row per merged concept and
- * records each LLM call's cost against the job. No ownership check — same precedent as
- * `recordOcrOutcome`.
- */
-export async function recordConceptsOutcome(jobId: string, concepts: Concept[], metas: AgentMeta[]): Promise<void> {
-  await prisma.$transaction([
-    prisma.concept.createMany({ data: concepts.map(c => ({ ...c, producedByJobId: jobId })) }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
-  ])
+/** Writes an outcome's domain rows and `GenerationMeta` rows (wasted ones flagged) for `job`. */
+async function writeDomainRows(tx: Prisma.TransactionClient, job: JobWithInputs, outcome: JobOutcome<unknown>): Promise<void> {
+  if (outcome.status === "executed") {
+    const write = DOMAIN_WRITERS[job.type]
+    if (!write) throw new Error(`Job ${job.id} has unknown type "${job.type}"`)
+    await write(tx, job, outcome.output as never)
+    await tx.generationMeta.createMany({ data: outcome.metas.map(meta => toGenerationMeta(job.id, meta)) })
+  }
+  await tx.generationMeta.createMany({ data: outcome.wastedMetas.map(meta => toGenerationMeta(job.id, meta, true)) })
 }
 
-export interface PrepMetaResult {
-  title: string
-  description: string
-  grade: number | null
-  discipline: PrepDiscipline | null
+/** Writes the OCR text/visual elements straight onto the target `PrepImage` row (ADR point 6, no staging). */
+function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrResult) {
+  const result: OcrResult = { text: output.text, visual_elements: output.visual_elements }
+  return tx.prepImage.update({
+    where: { id: job.inputs[0].entityId },
+    data: { ocrResult: result as unknown as Prisma.InputJsonValue, producedByJobId: job.id },
+  })
 }
 
-/**
- * Persists the `prep.meta` job's output: writes title/description/grade/discipline straight
- * onto the target `Prep` row (resolved through the input concept's `producedByJob`) and
- * records each LLM call's cost against the job. No ownership check — same precedent as
- * `recordOcrOutcome`.
- */
-export async function recordPrepMetaOutcome(jobId: string, conceptId: string, result: PrepMetaResult, metas: AgentMeta[]): Promise<void> {
-  const concept = await prisma.concept.findUnique({
+/** Creates one `Concept` row per merged concept. */
+function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: Concept[]) {
+  return tx.concept.createMany({ data: output.map(c => ({ ...c, producedByJobId: job.id })) })
+}
+
+/** Writes title/description/grade/discipline onto the `Prep` row, resolved through the input concept's `producedByJob`. */
+async function writePrepMetaOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: PrepMetaOutput) {
+  const conceptId = job.inputs[0].entityId
+  const concept = await tx.concept.findUnique({
     where: { id: conceptId },
     select: { producedByJob: { select: { prepId: true } } },
   })
   if (!concept) throw new NotFoundError(`Concept ${conceptId} not found`)
-  const { prepId } = concept.producedByJob
-
-  await prisma.$transaction([
-    prisma.prep.update({ where: { id: prepId }, data: result }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
-  ])
+  return tx.prep.update({ where: { id: concept.producedByJob.prepId }, data: output })
 }
 
-/**
- * Records LLM calls whose output didn't become the job's result (`wasted: true`) — called as
- * each attempt is rejected or errors, so a later failure can't leave them unrecorded. No
- * ownership check — same precedent as `recordOcrOutcome`.
- */
-export async function recordWastedCalls(jobId: string, metas: AgentMeta[]): Promise<void> {
-  await prisma.generationMeta.createMany({ data: metas.map(meta => toGenerationMeta(jobId, meta, true)) })
-}
-
-/**
- * Persists the `question` job's output: creates the `Question` row and records the passing
- * attempt's build+review calls against the job. No ownership check — same precedent as
- * `recordOcrOutcome`.
- */
-export async function recordQuestionOutcome(
-  jobId: string,
-  question: { type: string; difficulty: Difficulty; content: Prisma.InputJsonValue },
-  metas: AgentMeta[],
-): Promise<void> {
-  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { prepId: true } })
-  if (!job) throw new NotFoundError(`Job ${jobId} not found`)
-
-  await prisma.$transaction([
-    prisma.question.create({ data: { ...question, prepId: job.prepId, producedByJobId: jobId } }),
-    ...metas.map(meta => prisma.generationMeta.create({ data: toGenerationMeta(jobId, meta) })),
-  ])
+/** Creates the `Question` row, typed by the job's `questionType`/`difficulty`. */
+function writeQuestionOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: GeneratedQuestion) {
+  if (job.questionType === null || job.difficulty === null) throw new Error(`Job ${job.id} has no questionType/difficulty`)
+  return tx.question.create({
+    data: {
+      type: job.questionType,
+      difficulty: difficultySchema.parse(job.difficulty),
+      content: output as unknown as Prisma.InputJsonValue,
+      prepId: job.prepId,
+      producedByJobId: job.id,
+    },
+  })
 }
