@@ -163,9 +163,9 @@ function createRunner(options: GenerationParams): Runner {
       return {
         type: definition.type,
         async run(ctx) {
-          const output = await definition.run(ctx)
+          const result = await definition.run(ctx)
           progress.report({ done: done + 1, total })
-          return output
+          return result
         },
       }
     },

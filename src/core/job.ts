@@ -3,6 +3,8 @@
  * `src/core/` — this module must stay usable from a browser worker, a server, or a CLI.
  */
 
+import type { AgentMeta } from "@/lib/agent"
+
 export type JobStatus = "created" | "executed" | "failed"
 
 /** Model, tier, timeout, and retry count for one job's execution — fully resolved by the
@@ -30,7 +32,16 @@ export type Job<TOutput = unknown> =
   | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: TOutput; failureReason: null }
   | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string }
 
-/** The result `runJob` commits to the `Store` once a job finishes running. */
+/** What a job's `run` returns: its output plus the LLM calls behind it. `wastedMetas` are
+ *  calls whose result was discarded (rejected attempts). */
+export interface JobRunResult<TOutput> {
+  output: TOutput
+  metas: AgentMeta[]
+  wastedMetas: AgentMeta[]
+}
+
+/** The result `runJob` commits to the `Store` once a job finishes running; the `Store`
+ *  persists the output's domain rows and the metas together with the status change. */
 export type JobOutcome<TOutput> =
-  | { status: "executed"; output: TOutput }
-  | { status: "failed"; failureReason: string }
+  | { status: "executed"; output: TOutput; metas: AgentMeta[]; wastedMetas: AgentMeta[] }
+  | { status: "failed"; failureReason: string; wastedMetas: AgentMeta[] }

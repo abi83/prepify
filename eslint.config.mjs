@@ -72,6 +72,32 @@ const config = [
     },
   },
   {
+    // Runtime-agnostic code: runs in a browser worker, a server, or a CLI.
+    files: [
+      "src/core/**/*.ts",
+      "src/lib/agent.ts",
+      "src/lib/agents/**/*.ts",
+      "src/lib/jobs/*Job.ts",
+      "src/lib/jobs/execution.ts",
+      "src/lib/jobs/jobTypes.ts",
+    ],
+    ignores: [ "**/__tests__/**" ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: [ "next", "next/*" ], message: "Runtime-agnostic code must not depend on Next." },
+            { group: [ "@prisma/client", "@prisma/client/*" ], message: "Runtime-agnostic code must not depend on Prisma." },
+            { group: [ "@/repositories", "@/repositories/*" ], message: "Runtime-agnostic code must persist through the Store." },
+            { group: [ "@/actions", "@/actions/*" ], message: "Runtime-agnostic code must persist through the Store." },
+            { group: [ "openai", "openai/*" ], message: "Runtime-agnostic code must call models through the Llm port." },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [ "**/*.ts", "**/*.tsx" ],
     rules: {
       "@typescript-eslint/ban-ts-comment": [

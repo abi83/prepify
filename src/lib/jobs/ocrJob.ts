@@ -1,4 +1,4 @@
-import * as jobActions from "@/actions/jobs"
+import type { JobRunResult } from "@/core/job"
 import type { AgentDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import type { AgentImage } from "@/lib/agent"
@@ -8,17 +8,14 @@ import { OCR_JOB_TYPE } from "./jobTypes"
 
 /**
  * One job per `PrepImage` row — `inputIds[0]` is that row's id. `images` must already be
- * fetched by the caller (signed-URL download, etc.); this only wraps `runOcrAgent` and the
- * write to the target row.
+ * fetched by the caller (signed-URL download, etc.); this only wraps `runOcrAgent`.
  */
 export function createOcrJobDefinition(images: AgentImage[], deps: AgentDeps): JobDefinition<OcrOutput> {
   return {
     type: OCR_JOB_TYPE,
-    async run(ctx: JobRunContext): Promise<OcrOutput> {
-      const [ imageId ] = ctx.job.inputIds
+    async run(ctx: JobRunContext): Promise<JobRunResult<OcrOutput>> {
       const { output, meta } = await runOcrAgent(images, ctx.job.config.model, ctx.job.config.tier, ctx.signal, deps)
-      await jobActions.recordOcrOutcome(ctx.job.id, imageId, { text: output.text, visual_elements: output.visual_elements }, meta)
-      return output
+      return { output, metas: [ meta ], wastedMetas: [] }
     },
   }
 }

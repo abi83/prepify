@@ -39,7 +39,7 @@ function fakeDeps(failType?: string) {
         if (job.type === "concepts") state.concepts = [ concept ]
         if (job.type === "prep.meta") state.prepMetaDone = true
         if (job.type === "question") state.questionCount++
-        return null
+        return { output: null, metas: [], wastedMetas: [] }
       },
     }),
   }

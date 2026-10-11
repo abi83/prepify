@@ -1,16 +1,8 @@
 "use server"
 
-import type { Prisma } from "@prisma/client"
-
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
-import type { AgentMeta } from "@/lib/agent"
 import { requireUserId } from "@/lib/currentUser"
-import { NotFoundError } from "@/repositories/errors"
 import * as jobRepository from "@/repositories/jobRepository"
-import type { PrepMetaResult } from "@/repositories/jobRepository"
-import type { Concept } from "@/types/pipeline"
-import type { OcrResult } from "@/types/prep"
-import type { Difficulty } from "@/types/questions"
 
 const store = jobRepository.createPrismaStore()
 
@@ -34,41 +26,4 @@ export async function commitJob(jobId: string, fromStatus: JobStatus, outcome: J
 
 export async function listUnfinishedJobs(prepId: string): Promise<Job[]> {
   return jobRepository.listUnfinishedJobs(await requireUserId(), prepId)
-}
-
-// ── Outcome writers called from a job's `run` ──
-
-/** The repository writers skip ownership checks (they run after `runJob` authorized the job), so a browser-callable action must make it. */
-async function assertOwnsJob(jobId: string): Promise<void> {
-  const job = await store.getJob(await requireUserId(), jobId)
-  if (!job) throw new NotFoundError(`Job ${jobId} not found`)
-}
-
-export async function recordOcrOutcome(jobId: string, imageId: string, result: OcrResult, meta: AgentMeta): Promise<void> {
-  await assertOwnsJob(jobId)
-  await jobRepository.recordOcrOutcome(jobId, imageId, result, meta)
-}
-
-export async function recordConceptsOutcome(jobId: string, concepts: Concept[], metas: AgentMeta[]): Promise<void> {
-  await assertOwnsJob(jobId)
-  await jobRepository.recordConceptsOutcome(jobId, concepts, metas)
-}
-
-export async function recordPrepMetaOutcome(jobId: string, conceptId: string, result: PrepMetaResult, metas: AgentMeta[]): Promise<void> {
-  await assertOwnsJob(jobId)
-  await jobRepository.recordPrepMetaOutcome(jobId, conceptId, result, metas)
-}
-
-export async function recordWastedCalls(jobId: string, metas: AgentMeta[]): Promise<void> {
-  await assertOwnsJob(jobId)
-  await jobRepository.recordWastedCalls(jobId, metas)
-}
-
-export async function recordQuestionOutcome(
-  jobId: string,
-  question: { type: string; difficulty: Difficulty; content: Prisma.InputJsonValue },
-  metas: AgentMeta[],
-): Promise<void> {
-  await assertOwnsJob(jobId)
-  await jobRepository.recordQuestionOutcome(jobId, question, metas)
 }

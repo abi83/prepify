@@ -39,7 +39,7 @@ vi.mock("@/actions/prepState", () => ({ loadMyPrepState: async () => h.state }))
 vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: async () => "https://example.test/img" }))
 
 function fakeDefinition(type: string, output: unknown) {
-  return () => ({ type, run: async () => { h.ran.push(type); return output } })
+  return () => ({ type, run: async () => { h.ran.push(type); return { output, metas: [], wastedMetas: [] } } })
 }
 vi.mock("../ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", { language: "de" }) }))
 vi.mock("../conceptsJob", () => ({ createConceptsJobDefinition: fakeDefinition("concepts", null) }))
