@@ -7,7 +7,7 @@ vi.mock("@/lib/currentUser", () => ({ requireUserId }))
 vi.mock("@/lib/env", () => ({ config: { SAMPLE_RATE: 0.25 } }))
 
 import { getSampleRate, recordSample } from "@/actions/samples"
-import type { AgentSample } from "@/lib/sampler/schema"
+import type { AgentSample } from "@/core/sampler"
 
 const SAMPLE: AgentSample = {
   executionId: "0b9f6f4e-5a1c-4d2e-8c3b-1a2b3c4d5e6f",

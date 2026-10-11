@@ -1,4 +1,4 @@
-import type { TraceContext } from "./types"
+import type { TraceContext } from "@/core/logger"
 
 // W3C traceparent: 00-{32-hex traceId}-{16-hex spanId}-{2-hex flags}
 export function parseTraceparent(header: string | null): TraceContext | null {

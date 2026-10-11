@@ -1,7 +1,7 @@
 import { getSampleRate, recordSample } from "@/actions/samples"
+import type { Sampler } from "@/core/sampler"
 
 import { createRateSampler } from "./rateSampler"
-import type { Sampler } from "./schema"
 
 let rate: Promise<number> | undefined
 

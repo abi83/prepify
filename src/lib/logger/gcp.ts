@@ -1,4 +1,4 @@
-import type { FormatArgs } from "./types"
+import type { FormatArgs } from "@/core/logger"
 
 const GCP_SEVERITY = { debug: "DEBUG", info: "INFO", warn: "WARNING", error: "ERROR" } as const
 

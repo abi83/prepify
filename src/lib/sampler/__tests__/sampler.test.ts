@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
 
+import { agentSampleSchema, type AgentSample } from "@/core/sampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { createRateSampler } from "@/lib/sampler/rateSampler"
-import { agentSampleSchema, type AgentSample } from "@/lib/sampler/schema"
 
 const SAMPLE: AgentSample = {
   executionId: "0b9f6f4e-5a1c-4d2e-8c3b-1a2b3c4d5e6f",

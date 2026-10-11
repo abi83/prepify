@@ -1,4 +1,4 @@
-import type { Sampler } from "./schema"
+import type { Sampler } from "@/core/sampler"
 
 export const noopSampler: Sampler = {
   record: async () => {},
