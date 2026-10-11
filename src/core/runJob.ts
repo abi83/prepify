@@ -1,4 +1,4 @@
-import type { ExecutionConfig, JobOutcome } from "./job"
+import type { ExecutionConfig, JobOutcome, QuestionSpec } from "./job"
 import type { Llm, ProgressSink, Store } from "./ports"
 
 export class JobNotFoundError extends Error {
@@ -24,6 +24,7 @@ export interface JobContext {
   type: string
   inputIds: string[]
   config: ExecutionConfig
+  question: QuestionSpec | null
 }
 
 export interface JobRunContext {
@@ -91,7 +92,7 @@ export async function runJob<TOutput>(
   if (missingIds.length > 0) throw new MissingDependencyError(jobId, missingIds)
 
   const context: JobRunContext = {
-    job: { id: job.id, type: job.type, inputIds: job.inputIds, config: job.config },
+    job: { id: job.id, type: job.type, inputIds: job.inputIds, config: job.config, question: job.question },
     actorId,
     apiKey,
     store,

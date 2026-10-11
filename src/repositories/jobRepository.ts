@@ -1,12 +1,13 @@
 import { Prisma, type Job as JobRow, type PrepDiscipline } from "@prisma/client"
 
-import type { ExecutionConfig, Job, JobOutcome, JobStatus } from "@/core/job"
+import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import type { Store } from "@/core/ports"
 import type { AgentMeta } from "@/lib/agent"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
 import type { Concept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
+import type { Difficulty } from "@/types/questions"
 
 import { ForbiddenError, NotFoundError } from "./errors"
 
@@ -65,11 +66,19 @@ async function assertOwnsJob(actorId: string, jobId: string): Promise<JobRow & {
 /** Maps a `Job` row to the core discriminated union, failing fast on a row shape the writers
  *  below can't produce (output/failureReason set for the wrong status). */
 function toJob<TOutput>(row: JobRow & { inputs: { entityId: string }[] }): Job<TOutput> {
+  if ((row.questionType === null) !== (row.difficulty === null)) {
+    throw new Error(`Job ${row.id} has only one of questionType/difficulty`)
+  }
+  const question = row.questionType !== null && row.difficulty !== null
+    ? { questionType: row.questionType, difficulty: row.difficulty }
+    : null
+
   const base = {
     id: row.id,
     type: row.type,
     inputIds: row.inputs.map(i => i.entityId),
     config: { model: row.model, tier: row.tier, timeoutMs: row.timeoutMs, maxRetries: row.maxRetries } satisfies ExecutionConfig,
+    question,
   }
 
   if (row.status === "executed") {
@@ -96,6 +105,7 @@ export function createPrismaStore(): Store {
       type: string,
       inputIds: string[],
       config: ExecutionConfig,
+      question?: QuestionSpec,
     ): Promise<Job<TOutput>> {
       const inputs = await assertOwnsInputs(actorId, inputIds)
       const row = await prisma.job.create({
@@ -106,6 +116,8 @@ export function createPrismaStore(): Store {
           tier: config.tier,
           timeoutMs: config.timeoutMs,
           maxRetries: config.maxRetries,
+          questionType: question?.questionType ?? null,
+          difficulty: question?.difficulty ?? null,
           createdBy: actorId,
           inputs: { create: inputs.map(({ entityType, entityId }) => ({ entityType, entityId })) },
         },
@@ -206,5 +218,39 @@ export async function recordPrepMetaOutcome(jobId: string, conceptId: string, re
   await prisma.$transaction([
     prisma.prep.update({ where: { id: prepId }, data: result }),
     ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", prepId, meta), jobId } })),
+  ])
+}
+
+/**
+ * Records LLM calls whose output didn't become the job's result (`wasted: true`) — called as
+ * each attempt is rejected or errors, so a later failure can't leave them unrecorded. Linked
+ * by `jobId`; the owning Prep is read off the job row. No ownership check — same precedent as
+ * `recordOcrOutcome`.
+ */
+export async function recordWastedCalls(jobId: string, metas: AgentMeta[]): Promise<void> {
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { prepId: true } })
+  if (!job) throw new NotFoundError(`Job ${jobId} not found`)
+
+  await prisma.generationMeta.createMany({
+    data: metas.map(meta => ({ ...toGenerationMeta("prep", job.prepId, meta, true), jobId })),
+  })
+}
+
+/**
+ * Persists the `question` job's output: creates the `Question` row and records the passing
+ * attempt's build+review calls against the job. No ownership check — same precedent as
+ * `recordOcrOutcome`.
+ */
+export async function recordQuestionOutcome(
+  jobId: string,
+  question: { type: string; difficulty: Difficulty; content: Prisma.InputJsonValue },
+  metas: AgentMeta[],
+): Promise<void> {
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { prepId: true } })
+  if (!job) throw new NotFoundError(`Job ${jobId} not found`)
+
+  await prisma.$transaction([
+    prisma.question.create({ data: { ...question, prepId: job.prepId, producedByJobId: jobId } }),
+    ...metas.map(meta => prisma.generationMeta.create({ data: { ...toGenerationMeta("prep", job.prepId, meta), jobId } })),
   ])
 }

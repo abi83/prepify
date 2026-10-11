@@ -9,7 +9,7 @@ import type { Sampler } from "@/lib/sampler/schema"
 import * as jobRepository from "@/repositories/jobRepository"
 import type { Concept } from "@/types/pipeline"
 
-export const PREP_META_JOB_TYPE = "prep.meta"
+import { PREP_META_JOB_TYPE } from "./jobTypes"
 
 export interface PrepMetaOutput {
   title: string

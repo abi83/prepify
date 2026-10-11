@@ -1,4 +1,4 @@
-import type { ExecutionConfig, Job, JobOutcome, JobStatus } from "./job"
+import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Store } from "./ports"
 
 function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
@@ -17,13 +17,14 @@ export function createInMemoryStore(): Store {
   let nextId = 0
 
   return {
-    async createJob<TOutput>(_actorId: string, type: string, inputIds: string[], config: ExecutionConfig): Promise<Job<TOutput>> {
+    async createJob<TOutput>(_actorId: string, type: string, inputIds: string[], config: ExecutionConfig, question?: QuestionSpec): Promise<Job<TOutput>> {
       const job: Job<TOutput> = {
         id: `job-${++nextId}`,
         type,
         status: "created",
         inputIds,
         config,
+        question: question ?? null,
         output: null,
         failureReason: null,
       }

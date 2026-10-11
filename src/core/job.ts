@@ -15,13 +15,20 @@ export interface ExecutionConfig {
   maxRetries: number
 }
 
+/** What a `question` job builds — a task's type/difficulty aren't entities, so they can't be
+ *  `inputIds`. Null on every other job type. */
+export interface QuestionSpec {
+  questionType: string
+  difficulty: string
+}
+
 /** `created` is re-executable; `failed` is re-executable (retry); `executed` is terminal.
  *  A discriminated union so only `executed` carries `output` and only `failed` carries
  *  `failureReason` — no reachable state where either is present on the wrong status. */
 export type Job<TOutput = unknown> =
-  | { id: string; type: string; status: "created"; inputIds: string[]; config: ExecutionConfig; output: null; failureReason: null }
-  | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; output: TOutput; failureReason: null }
-  | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; output: null; failureReason: string }
+  | { id: string; type: string; status: "created"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: null }
+  | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: TOutput; failureReason: null }
+  | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string }
 
 /** The result `runJob` commits to the `Store` once a job finishes running. */
 export type JobOutcome<TOutput> =
