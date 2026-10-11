@@ -1,7 +1,7 @@
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Store } from "./ports"
 
-function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
+export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
   return outcome.status === "executed"
     ? { ...job, status: "executed", output: outcome.output, failureReason: null }
     : { ...job, status: "failed", output: null, failureReason: outcome.failureReason }
