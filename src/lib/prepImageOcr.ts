@@ -2,6 +2,7 @@ import { failPrepImage, finishPrepImage, startProcessingPrepImage } from "@/acti
 import { getReadSignedUrl } from "@/actions/uploads"
 import { runOcrAgent } from "@/lib/agents/OcrAgent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { OcrResult } from "@/types/prep"
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -25,9 +26,10 @@ async function runOcrForFile(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<OcrFileResult> {
   const base64 = await blobToBase64(blob)
-  const { output } = await runOcrAgent([ { base64, mimeType } ], apiKey, model, tier, signal, logger)
+  const { output } = await runOcrAgent([ { base64, mimeType } ], apiKey, model, tier, signal, logger, sampler)
   return { text: output.text, visual_elements: output.visual_elements, language: output.language }
 }
 
@@ -55,8 +57,9 @@ export async function ocrImageFile(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<OcrFileResult | null> {
-  return withOcrStatusUpdates(imageId, () => runOcrForFile(file, file.type, apiKey, model, tier, signal, logger))
+  return withOcrStatusUpdates(imageId, () => runOcrForFile(file, file.type, apiKey, model, tier, signal, logger, sampler))
 }
 
 /** Retries OCR for a single `prep_images` row — e.g. one that previously failed. Re-fetches the
@@ -69,10 +72,11 @@ export async function retryPrepImage(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<OcrFileResult | null> {
   return withOcrStatusUpdates(image.id, async () => {
     const signedUrl = await getReadSignedUrl(prepId, image.gcsKey)
     const blob = await fetch(signedUrl, { signal }).then(r => r.blob())
-    return runOcrForFile(blob, blob.type, apiKey, model, tier, signal, logger)
+    return runOcrForFile(blob, blob.type, apiKey, model, tier, signal, logger, sampler)
   })
 }

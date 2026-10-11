@@ -17,6 +17,7 @@ import { runJob } from "@/core/runJob"
 import { createConceptsJobDefinition } from "@/lib/jobs/conceptsJob"
 import { consoleLogger } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
+import { noopSampler } from "@/lib/sampler/noopSampler"
 import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
@@ -60,7 +61,7 @@ describe("concepts job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "concepts", [ image.id ], CONFIG)
 
-    const definition = createConceptsJobDefinition([], "en", consoleLogger)
+    const definition = createConceptsJobDefinition([], "en", consoleLogger, noopSampler)
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

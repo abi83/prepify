@@ -3,6 +3,7 @@ import type { Question } from "@prisma/client"
 import { insertAsset } from "@/actions/assets"
 import { recordGenerationMeta } from "@/actions/generationMeta"
 import { incrementPrepTokens } from "@/actions/preps"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { AssetHint } from "@/types/questions"
 
 import { routeAsset, type ActiveAssetHint } from "./agents/assets/assetRouter"
@@ -27,6 +28,7 @@ export async function generateAndSaveAssets(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<void> {
   const pending = questions
     .map(q => ({ q, hint: extractAssetHint(q) }))
@@ -39,7 +41,7 @@ export async function generateAndSaveAssets(
   await Promise.allSettled(
     pending.map(async ({ q, hint }) => {
       try {
-        const result = await routeAsset(hint, apiKey, model, tier, signal, logger)
+        const result = await routeAsset(hint, apiKey, model, tier, signal, logger, sampler)
         if (!result.output.blob) return
 
         await insertAsset(q.id, result.output.type, result.output.blob)

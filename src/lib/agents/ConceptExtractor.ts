@@ -1,6 +1,7 @@
 import { runAgent, AgentMeta, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
 import { CHUNK_SIZE } from "@/lib/config"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import { conceptsResponseSchema } from "@/types/pipeline"
 import type { Concept } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
@@ -96,6 +97,7 @@ export async function runConceptExtractor(
   language: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<ConceptExtractorResult> {
   const chunks = chunkPages(pages, CHUNK_SIZE)
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
@@ -115,6 +117,7 @@ export async function runConceptExtractor(
       tier,
       signal,
       logger,
+      sampler,
     })
     const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
     allConcepts.push(...filtered)

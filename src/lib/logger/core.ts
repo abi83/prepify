@@ -4,7 +4,7 @@ import path from "path"
 import { formatGcp } from "./gcp"
 import type { FormatArgs, LogFields, LogLevel, Logger, TraceContext } from "./types"
 
-const APP_VERSION = (() => {
+export const APP_VERSION = (() => {
   try {
     return readFileSync(path.join(process.cwd(), "version.txt"), "utf-8").trim()
   } catch {

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
+vi.mock("@/actions/samples", () => ({ getSampleRate: vi.fn(), recordSample: vi.fn() }))
 vi.mock("@/actions/preps", () => ({
   updatePrep: vi.fn().mockResolvedValue({}),
 }))

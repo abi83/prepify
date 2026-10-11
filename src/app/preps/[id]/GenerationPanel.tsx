@@ -19,6 +19,7 @@ import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { consoleLogger } from "@/lib/logger"
 import { runPipeline, TextTooLongError } from "@/lib/pipeline"
+import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 import type { PartialRunSummary } from "@/repositories/pipelineRepository"
 import type { PipelineProgressEvent } from "@/types/pipeline"
@@ -105,6 +106,7 @@ export default function GenerationPanel({
         difficultyMix: localConfig.difficultyMix,
         signal: abortRef.current.signal,
         logger: consoleLogger,
+        sampler: clientSampler,
         onProgress: (event) => {
           setPipelineProgress(event)
           if (event.stage === "crafting") setCraftProgress({ done: event.done, total: event.total })
@@ -127,7 +129,7 @@ export default function GenerationPanel({
       )
 
       if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger)
+        void generateAndSaveAssets(savedQuestions, prepId, keyConfig.key, keyConfig.model, keyConfig.tier, abortRef.current.signal, consoleLogger, clientSampler)
       }
 
       const freshPrep = await getMyPrep(prepId)

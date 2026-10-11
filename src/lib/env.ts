@@ -9,6 +9,8 @@ const envSchema = z.object({
   AUTH_GOOGLE_CLIENT_ID: z.string().min(1),
   AUTH_GOOGLE_CLIENT_SECRET: z.string().min(1),
   GCS_BUCKET_NAME: z.string().min(1),
+  SAMPLES_BUCKET_NAME: z.string().min(1),
+  SAMPLE_RATE: z.coerce.number().min(0).max(1),
 })
 
 class Config {
@@ -31,6 +33,8 @@ class Config {
   get AUTH_GOOGLE_CLIENT_ID() { return this.data.AUTH_GOOGLE_CLIENT_ID }
   get AUTH_GOOGLE_CLIENT_SECRET() { return this.data.AUTH_GOOGLE_CLIENT_SECRET }
   get GCS_BUCKET_NAME() { return this.data.GCS_BUCKET_NAME }
+  get SAMPLES_BUCKET_NAME() { return this.data.SAMPLES_BUCKET_NAME }
+  get SAMPLE_RATE() { return this.data.SAMPLE_RATE }
 }
 
 export const config = new Config()

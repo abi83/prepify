@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import type { QuestionTask } from "@/types/pipeline"
 import { sortingContentSchema } from "@/types/questions"
 import type { SortingContent } from "@/types/questions"
@@ -61,6 +62,7 @@ export async function runSortingBuilder(
   signal: AbortSignal,
   rewrite: RewriteInput | undefined,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<{ type: "sorting"; content: SortingContent }>> {
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
@@ -73,6 +75,7 @@ export async function runSortingBuilder(
     tier,
     signal,
     logger,
+    sampler,
   })
   return { output: { type: "sorting", content: result.output.content }, meta: result.meta }
 }

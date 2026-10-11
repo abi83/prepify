@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { runAgent, AgentResult } from "@/lib/agent"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 
 const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
@@ -42,6 +43,7 @@ export async function runDiagramAgent(
   tier: string,
   signal: AbortSignal,
   logger: Logger,
+  sampler: Sampler,
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "DiagramAgent",
@@ -53,6 +55,7 @@ export async function runDiagramAgent(
     tier,
     signal,
     logger,
+    sampler,
   })
 
   const blob = buildDiagramBlob(result.output.dsl)

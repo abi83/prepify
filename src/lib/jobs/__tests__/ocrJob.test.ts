@@ -14,6 +14,7 @@ import { runJob } from "@/core/runJob"
 import { createOcrJobDefinition } from "@/lib/jobs/ocrJob"
 import { consoleLogger } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
+import { noopSampler } from "@/lib/sampler/noopSampler"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
@@ -46,7 +47,7 @@ describe("ocr job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
 
-    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], consoleLogger)
+    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], consoleLogger, noopSampler)
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

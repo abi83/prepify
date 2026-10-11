@@ -18,6 +18,9 @@ vi.mock("openai", async importOriginal => {
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
 import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
 import { consoleLogger } from "@/lib/logger"
+import { noopSampler } from "@/lib/sampler/noopSampler"
+import { hashPrompt } from "@/lib/sampler/promptHash"
+import type { Sampler } from "@/lib/sampler/schema"
 
 describe("sanitizeLLMText", () => {
   it("passes through clean text unchanged", () => {
@@ -58,7 +61,7 @@ describe("runAgent", () => {
     })
   })
 
-  async function run(name: string) {
+  async function run(name: string, sampler: Sampler = noopSampler) {
     return runAgent({
       name,
       systemPrompt: "system",
@@ -67,6 +70,7 @@ describe("runAgent", () => {
       apiKey: "key",
       signal: new AbortController().signal,
       logger: consoleLogger,
+      sampler,
     })
   }
 
@@ -83,5 +87,25 @@ describe("runAgent", () => {
   it("falls back to the default timeout for an agent name not in the lookup", async () => {
     await run("SomeUnlistedAgent")
     expect(constructorMock).toHaveBeenCalledWith(expect.objectContaining({ timeout: DEFAULT_AGENT_TIMEOUT_MS }))
+  })
+
+  describe("sampling", () => {
+    it("records the full execution with a sha-256 prompt hash", async () => {
+      const record = vi.fn().mockResolvedValue(undefined)
+      await run("SomeAgent", { record })
+      await vi.waitFor(() => expect(record).toHaveBeenCalledOnce())
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({
+        agent: "SomeAgent",
+        systemPrompt: "system",
+        promptHash: await hashPrompt("system"),
+        input: { textContent: "hello", images: [] },
+        output: { answer: "ok" },
+      }))
+    })
+
+    it("does not fail the run when the sample write fails", async () => {
+      const record = vi.fn().mockRejectedValue(new Error("gcs down"))
+      await expect(run("SomeAgent", { record })).resolves.toMatchObject({ output: { answer: "ok" } })
+    })
   })
 })

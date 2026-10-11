@@ -5,6 +5,7 @@ import { runPrepLabeler } from "@/lib/agents/PrepLabeler"
 import { runPrepNamer } from "@/lib/agents/PrepNamer"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
 import type { Logger } from "@/lib/logger"
+import type { Sampler } from "@/lib/sampler/schema"
 import * as jobRepository from "@/repositories/jobRepository"
 import type { Concept } from "@/types/pipeline"
 
@@ -23,7 +24,7 @@ export interface PrepMetaOutput {
  * `pipeline.ts`/`ShareModal.tsx` already call) and writes title/description/grade/discipline
  * onto the target `Prep` row (resolved through the input concepts' `producedByJob`).
  */
-export function createPrepMetaJobDefinition(concepts: Concept[], language: string, logger: Logger): JobDefinition<PrepMetaOutput> {
+export function createPrepMetaJobDefinition(concepts: Concept[], language: string, logger: Logger, sampler: Sampler): JobDefinition<PrepMetaOutput> {
   return {
     type: PREP_META_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<PrepMetaOutput> {
@@ -31,8 +32,8 @@ export function createPrepMetaJobDefinition(concepts: Concept[], language: strin
       const [ conceptId ] = ctx.job.inputIds
 
       const [ named, labeled ] = await Promise.all([
-        runPrepNamer(concepts, ctx.apiKey, model, tier, language, ctx.signal, logger),
-        runPrepLabeler(concepts, ctx.apiKey, model, tier, ctx.signal, logger),
+        runPrepNamer(concepts, ctx.apiKey, model, tier, language, ctx.signal, logger, sampler),
+        runPrepLabeler(concepts, ctx.apiKey, model, tier, ctx.signal, logger, sampler),
       ])
 
       const output: PrepMetaOutput = {

@@ -6,6 +6,7 @@ import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { consoleLogger } from "@/lib/logger"
 import type { OcrFileResult } from "@/lib/prepImageOcr"
 import { ocrImageFile } from "@/lib/prepImageOcr"
+import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 
 import { FilePicker, type RecogniseArgs } from "./FilePicker"
@@ -42,7 +43,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
       files.map(async (file, i) => {
         const image = images[i]
         if (!image) return null
-        const result = await ocrImageFile(file, image.id, config.key, config.model, config.tier, abortRef.current!.signal, consoleLogger)
+        const result = await ocrImageFile(file, image.id, config.key, config.model, config.tier, abortRef.current!.signal, consoleLogger, clientSampler)
         setOcrProgress(p => ({ ...p, done: p.done + 1 }))
         return result
       })
