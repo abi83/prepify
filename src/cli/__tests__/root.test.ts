@@ -4,11 +4,11 @@ import path from "path"
 
 import { describe, expect, it } from "vitest"
 
+import { resolveCliConfig } from "@/cli/config"
 import { createFilePrep } from "@/cli/filePrep"
 import { runCli } from "@/cli/root"
 import type { Job } from "@/core/job"
 import type { Llm, LlmRequest } from "@/core/ports"
-import { DEFAULT_GEN_CONFIG } from "@/lib/generationConfig"
 
 const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
 
@@ -49,11 +49,9 @@ async function makePrepFixture(): Promise<string> {
 
 const options = (prepDir: string, llm: Llm) => ({
   prepDir,
-  model: "local-model",
-  tier: "default",
   apiKey: "unused",
   llm,
-  target: { ...DEFAULT_GEN_CONFIG, questionCount: 1, enabledTypes: [ "flashcard" as const ] },
+  config: resolveCliConfig({ llm: { model: "local-model" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } }),
 })
 
 describe("CLI root", () => {
