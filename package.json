@@ -7,6 +7,7 @@
     "dev": "scripts/with-secrets.sh next dev",
     "build": "next build",
     "start": "next start",
+    "cli": "tsx src/cli/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -67,8 +68,10 @@
     "jsdom": "29.1.1",
     "pglite-prisma-adapter": "0.7.2",
     "prisma": "7.9.1",
+    "tsx": "4.23.15",
     "typescript": "5.6.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "yaml": "2.9.1"
   },
   "overrides": {
     "undici": "7.29.1",

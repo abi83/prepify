@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import { runGeneration, runOcr, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
+import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, runGeneration, runOcr, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
 import type { PrepState } from "@/lib/planner"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -21,7 +21,7 @@ vi.mock("../ocrJob", () => ({
 
 function params(): Omit<GenerationParams, "language" | "maxChars"> {
   return {
-    actorId: "u1", prepId: "p1", apiKey: "sk", model: "m", tier: "flex", target: TARGET,
+    actorId: "u1", prepId: "p1", apiKey: "sk", config: { model: "m", tier: "flex", ...DEFAULT_JOB_SETTINGS }, concurrency: DEFAULT_CONCURRENCY, target: TARGET,
     signal: new AbortController().signal,
     onProgress: () => {},
   }

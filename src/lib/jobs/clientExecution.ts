@@ -19,9 +19,15 @@ const actionStore: Store = {
   commitJob: (_actorId, jobId, fromStatus, outcome) => jobActions.commitJob(jobId, fromStatus, outcome),
 }
 
-export interface GenerationParams extends generation.GenerationParams {
+export interface GenerationParams extends Omit<generation.GenerationParams, "config" | "concurrency"> {
+  model: string
+  tier: string
   logger: Logger
   sampler: Sampler
+}
+
+function runnerOptions<T extends Pick<GenerationParams, "model" | "tier">>(options: T) {
+  return { ...options, config: { model: options.model, tier: options.tier, ...generation.DEFAULT_JOB_SETTINGS }, concurrency: generation.DEFAULT_CONCURRENCY }
 }
 
 /** Browser composition root: server-action persistence and data, the BYOK key for the model. */
@@ -37,9 +43,9 @@ function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKe
 }
 
 export function runOcr(options: Omit<GenerationParams, "language" | "maxChars">): Promise<string | null> {
-  return generation.runOcr(browserPorts(options), options)
+  return generation.runOcr(browserPorts(options), runnerOptions(options))
 }
 
 export function runGeneration(options: GenerationParams): Promise<void> {
-  return generation.runGeneration(browserPorts(options), options)
+  return generation.runGeneration(browserPorts(options), runnerOptions(options))
 }

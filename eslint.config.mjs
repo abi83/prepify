@@ -74,6 +74,7 @@ const config = [
   {
     // Runtime-agnostic code: runs in a browser worker, a server, or a CLI.
     files: [
+      "src/cli/**/*.ts",
       "src/core/**/*.ts",
       "src/lib/agent.ts",
       "src/lib/agents/**/*.ts",

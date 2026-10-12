@@ -19,9 +19,9 @@ export type GenerationProgress =
   | { stage: "done" }
 
 /** Legacy parity: one build, plus one reviewed rewrite on rejection. */
-const DEFAULT_JOB_CONFIG = { timeoutMs: DEFAULT_AGENT_TIMEOUT_MS, maxRetries: 1 }
+export const DEFAULT_JOB_SETTINGS = { timeoutMs: DEFAULT_AGENT_TIMEOUT_MS, maxRetries: 1 }
 
-const CONCURRENCY = 5
+export const DEFAULT_CONCURRENCY = 5
 
 const STAGE_BY_JOB_TYPE: Record<string, GenerationStage> = {
   [OCR_JOB_TYPE]: "ocr",
@@ -100,8 +100,9 @@ export interface RunnerPorts extends Omit<Ports, "progress"> {
 export interface GenerationParams extends DefinitionOptions {
   actorId: string
   apiKey: string
-  model: string
-  tier: string
+  /** Stored on every job this run creates; unfinished jobs keep the config they were created with. */
+  config: ExecutionConfig
+  concurrency: number
   target: PlanTarget
   signal: AbortSignal
   onProgress: (progress: GenerationProgress) => void
@@ -116,7 +117,6 @@ interface Runner {
 
 /** Wires the planner/runner to `ports`, with stage progress emitted through a `ProgressSink`. */
 function createRunner(ports: RunnerPorts, options: GenerationParams): Runner {
-  const config: ExecutionConfig = { model: options.model, tier: options.tier, ...DEFAULT_JOB_CONFIG }
   let stage: GenerationStage = "ocr"
   let done = 0
   let total = 0
@@ -162,9 +162,9 @@ function createRunner(ports: RunnerPorts, options: GenerationParams): Runner {
     prepId: options.prepId,
     apiKey: options.apiKey,
     signal: options.signal,
-    config,
+    config: options.config,
     target: options.target,
-    concurrency: CONCURRENCY,
+    concurrency: options.concurrency,
   }
   return { deps, params, startStage, listUnfinishedJobs: ports.listUnfinishedJobs }
 }
