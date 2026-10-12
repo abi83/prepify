@@ -3,7 +3,6 @@ import { z, ZodSchema } from "zod"
 import { NonRetryableLlmError, type AgentDeps, type LlmContentPart } from "@/core/ports"
 import type { AgentMeta, Sampler } from "@/core/sampler"
 
-import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "./config"
 import { serializeError } from "./logger"
 import { computeCost } from "./pricing"
 import { hashPrompt } from "./sampler/promptHash"
@@ -78,6 +77,11 @@ function backoffMs(attempt: number): number {
   return Math.round(base * jitter)
 }
 
+function describeFailure(err: unknown, timeoutMs: number): string {
+  if (err instanceof Error && /timed out/i.test(err.message)) return `timed out after ${timeoutMs / 1000}s`
+  return err instanceof Error ? err.message : String(err)
+}
+
 async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, output: T, meta: AgentMeta): Promise<void> {
   await sampler.record({
     executionId: crypto.randomUUID(),
@@ -93,9 +97,7 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, outp
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
   const { name, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", signal, deps } = config
-  const { llm, logger, sampler } = deps
-
-  const timeoutMs = AGENT_TIMEOUT_MS[name] ?? DEFAULT_AGENT_TIMEOUT_MS
+  const { llm, logger, sampler, timeoutMs } = deps
 
   let lastError: unknown
 
@@ -148,15 +150,18 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
 
       return { output: validated, meta }
     } catch (err) {
+      const elapsedMs = Math.round(performance.now() - t0)
+      const retryable = !(err instanceof NonRetryableLlmError || (err instanceof Error && err.name === "AbortError"))
+      logger.warn(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} failed${retryable ? "" : " (not retryable)"}`, {
+        model, tier, attempt, timeoutMs, elapsedMs, error: serializeError(err),
+      })
       lastError = err
-      if (err instanceof NonRetryableLlmError || (err instanceof Error && err.name === "AbortError")) {
-        throw err
-      }
+      if (!retryable) throw err
       if (attempt < MAX_ATTEMPTS) {
         await delay(backoffMs(attempt))
       }
     }
   }
 
-  throw lastError
+  throw new Error(`${name}: ${describeFailure(lastError, timeoutMs)} (attempt ${MAX_ATTEMPTS}/${MAX_ATTEMPTS})`)
 }

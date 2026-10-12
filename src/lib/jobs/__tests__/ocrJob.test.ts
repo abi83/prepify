@@ -57,6 +57,7 @@ describe("ocr job", () => {
     )
 
     expect(result).toMatchObject({ committed: true, status: "executed" })
+    expect(runOcrAgent.mock.calls[0][4]).toMatchObject({ timeoutMs: CONFIG.timeoutMs })
 
     const finishedJob = await store.getJob(OWNER, job.id)
     expect(finishedJob).toMatchObject({ status: "executed" })

@@ -1,7 +1,7 @@
 import type { ExecutionConfig, Job } from "@/core/job"
 import type { ListUnfinishedJobs, Ports, ProgressSink } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
-import { DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
+import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
 import { ocrResultSchema, type Page } from "@/types/prep"
 
@@ -19,7 +19,7 @@ export type GenerationProgress =
   | { stage: "done" }
 
 /** Legacy parity: one build, plus one reviewed rewrite on rejection. */
-export const DEFAULT_JOB_SETTINGS = { timeoutMs: DEFAULT_AGENT_TIMEOUT_MS, maxRetries: 1 }
+export const DEFAULT_JOB_SETTINGS = { timeoutMs: DEFAULT_TIMEOUT_MS, maxRetries: 1 }
 
 export const DEFAULT_CONCURRENCY = 5
 

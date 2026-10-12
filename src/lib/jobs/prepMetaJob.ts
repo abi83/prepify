@@ -1,5 +1,5 @@
 import type { JobRunResult } from "@/core/job"
-import type { AgentDeps } from "@/core/ports"
+import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runPrepLabeler } from "@/lib/agents/PrepLabeler"
 import { runPrepNamer } from "@/lib/agents/PrepNamer"
@@ -21,15 +21,16 @@ export interface PrepMetaOutput {
  * fetched by the caller; this wraps `PrepNamer` and `PrepLabeler` (the same agents
  * `ShareModal.tsx` calls).
  */
-export function createPrepMetaJobDefinition(concepts: Concept[], language: string, deps: AgentDeps): JobDefinition<PrepMetaOutput> {
+export function createPrepMetaJobDefinition(concepts: Concept[], language: string, deps: JobDeps): JobDefinition<PrepMetaOutput> {
   return {
     type: PREP_META_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<PrepMetaOutput>> {
-      const { model, tier } = ctx.job.config
+      const { model, tier, timeoutMs } = ctx.job.config
+      const agentDeps = { ...deps, timeoutMs }
 
       const [ named, labeled ] = await Promise.all([
-        runPrepNamer(concepts, model, tier, language, ctx.signal, deps),
-        runPrepLabeler(concepts, model, tier, ctx.signal, deps),
+        runPrepNamer(concepts, model, tier, language, ctx.signal, agentDeps),
+        runPrepLabeler(concepts, model, tier, ctx.signal, agentDeps),
       ])
 
       const output: PrepMetaOutput = {

@@ -1,5 +1,5 @@
 import type { JobRunResult } from "@/core/job"
-import type { AgentDeps } from "@/core/ports"
+import type { JobDeps } from "@/core/ports"
 import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
 import type { AgentMeta } from "@/lib/agent"
 import { BUILDERS } from "@/lib/agents/builders"
@@ -17,11 +17,12 @@ import { QUESTION_JOB_TYPE } from "./jobTypes"
  * errored attempt's calls travel as `wastedMetas` (on failure, inside a `JobRunError`), the
  * passing attempt's calls as `metas`. Exhausting the attempts fails the job.
  */
-export function createQuestionJobDefinition(concepts: Concept[], language: string, deps: AgentDeps): JobDefinition<GeneratedQuestion> {
+export function createQuestionJobDefinition(concepts: Concept[], language: string, deps: JobDeps): JobDefinition<GeneratedQuestion> {
   return {
     type: QUESTION_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<GeneratedQuestion>> {
-      const { model, tier, maxRetries } = ctx.job.config
+      const { model, tier, timeoutMs, maxRetries } = ctx.job.config
+      const agentDeps = { ...deps, timeoutMs }
       if (!ctx.job.question) throw new Error(`Job ${ctx.job.id} has no questionType/difficulty`)
       const task: QuestionTask = {
         concepts,
@@ -37,10 +38,10 @@ export function createQuestionJobDefinition(concepts: Concept[], language: strin
         let built: GeneratedQuestion
         let review: Awaited<ReturnType<typeof runQuestionReviewer>>
         try {
-          const build = await BUILDERS[task.type](task, model, tier, language, ctx.signal, rewrite, deps)
+          const build = await BUILDERS[task.type](task, model, tier, language, ctx.signal, rewrite, agentDeps)
           attemptMetas.push(build.meta)
           built = build.output
-          review = await runQuestionReviewer(built, task, model, tier, language, ctx.signal, deps)
+          review = await runQuestionReviewer(built, task, model, tier, language, ctx.signal, agentDeps)
           attemptMetas.push(review.meta)
         } catch (e) {
           throw new JobRunError([ ...wastedMetas, ...attemptMetas ], e)
