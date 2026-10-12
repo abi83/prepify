@@ -55,35 +55,35 @@ describe.each(Object.entries(factories))("Store contract: %s", (_name, makeStore
   it("commits an executed outcome from the expected status", async () => {
     const store = await makeStore()
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
-    expect(await store.commitJob(ACTOR, job.id, "created", { status: "executed", output: { text: "x" } })).toBe(true)
+    expect(await store.commitJob(ACTOR, job.id, "created", { status: "executed", output: { text: "x" }, metas: [], wastedMetas: [] })).toBe(true)
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "executed", output: { text: "x" }, failureReason: null })
   })
 
   it("commits a failed outcome from the expected status", async () => {
     const store = await makeStore()
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
-    expect(await store.commitJob(ACTOR, job.id, "created", { status: "failed", failureReason: "boom" })).toBe(true)
+    expect(await store.commitJob(ACTOR, job.id, "created", { status: "failed", failureReason: "boom", wastedMetas: [] })).toBe(true)
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "failed", output: null, failureReason: "boom" })
   })
 
   it("rejects a commit from the wrong status", async () => {
     const store = await makeStore()
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
-    expect(await store.commitJob(ACTOR, job.id, "failed", { status: "executed", output: 1 })).toBe(false)
+    expect(await store.commitJob(ACTOR, job.id, "failed", { status: "executed", output: 1, metas: [], wastedMetas: [] })).toBe(false)
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "created" })
   })
 
   it("rejects a commit for a missing job", async () => {
     const store = await makeStore()
-    expect(await store.commitJob(ACTOR, "missing", "created", { status: "executed", output: 1 })).toBe(false)
+    expect(await store.commitJob(ACTOR, "missing", "created", { status: "executed", output: 1, metas: [], wastedMetas: [] })).toBe(false)
   })
 
   it("lets exactly one of two commits from the same status win", async () => {
     const store = await makeStore()
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
     const results = await Promise.all([
-      store.commitJob(ACTOR, job.id, "created", { status: "executed", output: "first" }),
-      store.commitJob(ACTOR, job.id, "created", { status: "executed", output: "second" }),
+      store.commitJob(ACTOR, job.id, "created", { status: "executed", output: "first", metas: [], wastedMetas: [] }),
+      store.commitJob(ACTOR, job.id, "created", { status: "executed", output: "second", metas: [], wastedMetas: [] }),
     ])
     expect(results.filter(Boolean)).toHaveLength(1)
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ output: results[0] ? "first" : "second" })
