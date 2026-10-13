@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { toSchemaName } from "../openAiLlm"
+import { toSchemaName } from "@/lib/llm/openAiLlm"
 
 describe("toSchemaName", () => {
   it("replaces characters OpenAI rejects", () => {
