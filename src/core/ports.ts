@@ -109,5 +109,8 @@ export interface Ports {
   data: PrepData
 }
 
-/** What agents (and the job definitions that call them) depend on. */
-export type AgentDeps = Pick<Ports, "llm" | "logger" | "sampler">
+/** What job definitions depend on. */
+export type JobDeps = Pick<Ports, "llm" | "logger" | "sampler">
+
+/** What agents depend on: the job's deps plus its per-request timeout. */
+export type AgentDeps = JobDeps & { timeoutMs: number }

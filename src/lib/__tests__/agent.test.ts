@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
+import type { Logger } from "@/core/logger"
 import { NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
-import { AGENT_TIMEOUT_MS, DEFAULT_AGENT_TIMEOUT_MS } from "@/lib/config"
-import { consoleLogger } from "@/lib/logger"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 
@@ -39,11 +38,16 @@ describe("sanitizeLLMText", () => {
 describe("runAgent", () => {
   const schema = z.object({ answer: z.string() })
 
+  const TIMEOUT_MS = 7_000
+  const warn = vi.fn()
+  const logger = { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger
+
   const complete = vi.fn<Llm["complete"]>()
   const llm: Llm = { complete }
 
   beforeEach(() => {
     complete.mockReset()
+    warn.mockReset()
     complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 10, cachedTokens: 0, completionTokens: 5 })
   })
 
@@ -58,7 +62,7 @@ describe("runAgent", () => {
       userContent,
       schema,
       signal: new AbortController().signal,
-      deps: { llm, logger: consoleLogger, sampler },
+      deps: { llm, logger, sampler, timeoutMs: TIMEOUT_MS },
     })
   }
 
@@ -66,14 +70,9 @@ describe("runAgent", () => {
     return complete.mock.calls[complete.mock.calls.length - 1][0]
   }
 
-  it("resolves the configured timeout for a listed agent name", async () => {
+  it("sends the deps' timeout to the Llm", async () => {
     await run("ocr")
-    expect(lastRequest().timeoutMs).toBe(AGENT_TIMEOUT_MS.ocr)
-  })
-
-  it("falls back to the default timeout for an agent name not in the lookup", async () => {
-    await run("SomeUnlistedAgent")
-    expect(lastRequest().timeoutMs).toBe(DEFAULT_AGENT_TIMEOUT_MS)
+    expect(lastRequest().timeoutMs).toBe(TIMEOUT_MS)
   })
 
   it("builds app-shaped meta from the port's token counts", async () => {
@@ -113,11 +112,27 @@ describe("runAgent", () => {
       expect(complete).toHaveBeenCalledTimes(3)
     })
 
-    it("does not retry a non-retryable error", async () => {
+    it("does not retry a non-retryable error, and logs it", async () => {
       complete.mockRejectedValue(new NonRetryableLlmError("bad key"))
 
       await expect(run("SomeAgent")).rejects.toBeInstanceOf(NonRetryableLlmError)
       expect(complete).toHaveBeenCalledOnce()
+      expect(warn).toHaveBeenCalledWith("agent:SomeAgent: attempt 1/3 failed (not retryable)", expect.objectContaining({ attempt: 1 }))
+    })
+
+    it("logs every failed attempt and names the timeout in the final error", async () => {
+      vi.useFakeTimers()
+      complete.mockRejectedValue(new Error("Request timed out."))
+
+      const result = run("ocr")
+      const assertion = expect(result).rejects.toThrow("ocr: timed out after 7s (attempt 3/3)")
+      await vi.runAllTimersAsync()
+
+      await assertion
+      expect(warn).toHaveBeenCalledTimes(3)
+      expect(warn).toHaveBeenLastCalledWith("agent:ocr: attempt 3/3 failed", expect.objectContaining({
+        model: "gpt-5-nano", attempt: 3, timeoutMs: TIMEOUT_MS, elapsedMs: expect.any(Number),
+      }))
     })
   })
 

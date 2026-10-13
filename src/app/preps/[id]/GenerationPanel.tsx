@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
 import { generateAndSaveAssets } from "@/lib/assetGeneration"
-import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
@@ -120,7 +120,7 @@ export default function GenerationPanel({
           keyConfig.model,
           keyConfig.tier,
           abortRef.current.signal,
-          { llm: new OpenAiLlm({ apiKey: keyConfig.key }), logger: consoleLogger, sampler: clientSampler },
+          { llm: new OpenAiLlm({ apiKey: keyConfig.key }), logger: consoleLogger, sampler: clientSampler, timeoutMs: DEFAULT_TIMEOUT_MS },
         )
       }
 
