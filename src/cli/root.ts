@@ -44,7 +44,7 @@ function createCliRoot(options: CliOptions) {
     store: prep.store,
     llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl }),
     logger: createLogger({ transport: createFileTransport(path.join(prepDir, "logs", "run.log")), minLevel: config.log.level }),
-    sampler: createDiskSampler(path.join(prepDir, "samples"), SAMPLE_RATE),
+    sampler: createDiskSampler(prepDir, SAMPLE_RATE),
     data: prep.data,
     listUnfinishedJobs: prep.listUnfinishedJobs,
   }
