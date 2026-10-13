@@ -44,6 +44,21 @@ If no visual elements are present, return an empty array for visual_elements.`
 
 const MIN_PAGE_CONFIDENCE = 0.5
 const MIN_ELEMENT_CONFIDENCE = 0.6
+const MIN_TEXT_LENGTH = 20
+const MIN_LETTER_RATIO = 0.7
+
+export function assertReadableText(text: string): void {
+  const trimmed = text.trim()
+  if (trimmed.length < MIN_TEXT_LENGTH) {
+    throw new Error(`ocr_text_too_short:${trimmed.length}`)
+  }
+  const nonWhitespace = trimmed.replace(/\s/g, "")
+  const letters = nonWhitespace.match(/\p{L}/gu)?.length ?? 0
+  const ratio = letters / nonWhitespace.length
+  if (ratio < MIN_LETTER_RATIO) {
+    throw new Error(`ocr_text_not_letters:${ratio.toFixed(2)}`)
+  }
+}
 
 function assertSupportedLanguage(code: string): asserts code is SupportedLanguage {
   if (!(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
@@ -73,6 +88,7 @@ export async function runOcrAgent(
     throw new Error(`low_confidence:${result.output.confidence}`)
   }
 
+  assertReadableText(result.output.text)
   assertSupportedLanguage(result.output.language)
 
   return {
