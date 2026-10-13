@@ -14,7 +14,7 @@ const USAGE = `Usage:
       Run the whole pipeline: OCR, then everything else the target needs.
 Images are read from <prepDir>/images; jobs, logs and samples are written next to them.
 API key (run, all): OPENAI_API_KEY (any non-empty value for local endpoints).
-Config file: YAML overrides for llm, job, run and target; see src/cli/config.ts.
+Config file: YAML overrides for llm, job, run, log and target; see src/cli/config.ts.
 Unfinished jobs keep the config they were created with — use a fresh <prepDir> to apply new settings.`
 
 const logProgress = (progress: GenerationProgress) => console.log(progress.stage === "done" ? "done" : `${progress.stage} ${progress.done}/${progress.total}`)

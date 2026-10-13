@@ -40,7 +40,8 @@ describe("runAgent", () => {
 
   const TIMEOUT_MS = 7_000
   const warn = vi.fn()
-  const logger = { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger
+  const debug = vi.fn()
+  const logger = { debug, info: vi.fn(), warn, error: vi.fn() } as unknown as Logger
 
   const complete = vi.fn<Llm["complete"]>()
   const llm: Llm = { complete }
@@ -48,6 +49,7 @@ describe("runAgent", () => {
   beforeEach(() => {
     complete.mockReset()
     warn.mockReset()
+    debug.mockReset()
     complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 10, cachedTokens: 0, completionTokens: 5 })
   })
 
@@ -73,6 +75,19 @@ describe("runAgent", () => {
   it("sends the deps' timeout to the Llm", async () => {
     await run("ocr")
     expect(lastRequest().timeoutMs).toBe(TIMEOUT_MS)
+  })
+
+  it("logs each attempt's start, retries included", async () => {
+    vi.useFakeTimers()
+    complete.mockRejectedValueOnce(new Error("503"))
+
+    const result = run("ocr")
+    await vi.runAllTimersAsync()
+    await result
+
+    const fields = { model: "gpt-5-nano", tier: "flex", timeoutMs: TIMEOUT_MS }
+    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 1/3 started", { ...fields, attempt: 1 })
+    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 2/3 started", { ...fields, attempt: 2 })
   })
 
   it("builds app-shaped meta from the port's token counts", async () => {

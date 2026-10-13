@@ -103,6 +103,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const t0 = performance.now()
+    logger.debug(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} started`, { model, tier, attempt, timeoutMs })
 
     try {
       const response = await llm.complete(
