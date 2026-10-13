@@ -1,6 +1,6 @@
 import { z, ZodSchema } from "zod"
 
-import { NonRetryableLlmError, type AgentDeps, type LlmContentPart } from "@/core/ports"
+import { DEFAULT_MAX_TOKENS, NonRetryableLlmError, type AgentDeps, type LlmContentPart } from "@/core/ports"
 import type { AgentMeta, Sampler } from "@/core/sampler"
 
 import { serializeError } from "./logger"
@@ -17,6 +17,8 @@ export interface AgentResult<T> {
 export const EMPTY_AGENT_META: AgentMeta = {
   model: "",
   tier: "",
+  temperature: 0,
+  maxTokens: 0,
   promptTokens: 0,
   cachedTokens: 0,
   completionTokens: 0,
@@ -43,6 +45,8 @@ interface RunAgentConfig<T> {
   schema: ZodSchema<T>
   model?: string
   tier?: string
+  /** Completion cap; `DEFAULT_MAX_TOKENS` when unset. */
+  maxTokens?: number
   signal: AbortSignal
   deps: AgentDeps
 }
@@ -96,7 +100,7 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, outp
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", signal, deps } = config
+  const { name, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
   const { llm, logger, sampler, timeoutMs } = deps
 
   let lastError: unknown
@@ -111,6 +115,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
           model,
           tier,
           timeoutMs,
+          maxTokens,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: buildUserContent(userContent) },
@@ -129,11 +134,13 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       // so this is a cheap type-safety assertion rather than a real fallback path.
       const validated = schema.parse(parsed)
 
-      const { promptTokens, cachedTokens, completionTokens } = response
+      const { promptTokens, cachedTokens, completionTokens, temperature } = response
 
       const meta: AgentMeta = {
         model,
         tier,
+        temperature,
+        maxTokens: response.maxTokens,
         promptTokens,
         cachedTokens,
         completionTokens,

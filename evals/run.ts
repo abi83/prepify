@@ -17,8 +17,10 @@ export interface CellSummary extends CellStats {
   evaluatorId: string
   judgeModel: string
   gitSha: string
-  /** The sampling service tier shared by every sample of the cell. */
+  /** The sampling settings shared by every sample of the cell. */
   tier: string
+  temperature: number
+  maxTokens: number
 }
 
 export interface RunDeps {
@@ -29,14 +31,17 @@ export interface RunDeps {
   gitSha: string
 }
 
-function singleTier(cell: Experiment["cell"], samples: StoredSample[]): string {
-  const counts = new Map<string, number>()
-  for (const { meta } of samples) counts.set(meta.tier, (counts.get(meta.tier) ?? 0) + 1)
+type SamplingSetting = "tier" | "temperature" | "maxTokens"
+
+/** The value of `setting` shared by every sample; throws if samples differ, since one cell must compare like with like. */
+function single<K extends SamplingSetting>(cell: Experiment["cell"], samples: StoredSample[], setting: K): StoredSample["meta"][K] {
+  const counts = new Map<StoredSample["meta"][K], number>()
+  for (const { meta } of samples) counts.set(meta[setting], (counts.get(meta[setting]) ?? 0) + 1)
   if (counts.size > 1) {
-    const found = [ ...counts ].map(([ tier, count ]) => `${tier} (${count})`).join(", ")
-    throw new Error(`Cell ${cell.agent}/${cell.promptHash}/${cell.model} mixes service tiers: ${found}. Put samples of different tiers in separate samples directories.`)
+    const found = [ ...counts ].map(([ value, count ]) => `${value} (${count})`).join(", ")
+    throw new Error(`Cell ${cell.agent}/${cell.promptHash}/${cell.model} mixes ${setting} values: ${found}. Put samples with different ${setting} in separate samples directories.`)
   }
-  return samples[0].meta.tier
+  return samples[0].meta[setting]
 }
 
 /** Judges every sample of the experiment's cell, writes per-sample results and the cell summary. Judges up to `judge.concurrency` samples at once; any failure aborts. */
@@ -47,7 +52,7 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
   const samples = await source.readCell(cell)
   if (samples.length === 0) throw new Error(`No samples for cell ${cell.agent}/${cell.promptHash}/${cell.model}`)
 
-  const tier = singleTier(cell, samples)
+  const sampling = { tier: single(cell, samples, "tier"), temperature: single(cell, samples, "temperature"), maxTokens: single(cell, samples, "maxTokens") }
 
   const deps = { llm, logger, sampler: noopSampler, timeoutMs: judge.timeoutMs }
   const signal = new AbortController().signal
@@ -80,7 +85,7 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
   if (failures.length > 0) throw new Error(`${failures.length} of ${samples.length} sample(s) failed:\n${failures.join("\n")}`)
   const rows = settled.flatMap(result => (result.status === "fulfilled" ? [ result.value ] : []))
 
-  const summary: CellSummary = { cell, evaluatorId, judgeModel: judge.llm.model, gitSha, tier, ...summarizeCell(rows) }
+  const summary: CellSummary = { cell, evaluatorId, judgeModel: judge.llm.model, gitSha, ...sampling, ...summarizeCell(rows) }
   await sink.writeSummary(cell, evaluatorId, summary)
   return summary
 }

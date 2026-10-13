@@ -16,7 +16,7 @@ export function makeSample(n: number, overrides: Partial<StoredSample> = {}): St
     input: { textContent: "Extract text", images: [ { base64: "AAAA", mimeType: "image/png" } ] },
     output: { text: `page ${n}`, confidence: 0.9, language: "en", visual_elements: [] },
     meta: {
-      model: CELL.model, tier: "default", promptTokens: 100 * n, cachedTokens: 0, completionTokens: 10 * n,
+      model: CELL.model, tier: "default", temperature: 1, maxTokens: 32_000, promptTokens: 100 * n, cachedTokens: 0, completionTokens: 10 * n,
       totalTokens: 110 * n, costUsd: 0.001 * n, toolCalls: 0, executionMs: 1000 * n,
     },
     timestamp: "2026-01-01T00:00:00.000Z",

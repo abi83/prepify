@@ -35,7 +35,7 @@ function fakeLlm(calls: string[] = []): Llm {
       const { name } = request.responseFormat
       calls.push(name)
       if (!(name in RESPONSES)) throw new Error(`Unexpected agent "${name}"`)
-      return { content: JSON.stringify(RESPONSES[name]), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+      return { content: JSON.stringify(RESPONSES[name]), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
     },
   }
 }

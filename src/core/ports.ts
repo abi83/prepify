@@ -49,10 +49,14 @@ export interface LlmMessage {
   content: string | LlmContentPart[]
 }
 
+/** Completion cap for an agent that sets no `maxTokens` of its own. */
+export const DEFAULT_MAX_TOKENS = 32_000
+
 export interface LlmRequest {
   model: string
   tier: string
   timeoutMs: number
+  maxTokens: number
   messages: LlmMessage[]
   /** The completion must be JSON matching `schema`; `name` labels it for the provider. */
   responseFormat: { name: string; schema: ZodType }
@@ -63,6 +67,9 @@ export interface LlmResponse {
   promptTokens: number
   cachedTokens: number
   completionTokens: number
+  /** The sampling settings the call actually used — an `Llm` may override the request's. */
+  temperature: number
+  maxTokens: number
 }
 
 /** Thrown by an `Llm` when retrying the same request cannot succeed (bad request, bad key, forbidden). */
