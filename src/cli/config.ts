@@ -8,7 +8,7 @@ import { ALL_QUESTION_TYPES, DEFAULT_GEN_CONFIG, type GenerationConfig } from "@
 import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS } from "@/lib/jobs/generation"
 
 export interface CliConfig {
-  llm: { baseUrl: string | undefined; model: string; tier: string }
+  llm: { baseUrl: string | undefined; model: string; tier: string; temperature: number | undefined; maxTokens: number | undefined }
   job: { timeoutMs: number; maxRetries: number }
   run: { concurrency: number; maxChars: number }
   log: { level: LogLevel }
@@ -16,7 +16,7 @@ export interface CliConfig {
 }
 
 export const DEFAULT_CLI_CONFIG: CliConfig = {
-  llm: { baseUrl: undefined, model: "gpt-5-mini", tier: "default" },
+  llm: { baseUrl: undefined, model: "gpt-5-mini", tier: "default", temperature: undefined, maxTokens: undefined },
   job: DEFAULT_JOB_SETTINGS,
   run: { concurrency: DEFAULT_CONCURRENCY, maxChars: 60_000 },
   log: { level: "debug" },
@@ -28,7 +28,13 @@ const positiveInt = z.number().int().positive()
 
 /** Strict so a typo like `timeout` fails instead of silently doing nothing. */
 const overridesSchema = z.strictObject({
-  llm: z.strictObject({ baseUrl: z.url(), model: z.string().min(1), tier: z.string().min(1) }).partial(),
+  llm: z.strictObject({
+    baseUrl: z.url(),
+    model: z.string().min(1),
+    tier: z.string().min(1),
+    temperature: z.number().min(0).max(2),
+    maxTokens: positiveInt,
+  }).partial(),
   job: z.strictObject({ timeoutMs: positiveInt, maxRetries: z.number().int().nonnegative() }).partial(),
   run: z.strictObject({ concurrency: positiveInt, maxChars: positiveInt }).partial(),
   log: z.strictObject({ level: z.enum(LOG_LEVELS) }).partial(),

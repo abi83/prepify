@@ -24,8 +24,18 @@ function toOpenAiMessage(message: LlmMessage): OpenAI.ChatCompletionMessageParam
 /** `Llm` over the OpenAI chat-completions API (or any compatible `baseUrl`); safe to run in the browser. */
 export class OpenAiLlm implements Llm {
   private readonly client: OpenAI
+  private readonly samplingParams: Pick<OpenAI.ChatCompletionCreateParams, "temperature" | "max_tokens" | "max_completion_tokens">
+  private readonly maxTokens: number | undefined
 
-  constructor({ apiKey, baseUrl }: { apiKey: string; baseUrl?: string }) {
+  /** `temperature` and `maxTokens` are sent only when set — gpt-5/6 reject a non-default temperature. */
+  constructor({ apiKey, baseUrl, temperature, maxTokens }: { apiKey: string; baseUrl?: string; temperature?: number; maxTokens?: number }) {
+    // OpenAI's newer models reject `max_tokens`; OpenAI-compatible local servers (LM Studio) document only `max_tokens`.
+    const capParam = baseUrl === undefined ? "max_completion_tokens" : "max_tokens"
+    this.maxTokens = maxTokens
+    this.samplingParams = {
+      ...(temperature !== undefined && { temperature }),
+      ...(maxTokens !== undefined && { [capParam]: maxTokens }),
+    }
     // maxRetries: 0 — `runAgent`'s backoff loop is the only retry path; the SDK must not add a second one under it.
     this.client = new OpenAI({ apiKey, baseURL: baseUrl, dangerouslyAllowBrowser: true, maxRetries: 0 })
   }
@@ -49,9 +59,11 @@ export class OpenAiLlm implements Llm {
           messages: request.messages.map(toOpenAiMessage),
           response_format: zodResponseFormat(request.responseFormat.schema, toSchemaName(request.responseFormat.name)),
           service_tier: request.tier as OpenAI.ChatCompletionCreateParams["service_tier"],
+          ...this.samplingParams,
         },
         { signal, timeout: request.timeoutMs },
       )
+      if (response.choices[0]?.finish_reason === "length") throw new NonRetryableLlmError(`completion hit max tokens (${this.maxTokens})`)
       const usage = response.usage
       return {
         content: response.choices[0]?.message?.content ?? "",

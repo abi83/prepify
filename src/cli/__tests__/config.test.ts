@@ -39,6 +39,17 @@ target:
     expect(config.target).toEqual({ ...DEFAULT_CLI_CONFIG.target, questionCount: 3 })
   })
 
+  it("leaves temperature and maxTokens unset by default", () => {
+    const { llm } = resolveCliConfig({})
+    expect(llm.temperature).toBeUndefined()
+    expect(llm.maxTokens).toBeUndefined()
+  })
+
+  it("accepts temperature bounds and maxTokens", () => {
+    expect(resolveCliConfig({ llm: { temperature: 0, maxTokens: 4096 } }).llm).toMatchObject({ temperature: 0, maxTokens: 4096 })
+    expect(resolveCliConfig({ llm: { temperature: 2 } }).llm.temperature).toBe(2)
+  })
+
   it("treats an empty file as no overrides", async () => {
     expect(await loadCliConfig(await writeConfig(""))).toEqual(DEFAULT_CLI_CONFIG)
   })
@@ -48,6 +59,10 @@ target:
     [ "unknown section", { network: {} } ],
     [ "non-positive timeout", { job: { timeoutMs: 0 } } ],
     [ "malformed url", { llm: { baseUrl: "localhost" } } ],
+    [ "negative temperature", { llm: { temperature: -0.1 } } ],
+    [ "temperature above 2", { llm: { temperature: 2.1 } } ],
+    [ "zero maxTokens", { llm: { maxTokens: 0 } } ],
+    [ "fractional maxTokens", { llm: { maxTokens: 1.5 } } ],
     [ "unknown log level", { log: { level: "trace" } } ],
     [ "unknown question type", { target: { enabledTypes: [ "essay" ] } } ],
   ])("rejects %s", (_name, overrides) => {
