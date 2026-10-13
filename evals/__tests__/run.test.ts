@@ -59,7 +59,7 @@ describe("runExperiment (OCR)", () => {
     const summary = await runExperiment(experiment, deps(dir, llm))
 
     const evaluatorId = await hashPrompt(ocrEvaluator.systemPrompt)
-    expect(summary).toMatchObject({ cell: CELL, evaluatorId, judgeModel: "big-judge", gitSha: "abc123", tier: "default", sampleCount: 2 })
+    expect(summary).toMatchObject({ cell: CELL, evaluatorId, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
     expect(summary.score).toEqual({ mean: 0.75, median: 0.75, p95: 1 })
     expect(summary.latencyMs.mean).toBe(1500)
 
@@ -67,7 +67,7 @@ describe("runExperiment (OCR)", () => {
     expect((await readdir(resultDir)).sort()).toEqual([ ...samples.map(s => `${s.executionId}.json`), "summary.json" ].sort())
     expect(JSON.parse(await readFile(path.join(resultDir, `${samples[0].executionId}.json`), "utf-8")))
       .toEqual({ executionId: samples[0].executionId, evaluatorId, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
-    expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8"))).toMatchObject({ gitSha: "abc123", tier: "default" })
+    expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8"))).toMatchObject({ gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000 })
 
     expect(requests[0].model).toBe("big-judge")
     expect(requests[0].responseFormat.name).toBe("eval:ocr")
@@ -75,7 +75,7 @@ describe("runExperiment (OCR)", () => {
       { type: "image", mimeType: "image/png", base64: "AAAA" },
       { type: "text", text: expect.stringContaining("\"text\": \"page 1\"") },
     ])
-    expect(formatSummary(summary)).toContain("tier=default  n=2")
+    expect(formatSummary(summary)).toContain("tier=default  temperature=1  maxTokens=32000  n=2")
   })
 
   it("never has more than `concurrency` judge calls in flight", async () => {
@@ -123,7 +123,19 @@ describe("runExperiment (OCR)", () => {
     const { meta } = makeSample(3)
     await writeSamples(dir, [ makeSample(1), makeSample(2), makeSample(3, { meta: { ...meta, tier: "flex" } }) ])
     const { llm, requests } = fakeJudge([])
-    await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/mixes service tiers: default \(2\), flex \(1\).*separate samples directories/)
+    await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/mixes tier values: default \(2\), flex \(1\).*separate samples directories/)
+    expect(requests).toHaveLength(0)
+  })
+
+  it.each([
+    [ "temperature", { temperature: 0.2 }, /mixes temperature values: 1 \(2\), 0.2 \(1\)/ ],
+    [ "maxTokens", { maxTokens: 512 }, /mixes maxTokens values: 32000 \(2\), 512 \(1\)/ ],
+  ])("fails fast when a cell mixes %s", async (_name, change, message) => {
+    const { dir, experiment } = await setup(0)
+    const { meta } = makeSample(3)
+    await writeSamples(dir, [ makeSample(1), makeSample(2), makeSample(3, { meta: { ...meta, ...change } }) ])
+    const { llm, requests } = fakeJudge([])
+    await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(message)
     expect(requests).toHaveLength(0)
   })
 
