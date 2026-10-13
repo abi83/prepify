@@ -5,6 +5,13 @@ import { NonRetryableLlmError, type Llm, type LlmMessage, type LlmRequest, type 
 
 const NON_RETRYABLE_STATUSES = [ 400, 401, 403 ]
 
+/** OpenAI accepts only `[a-zA-Z0-9_-]{1,64}` as a json_schema name. */
+export function toSchemaName(label: string): string {
+  const name = label.replace(/[^a-zA-Z0-9_-]/g, "_")
+  if (name.length === 0 || name.length > 64) throw new Error(`Invalid response format name length (${name.length}): "${label}"`)
+  return name
+}
+
 function toOpenAiMessage(message: LlmMessage): OpenAI.ChatCompletionMessageParam {
   if (typeof message.content === "string") return { role: message.role, content: message.content } as OpenAI.ChatCompletionMessageParam
   const parts = message.content.map((part): OpenAI.ChatCompletionContentPart =>
@@ -40,7 +47,7 @@ export class OpenAiLlm implements Llm {
         {
           model: request.model,
           messages: request.messages.map(toOpenAiMessage),
-          response_format: zodResponseFormat(request.responseFormat.schema, request.responseFormat.name),
+          response_format: zodResponseFormat(request.responseFormat.schema, toSchemaName(request.responseFormat.name)),
           service_tier: request.tier as OpenAI.ChatCompletionCreateParams["service_tier"],
         },
         { signal, timeout: request.timeoutMs },
