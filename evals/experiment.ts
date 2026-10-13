@@ -15,6 +15,8 @@ const experimentSchema = z.strictObject({
   judge: z.strictObject({
     llm: z.strictObject({ baseUrl: z.url().optional(), model: z.string().min(1), tier: z.string().min(1) }),
     timeoutMs: z.number().int().positive(),
+    /** Max judge calls in flight. */
+    concurrency: z.number().int().positive(),
   }),
   /** Directory results are written under, in `results/`. */
   outputDir: z.string().min(1),
