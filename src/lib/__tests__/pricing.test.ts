@@ -37,4 +37,14 @@ describe("computeCost", () => {
     const priority = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-5-nano", "priority")
     expect(priority).toBeGreaterThan(standard)
   })
+
+  it("prices gpt-6-luna at $0.10/$0.50 per 1M tokens on the default tier", () => {
+    const cost = computeCost({ promptTokens: 2_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-6-luna", "default")
+    expect(cost).toBeCloseTo(0.70)
+  })
+
+  it("prices gpt-6-luna at $0.05/$0.25 per 1M tokens on the flex tier", () => {
+    const cost = computeCost({ promptTokens: 2_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-6-luna", "flex")
+    expect(cost).toBeCloseTo(0.35)
+  })
 })
