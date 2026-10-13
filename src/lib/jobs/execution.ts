@@ -3,23 +3,29 @@ import type { Llm, ProgressSink, Store } from "@/core/ports"
 import { runJob, type JobDefinition } from "@/core/runJob"
 import { nextJobs, type JobSpec, type PlanTarget, type PrepState } from "@/lib/planner"
 
-export interface ExecutionDeps {
+export interface RunDeps {
   store: Store
   llm: Llm
   progress: ProgressSink
-  loadState(prepId: string): Promise<PrepState>
   /** Builds the definition for a job, fetching whatever inputs its `run` needs (images, pages, concepts). */
   definitionFor(job: Job): Promise<JobDefinition<unknown>>
 }
 
-export interface ExecutionParams {
+export interface ExecutionDeps extends RunDeps {
+  loadState(prepId: string): Promise<PrepState>
+}
+
+export interface RunParams {
   actorId: string
-  prepId: string
   apiKey: string
   signal: AbortSignal
+  concurrency: number
+}
+
+export interface ExecutionParams extends RunParams {
+  prepId: string
   config: ExecutionConfig
   target: PlanTarget
-  concurrency: number
 }
 
 /** Persists `specs` as `created` jobs without executing them. */
@@ -47,7 +53,7 @@ async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number)
 }
 
 /** Runs `jobs` through `runJob`; throws once all have settled if any failed, lost its commit race, or threw. */
-export async function runJobs(deps: ExecutionDeps, params: ExecutionParams, jobs: Job[]): Promise<void> {
+export async function runJobs(deps: RunDeps, params: RunParams, jobs: Job[]): Promise<void> {
   const { store, llm, progress } = deps
   const { actorId, apiKey, signal, concurrency } = params
 
