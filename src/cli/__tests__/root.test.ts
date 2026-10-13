@@ -70,7 +70,9 @@ describe("CLI root", () => {
       questionCount: 1,
     })
     expect(await readFile(path.join(dir, "logs", "run.log"), "utf-8")).not.toBe("")
-    expect((await readdir(path.join(dir, "samples"), { recursive: true })).length).toBeGreaterThan(0)
+    const files = (await readdir(path.join(dir, "samples"), { recursive: true })).filter((f) => f.endsWith(".json"))
+    expect(files.length).toBeGreaterThan(0)
+    expect(files.every((f) => !f.startsWith("samples"))).toBe(true)
   })
 
   it("logs attempt starts at the default debug level", async () => {
