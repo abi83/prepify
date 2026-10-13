@@ -59,7 +59,7 @@ describe("runExperiment (OCR)", () => {
     const summary = await runExperiment(experiment, deps(dir, llm))
 
     const evaluatorId = await hashPrompt(ocrEvaluator.systemPrompt)
-    expect(summary).toMatchObject({ cell: CELL, evaluatorId, judgeModel: "big-judge", gitSha: "abc123", sampleCount: 2 })
+    expect(summary).toMatchObject({ cell: CELL, evaluatorId, judgeModel: "big-judge", gitSha: "abc123", tier: "default", sampleCount: 2 })
     expect(summary.score).toEqual({ mean: 0.75, median: 0.75, p95: 1 })
     expect(summary.latencyMs.mean).toBe(1500)
 
@@ -67,7 +67,7 @@ describe("runExperiment (OCR)", () => {
     expect((await readdir(resultDir)).sort()).toEqual([ ...samples.map(s => `${s.executionId}.json`), "summary.json" ].sort())
     expect(JSON.parse(await readFile(path.join(resultDir, `${samples[0].executionId}.json`), "utf-8")))
       .toEqual({ executionId: samples[0].executionId, evaluatorId, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
-    expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8")).gitSha).toBe("abc123")
+    expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8"))).toMatchObject({ gitSha: "abc123", tier: "default" })
 
     expect(requests[0].model).toBe("big-judge")
     expect(requests[0].responseFormat.name).toBe("eval:ocr")
@@ -75,12 +75,21 @@ describe("runExperiment (OCR)", () => {
       { type: "image", mimeType: "image/png", base64: "AAAA" },
       { type: "text", text: expect.stringContaining("\"text\": \"page 1\"") },
     ])
-    expect(formatSummary(summary)).toContain("n=2")
+    expect(formatSummary(summary)).toContain("tier=default  n=2")
   })
 
   it("fails fast on a cell with zero samples", async () => {
     const { dir, experiment } = await setup(0)
     await expect(runExperiment(experiment, deps(dir, fakeJudge([]).llm))).rejects.toThrow(/No samples/)
+  })
+
+  it("fails fast when a cell mixes service tiers", async () => {
+    const { dir, experiment } = await setup(0)
+    const { meta } = makeSample(3)
+    await writeSamples(dir, [ makeSample(1), makeSample(2), makeSample(3, { meta: { ...meta, tier: "flex" } }) ])
+    const { llm, requests } = fakeJudge([])
+    await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/mixes service tiers: default \(2\), flex \(1\).*separate samples directories/)
+    expect(requests).toHaveLength(0)
   })
 
   it("fails on an agent without an evaluator", async () => {
