@@ -1,7 +1,8 @@
 import path from "path"
 
+import type { Job } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import { runGeneration, runOcr, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
+import { createNextJobs, runCreatedJobs, runGeneration, runOcr, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { createLogger } from "@/lib/logger/core"
 import { createFileTransport } from "@/lib/logger/fileTransport"
@@ -24,8 +25,19 @@ export interface CliOptions {
   onProgress?: (progress: GenerationProgress) => void
 }
 
+const executionConfig = ({ llm, job }: CliConfig) => ({ model: llm.model, tier: llm.tier, ...job })
+
+/** Plans the prep's next stage and persists it as `created` jobs carrying the config's llm/job settings; runs nothing. */
+export async function createCliJobs({ prepDir, config }: Pick<CliOptions, "prepDir" | "config">): Promise<Job[]> {
+  const prep = createFilePrep(prepDir)
+  return createNextJobs(
+    { store: prep.store, data: prep.data, listUnfinishedJobs: prep.listUnfinishedJobs },
+    { actorId: ACTOR_ID, prepId: PREP_ID, config: executionConfig(config), target: config.target },
+  )
+}
+
 /** CLI composition root: files for jobs, logs and samples; any OpenAI-compatible endpoint for the model. */
-export async function runCli(options: CliOptions): Promise<void> {
+function createCliRoot(options: CliOptions) {
   const { prepDir, apiKey, config } = options
   const prep = createFilePrep(prepDir)
   const ports: RunnerPorts = {
@@ -40,15 +52,30 @@ export async function runCli(options: CliOptions): Promise<void> {
     actorId: ACTOR_ID,
     prepId: PREP_ID,
     apiKey,
-    config: { model: config.llm.model, tier: config.llm.tier, ...config.job },
     concurrency: config.run.concurrency,
-    target: config.target,
     signal: new AbortController().signal,
     onProgress: options.onProgress ?? (() => {}),
   }
+  async function language(): Promise<string> {
+    const detected = await prep.detectedLanguage()
+    if (!detected) throw new Error(`No executed OCR job in ${prepDir} — run OCR first (is ${path.join(prepDir, "images")} empty?)`)
+    return detected
+  }
+  return { ports, params, language }
+}
 
-  await runOcr(ports, params)
-  const language = await prep.detectedLanguage()
-  if (!language) throw new Error(`No OCR result in ${prepDir} — does ${path.join(prepDir, "images")} contain images?`)
-  await runGeneration(ports, { ...params, language, maxChars: config.run.maxChars })
+/** Executes the given `created`/`failed` jobs, or every unfinished job when `jobIds` is empty. */
+export async function runCliJobs(options: CliOptions & { jobIds: string[] }): Promise<Job[]> {
+  const { ports, params, language } = createCliRoot(options)
+  return runCreatedJobs(ports, { ...params, jobIds: options.jobIds, language, maxChars: options.config.run.maxChars })
+}
+
+/** Runs the whole pipeline: OCR, then everything else the target needs. */
+export async function runCli(options: CliOptions): Promise<void> {
+  const { config } = options
+  const { ports, params, language } = createCliRoot(options)
+  const generation = { ...params, config: executionConfig(config), target: config.target }
+
+  await runOcr(ports, generation)
+  await runGeneration(ports, { ...generation, language: await language(), maxChars: config.run.maxChars })
 }

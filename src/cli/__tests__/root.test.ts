@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 
 import { resolveCliConfig } from "@/cli/config"
 import { createFilePrep } from "@/cli/filePrep"
-import { runCli } from "@/cli/root"
+import { createCliJobs, runCli, runCliJobs } from "@/cli/root"
 import type { Job } from "@/core/job"
 import type { Llm, LlmRequest } from "@/core/ports"
 
@@ -85,5 +85,29 @@ describe("CLI root", () => {
 
     expect(await prep.listUnfinishedJobs("cli", "p")).toEqual([])
     expect((await prep.data.loadState("p")).questionCount).toBe(1)
+  })
+
+  it("creates OCR jobs without calling the Llm, then runs them by id", async () => {
+    const dir = await makePrepFixture()
+    const calls: string[] = []
+    const opts = options(dir, fakeLlm(calls))
+
+    const created = await createCliJobs(opts)
+
+    expect(calls).toEqual([])
+    expect(created).toMatchObject([ { type: "ocr", status: "created", config: { model: "local-model" } } ])
+
+    await runCliJobs({ ...opts, jobIds: [ created[0].id ] })
+
+    expect(calls).toEqual([ "ocr" ])
+    expect(await createFilePrep(dir).data.loadState("p")).toMatchObject({ images: [ { id: "page-1", ocrDone: true } ], concepts: [] })
+  })
+
+  it("fails to run a later stage when no OCR language is available", async () => {
+    const dir = await makePrepFixture()
+    const prep = createFilePrep(dir)
+    await prep.store.createJob("cli", "prep.meta", [], { model: "m", tier: "default", timeoutMs: 1000, maxRetries: 0 })
+
+    await expect(runCliJobs({ ...options(dir, fakeLlm()), jobIds: [] })).rejects.toThrow("run OCR first")
   })
 })

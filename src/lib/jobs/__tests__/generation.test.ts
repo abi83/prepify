@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, runGeneration, runOcr, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
+import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, createNextJobs, runCreatedJobs, runGeneration, runOcr, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
 import type { PrepState } from "@/lib/planner"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -63,5 +63,64 @@ describe("generation with swapped roots", () => {
     await runGeneration({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { ...params(), language: "en", maxChars: 1000 })
 
     expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "executed" })
+  })
+})
+
+describe("create/run split", () => {
+  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false }, { id: "i2", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0 }
+  const unusedLlm: Llm = { complete: () => { throw new Error("unused") } }
+
+  function twoImageRoot() {
+    const ports = root(unusedLlm, TWO_IMAGES)
+    ports.data.listImages = async () => [ { id: "i1", gcsKey: "k1", ocrResult: null }, { id: "i2", gcsKey: "k2", ocrResult: null } ]
+    return ports
+  }
+  const runParams = (jobIds: string[]) => ({ ...params(), jobIds, language: async () => "en", maxChars: 1000 })
+
+  it("createNextJobs persists created jobs carrying the config and runs nothing", async () => {
+    const ports = twoImageRoot()
+    h.llmsSeen.length = 0
+
+    const jobs = await createNextJobs(ports, { actorId: "u1", prepId: "p1", config: CONFIG, target: TARGET })
+
+    expect(jobs).toMatchObject([ { type: "ocr", inputIds: [ "i1" ], status: "created", config: CONFIG }, { type: "ocr", inputIds: [ "i2" ], status: "created", config: CONFIG } ])
+    expect(await ports.store.getJob("u1", jobs[0].id)).toMatchObject({ status: "created", config: CONFIG })
+    expect(h.llmsSeen).toEqual([])
+  })
+
+  it("createNextJobs throws while unfinished jobs exist", async () => {
+    const ports = twoImageRoot()
+    const unfinished = await ports.store.createJob("u1", "ocr", [ "i1" ], CONFIG)
+
+    await expect(createNextJobs({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { actorId: "u1", prepId: "p1", config: CONFIG, target: TARGET }))
+      .rejects.toThrow(unfinished.id)
+  })
+
+  it("runCreatedJobs executes only the given ids", async () => {
+    const ports = twoImageRoot()
+    const [ first, second ] = await createNextJobs(ports, { actorId: "u1", prepId: "p1", config: CONFIG, target: TARGET })
+
+    await runCreatedJobs(ports, runParams([ first.id ]))
+
+    expect(await ports.store.getJob("u1", first.id)).toMatchObject({ status: "executed" })
+    expect(await ports.store.getJob("u1", second.id)).toMatchObject({ status: "created" })
+  })
+
+  it("runCreatedJobs without ids executes every unfinished job", async () => {
+    const ports = twoImageRoot()
+    const created = await createNextJobs(ports, { actorId: "u1", prepId: "p1", config: CONFIG, target: TARGET })
+
+    await runCreatedJobs({ ...ports, listUnfinishedJobs: async () => created }, runParams([]))
+
+    for (const job of created) expect(await ports.store.getJob("u1", job.id)).toMatchObject({ status: "executed" })
+  })
+
+  it("runCreatedJobs throws on unknown and already executed ids", async () => {
+    const ports = twoImageRoot()
+    const [ first ] = await createNextJobs(ports, { actorId: "u1", prepId: "p1", config: CONFIG, target: TARGET })
+    await runCreatedJobs(ports, runParams([ first.id ]))
+
+    await expect(runCreatedJobs(ports, runParams([ "job-999" ]))).rejects.toThrow("Unknown job")
+    await expect(runCreatedJobs(ports, runParams([ first.id ]))).rejects.toThrow("already executed")
   })
 })
