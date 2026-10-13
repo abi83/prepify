@@ -34,7 +34,7 @@ export function createJobs(store: Store, actorId: string, config: ExecutionConfi
 }
 
 /** Runs `tasks` with at most `limit` in flight; a new one starts as soon as any finishes. */
-async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<PromiseSettledResult<T>[]> {
+export async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<PromiseSettledResult<T>[]> {
   const results: PromiseSettledResult<T>[] = new Array(tasks.length)
   let next = 0
 

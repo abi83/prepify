@@ -14,6 +14,7 @@ samplesDir: ./samples
 judge:
   llm: { model: big, tier: default }
   timeoutMs: 60000
+  concurrency: 4
 outputDir: ./out
 `
 
@@ -31,6 +32,8 @@ describe("loadExperiment", () => {
   it("rejects unknown keys and bad values", async () => {
     await expect(load(YAML + "extra: 1\n")).rejects.toThrow()
     await expect(load(YAML.replace("timeoutMs: 60000", "timeoutMs: 0"))).rejects.toThrow()
+    await expect(load(YAML.replace("  concurrency: 4\n", ""))).rejects.toThrow()
+    for (const bad of [ "0", "-1", "1.5", "\"2\"" ]) await expect(load(YAML.replace("concurrency: 4", `concurrency: ${bad}`))).rejects.toThrow()
     await expect(load(YAML.replace("a".repeat(64), "abc"))).rejects.toThrow()
   })
 })

@@ -37,7 +37,7 @@ async function setup(sampleCount: number) {
   const experiment: Experiment = {
     cell: CELL,
     samplesDir: dir,
-    judge: { llm: { model: "big-judge", tier: "default" }, timeoutMs: 5000 },
+    judge: { llm: { model: "big-judge", tier: "default" }, timeoutMs: 5000, concurrency: 2 },
     outputDir: dir,
   }
   return { dir, samples, experiment }
@@ -76,6 +76,41 @@ describe("runExperiment (OCR)", () => {
       { type: "text", text: expect.stringContaining("\"text\": \"page 1\"") },
     ])
     expect(formatSummary(summary)).toContain("tier=default  n=2")
+  })
+
+  it("never has more than `concurrency` judge calls in flight", async () => {
+    const { dir, experiment } = await setup(6)
+    let inFlight = 0
+    let peak = 0
+    const llm: Llm = {
+      async complete() {
+        peak = Math.max(peak, ++inFlight)
+        await new Promise(resolve => setTimeout(resolve, 5))
+        inFlight--
+        return { content: JSON.stringify({ score: 0.5, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+      },
+    }
+
+    const summary = await runExperiment(experiment, deps(dir, llm))
+
+    expect(peak).toBe(2)
+    expect(summary.sampleCount).toBe(6)
+    expect(summary.score).toEqual({ mean: 0.5, median: 0.5, p95: 0.5 })
+  })
+
+  it("throws and writes no summary when a judge call fails", async () => {
+    const { dir, experiment } = await setup(3)
+    let calls = 0
+    const llm: Llm = {
+      async complete() {
+        if (++calls >= 2) throw new Error("boom")
+        return { content: JSON.stringify({ score: 1, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+      },
+    }
+    await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/sample\(s\) failed/)
+    const evaluatorId = await hashPrompt(ocrEvaluator.systemPrompt)
+    const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", evaluatorId)
+    expect(await readdir(resultDir)).not.toContain("summary.json")
   })
 
   it("fails fast on a cell with zero samples", async () => {
