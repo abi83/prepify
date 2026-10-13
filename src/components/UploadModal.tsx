@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
 import { getApiKey } from "@/lib/apiKey"
-import { BYOK_TEXT_HARD_LIMIT, type SupportedLanguage } from "@/lib/config"
+import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { getGenerationConfig } from "@/lib/generationConfig"
 import { runOcr } from "@/lib/jobs/clientExecution"
 import { consoleLogger } from "@/lib/logger"
@@ -49,9 +49,8 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
 
-    let language: SupportedLanguage | null
     try {
-      language = await runOcr({
+      await runOcr({
         actorId,
         prepId,
         apiKey: config.key,
@@ -74,7 +73,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     const images = await listMyPrepImages(prepId)
     const combinedText = images.map(image => ocrResultSchema.parse(image.ocrResult).text).join("\n\n")
 
-    if (language === null || !combinedText.trim()) {
+    if (!combinedText.trim()) {
       setPhase("error")
       setErrorMsg("No text detected in any image. Please try clearer photos.")
       return
@@ -89,7 +88,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase("saving")
 
     try {
-      await updatePrep(prepId, { language, isActive: true })
+      await updatePrep(prepId, { isActive: true })
       onDone(prepId)
     } catch {
       setPhase("error")

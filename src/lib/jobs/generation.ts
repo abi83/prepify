@@ -1,11 +1,11 @@
 import type { ExecutionConfig, Job } from "@/core/job"
 import type { ListUnfinishedJobs, Ports, ProgressSink } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
-import { DEFAULT_TIMEOUT_MS, type SupportedLanguage } from "@/lib/config"
+import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
-import { ocrResultSchema, type Page } from "@/types/prep"
+import { ocrResultSchema } from "@/types/prep"
 
-import { createConceptsJobDefinition } from "./conceptsJob"
+import { createConceptsJobDefinition, type OcrPage } from "./conceptsJob"
 import { createJobs, executePrep, runJobs, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
 import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
 import { createOcrJobDefinition } from "./ocrJob"
@@ -37,27 +37,15 @@ function stageOf(jobType: string): GenerationStage {
   return stage
 }
 
-/** Pages up to `maxChars` of text in total; later pages are dropped. */
-function truncatePages(pages: Page[], maxChars: number): Page[] {
-  let charCount = 0
-  return pages.filter(page => {
-    if (charCount >= maxChars) return false
-    charCount += page.text.length
-    return true
-  })
-}
-
 interface DefinitionOptions {
   prepId: string
-  /** Called only for job types that need it, so a stage that doesn't (OCR) never resolves it. */
-  language: () => Promise<SupportedLanguage>
   maxChars: number
 }
 
 type DefinitionPorts = Pick<Ports, "llm" | "logger" | "sampler" | "data">
 
 /** Builds each job type's definition, fetching the inputs its `run` needs. */
-function createDefinitionFor({ prepId, language, maxChars }: DefinitionOptions, { data, ...deps }: DefinitionPorts): RunDeps["definitionFor"] {
+function createDefinitionFor({ prepId, maxChars }: DefinitionOptions, { data, ...deps }: DefinitionPorts): RunDeps["definitionFor"] {
   async function conceptsFor(job: Job) {
     const { concepts } = await data.loadState(prepId)
     return job.inputIds.map(id => {
@@ -76,17 +64,18 @@ function createDefinitionFor({ prepId, language, maxChars }: DefinitionOptions, 
     }
     case CONCEPTS_JOB_TYPE: {
       const images = await data.listImages(prepId)
-      const pages: Page[] = job.inputIds.map((id, i) => {
+      const pages: OcrPage[] = job.inputIds.map((id, i) => {
         const image = images.find(img => img.id === id)
         if (!image) throw new Error(`PrepImage ${id} not found for job ${job.id}`)
-        return { page: i + 1, gcsKey: image.gcsKey, ...ocrResultSchema.parse(image.ocrResult) }
+        if (!image.language) throw new Error(`PrepImage ${id} has no language for job ${job.id}`)
+        return { page: i + 1, gcsKey: image.gcsKey, language: image.language, ...ocrResultSchema.parse(image.ocrResult) }
       })
-      return createConceptsJobDefinition(truncatePages(pages, maxChars), await language(), deps)
+      return createConceptsJobDefinition(pages, maxChars, deps)
     }
     case PREP_META_JOB_TYPE:
-      return createPrepMetaJobDefinition(await conceptsFor(job), await language(), deps)
+      return createPrepMetaJobDefinition(await conceptsFor(job), deps)
     case QUESTION_JOB_TYPE:
-      return createQuestionJobDefinition(await conceptsFor(job), await language(), deps)
+      return createQuestionJobDefinition(await conceptsFor(job), deps)
     default:
       throw new Error(`Unknown job type "${job.type}"`)
     }
@@ -102,8 +91,7 @@ interface RunnerOptions extends DefinitionOptions, RunParams {
   onProgress: (progress: GenerationProgress) => void
 }
 
-export interface GenerationParams extends Omit<RunnerOptions, "language"> {
-  language: SupportedLanguage
+export interface GenerationParams extends RunnerOptions {
   /** Stored on every job this run creates; unfinished jobs keep the config they were created with. */
   config: ExecutionConfig
   target: PlanTarget
@@ -209,15 +197,10 @@ export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedPara
   return jobs
 }
 
-const NO_LANGUAGE_NEEDED = async (): Promise<SupportedLanguage> => { throw new Error("OCR jobs need no language") }
-
-/**
- * Runs OCR for the prep's images that lack it (re-executing unfinished OCR jobs first);
- * returns the language detected on the first job run, or null if there was nothing to do.
- */
-export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams, "language" | "maxChars">): Promise<SupportedLanguage | null> {
+/** Runs OCR for the prep's images that lack it, re-executing unfinished OCR jobs first. */
+export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams, "maxChars">): Promise<void> {
   const { config, target, ...rest } = options
-  const runner = createRunner(ports, { ...rest, language: NO_LANGUAGE_NEEDED, maxChars: 0 })
+  const runner = createRunner(ports, { ...rest, maxChars: 0 })
   const { actorId, prepId } = options
 
   const rerun = (await ports.listUnfinishedJobs(actorId, prepId)).filter(job => job.type === OCR_JOB_TYPE)
@@ -225,12 +208,6 @@ export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams,
   const specs = nextJobs(await ports.data.loadState(prepId), target).filter(spec => spec.type === OCR_JOB_TYPE)
   const created = await createJobs(ports.store, actorId, config, specs)
   await runStaged(runner, created)
-
-  const [ first ] = [ ...rerun, ...created ]
-  if (!first) return null
-  const executed = await ports.store.getJob<{ language: SupportedLanguage }>(actorId, first.id)
-  if (executed?.status !== "executed") throw new Error(`OCR job ${first.id} did not execute`)
-  return executed.output.language
 }
 
 /**
@@ -238,8 +215,8 @@ export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams,
  * missing to reach `target`.
  */
 export async function runGeneration(ports: RunnerPorts, options: GenerationParams): Promise<void> {
-  const { config, target, language, ...rest } = options
-  const runner = createRunner(ports, { ...rest, language: async () => language })
+  const { config, target, ...rest } = options
+  const runner = createRunner(ports, rest)
   await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId))
 
   const deps: ExecutionDeps = {

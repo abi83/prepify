@@ -14,6 +14,7 @@ const concept = (id: string, importance: number) => ({
   description: "A description that is long enough to be a realistic concept",
   importance,
   misconceptions: [],
+  language: "en" as const,
 })
 
 const CONCEPTS = [ concept("c1", 0.9), concept("c2", 0.7), concept("c3", 0.5) ]

@@ -5,7 +5,8 @@ import type { AgentMeta } from "@/lib/agent"
 import { BUILDERS } from "@/lib/agents/builders"
 import type { RewriteInput } from "@/lib/agents/builders/rewrite"
 import { reviewFeedback, runQuestionReviewer } from "@/lib/agents/QuestionReviewer"
-import type { Concept, QuestionTask } from "@/types/pipeline"
+import { resolveLanguage } from "@/lib/language"
+import type { QuestionTask, StoredConcept } from "@/types/pipeline"
 import { difficultySchema, questionTypeSchema, type GeneratedQuestion } from "@/types/questions"
 
 import { QUESTION_JOB_TYPE } from "./jobTypes"
@@ -17,7 +18,8 @@ import { QUESTION_JOB_TYPE } from "./jobTypes"
  * errored attempt's calls travel as `wastedMetas` (on failure, inside a `JobRunError`), the
  * passing attempt's calls as `metas`. Exhausting the attempts fails the job.
  */
-export function createQuestionJobDefinition(concepts: Concept[], language: string, deps: JobDeps): JobDefinition<GeneratedQuestion> {
+export function createQuestionJobDefinition(concepts: StoredConcept[], deps: JobDeps): JobDefinition<GeneratedQuestion> {
+  const language = resolveLanguage(concepts)
   return {
     type: QUESTION_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<GeneratedQuestion>> {

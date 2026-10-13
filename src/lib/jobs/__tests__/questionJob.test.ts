@@ -64,7 +64,7 @@ async function makeConcept(userId: string) {
 }
 
 async function execute(jobId: string) {
-  const definition = createQuestionJobDefinition([ CONCEPT ], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+  const definition = createQuestionJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
   return runJob(
     definition,
     { store: createPrismaStore(), llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -81,6 +81,11 @@ beforeEach(async () => {
   await prisma.prep.deleteMany()
   runBuilder.mockReset()
   runQuestionReviewer.mockReset()
+})
+
+it("throws when the input concepts span languages", () => {
+  expect(() => createQuestionJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }))
+    .toThrow("more than one language")
 })
 
 describe("question job", () => {

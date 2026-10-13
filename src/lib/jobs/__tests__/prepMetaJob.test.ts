@@ -59,6 +59,11 @@ beforeEach(async () => {
   runPrepLabeler.mockReset()
 })
 
+it("throws when the input concepts span languages", () => {
+  expect(() => createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }))
+    .toThrow("more than one language")
+})
+
 describe("prep.meta job", () => {
   it("runs end-to-end: Prep title/description/grade/discipline and GenerationMeta rows are persisted", async () => {
     const { prep, concept } = await makeConcept(OWNER)
@@ -72,7 +77,7 @@ describe("prep.meta job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
 
-    const definition = createPrepMetaJobDefinition([ CONCEPT ], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+    const definition = createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

@@ -11,7 +11,7 @@ const TARGET: PlanTarget = { questionCount: 3, enabledTypes: [ "flashcard" ], di
 const NOOP_LLM: Llm = { complete: () => { throw new Error("not used") } }
 const NOOP_PROGRESS: ProgressSink = { report: () => {} }
 
-const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [] }
+const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
 function fakeDeps(failType?: string) {
