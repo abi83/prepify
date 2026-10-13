@@ -23,7 +23,7 @@ function fakeJudge(scores: number[]) {
     async complete(request) {
       const score = scores[requests.length]
       requests.push(request)
-      return { content: JSON.stringify({ score, reasoning: `r${requests.length}` }), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+      return { content: JSON.stringify({ score, reasoning: `r${requests.length}` }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
     },
   }
   return { llm, requests }
@@ -87,7 +87,7 @@ describe("runExperiment (OCR)", () => {
         peak = Math.max(peak, ++inFlight)
         await new Promise(resolve => setTimeout(resolve, 5))
         inFlight--
-        return { content: JSON.stringify({ score: 0.5, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+        return { content: JSON.stringify({ score: 0.5, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
       },
     }
 
@@ -104,7 +104,7 @@ describe("runExperiment (OCR)", () => {
     const llm: Llm = {
       async complete() {
         if (++calls >= 2) throw new Error("boom")
-        return { content: JSON.stringify({ score: 1, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1 }
+        return { content: JSON.stringify({ score: 1, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
       },
     }
     await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/sample\(s\) failed/)

@@ -17,7 +17,7 @@ const OTHER = "user-other"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 
-const META = { model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
+const META = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 32_000, promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
 const FAILED: JobOutcome<unknown> = { status: "failed", failureReason: "boom", wastedMetas: [] }
 
 function executedOcr(text: string): Extract<JobOutcome<unknown>, { status: "executed" }> {

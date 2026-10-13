@@ -21,21 +21,22 @@ function toOpenAiMessage(message: LlmMessage): OpenAI.ChatCompletionMessageParam
   return { role: "user", content: parts }
 }
 
+/** OpenAI's default; sent explicitly so a sample always records the value used. */
+export const DEFAULT_TEMPERATURE = 1
+
 /** `Llm` over the OpenAI chat-completions API (or any compatible `baseUrl`); safe to run in the browser. */
 export class OpenAiLlm implements Llm {
   private readonly client: OpenAI
-  private readonly samplingParams: Pick<OpenAI.ChatCompletionCreateParams, "temperature" | "max_tokens" | "max_completion_tokens">
-  private readonly maxTokens: number | undefined
+  private readonly temperature: number
+  private readonly maxTokensOverride: number | undefined
+  private readonly capParam: "max_tokens" | "max_completion_tokens"
 
-  /** `temperature` and `maxTokens` are sent only when set — gpt-5/6 reject a non-default temperature. */
-  constructor({ apiKey, baseUrl, temperature, maxTokens }: { apiKey: string; baseUrl?: string; temperature?: number; maxTokens?: number }) {
+  /** `maxTokensOverride` replaces every request's `maxTokens`; the response reports the value actually sent. */
+  constructor({ apiKey, baseUrl, temperature = DEFAULT_TEMPERATURE, maxTokens }: { apiKey: string; baseUrl?: string; temperature?: number; maxTokens?: number }) {
+    this.temperature = temperature
+    this.maxTokensOverride = maxTokens
     // OpenAI's newer models reject `max_tokens`; OpenAI-compatible local servers (LM Studio) document only `max_tokens`.
-    const capParam = baseUrl === undefined ? "max_completion_tokens" : "max_tokens"
-    this.maxTokens = maxTokens
-    this.samplingParams = {
-      ...(temperature !== undefined && { temperature }),
-      ...(maxTokens !== undefined && { [capParam]: maxTokens }),
-    }
+    this.capParam = baseUrl === undefined ? "max_completion_tokens" : "max_tokens"
     // maxRetries: 0 — `runAgent`'s backoff loop is the only retry path; the SDK must not add a second one under it.
     this.client = new OpenAI({ apiKey, baseURL: baseUrl, dangerouslyAllowBrowser: true, maxRetries: 0 })
   }
@@ -52,6 +53,7 @@ export class OpenAiLlm implements Llm {
   }
 
   async complete(request: LlmRequest, signal: AbortSignal): Promise<LlmResponse> {
+    const maxTokens = this.maxTokensOverride ?? request.maxTokens
     try {
       const response = await this.client.chat.completions.create(
         {
@@ -59,17 +61,20 @@ export class OpenAiLlm implements Llm {
           messages: request.messages.map(toOpenAiMessage),
           response_format: zodResponseFormat(request.responseFormat.schema, toSchemaName(request.responseFormat.name)),
           service_tier: request.tier as OpenAI.ChatCompletionCreateParams["service_tier"],
-          ...this.samplingParams,
+          temperature: this.temperature,
+          [this.capParam]: maxTokens,
         },
         { signal, timeout: request.timeoutMs },
       )
-      if (response.choices[0]?.finish_reason === "length") throw new NonRetryableLlmError(`completion hit max tokens (${this.maxTokens})`)
+      if (response.choices[0]?.finish_reason === "length") throw new NonRetryableLlmError(`completion hit max tokens (${maxTokens})`)
       const usage = response.usage
       return {
         content: response.choices[0]?.message?.content ?? "",
         promptTokens: usage?.prompt_tokens ?? 0,
         cachedTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
         completionTokens: usage?.completion_tokens ?? 0,
+        temperature: this.temperature,
+        maxTokens,
       }
     } catch (err) {
       if (err instanceof OpenAI.APIError && err.status !== undefined && NON_RETRYABLE_STATUSES.includes(err.status)) {

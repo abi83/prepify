@@ -9,6 +9,8 @@ import { z } from "zod"
 export const agentMetaSchema = z.object({
   model: z.string(),
   tier: z.string(),
+  temperature: z.number(),
+  maxTokens: z.number(),
   promptTokens: z.number(),
   cachedTokens: z.number(),
   completionTokens: z.number(),

@@ -121,6 +121,8 @@ export async function runConceptExtractor(
     meta = {
       model: result.meta.model,
       tier: result.meta.tier,
+      temperature: result.meta.temperature,
+      maxTokens: result.meta.maxTokens,
       promptTokens: meta.promptTokens + result.meta.promptTokens,
       cachedTokens: meta.cachedTokens + result.meta.cachedTokens,
       completionTokens: meta.completionTokens + result.meta.completionTokens,

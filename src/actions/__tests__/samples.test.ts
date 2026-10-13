@@ -17,7 +17,7 @@ const SAMPLE: AgentSample = {
   input: { textContent: "hi", images: [] },
   output: { text: "hello" },
   meta: {
-    model: "m", tier: "flex", promptTokens: 1, cachedTokens: 0, completionTokens: 1,
+    model: "m", tier: "flex", temperature: 1, maxTokens: 32_000, promptTokens: 1, cachedTokens: 0, completionTokens: 1,
     totalTokens: 2, costUsd: 0, toolCalls: 0, executionMs: 1,
   },
   timestamp: "2026-10-10T12:00:00.000Z",

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
 import type { Logger } from "@/core/logger"
-import { NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
+import { DEFAULT_MAX_TOKENS, NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
 import { noopSampler } from "@/lib/sampler/noopSampler"
@@ -50,7 +50,7 @@ describe("runAgent", () => {
     complete.mockReset()
     warn.mockReset()
     debug.mockReset()
-    complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 10, cachedTokens: 0, completionTokens: 5 })
+    complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 10, cachedTokens: 0, completionTokens: 5, temperature: 1, maxTokens: 32_000 })
   })
 
   afterEach(() => {
@@ -75,6 +75,20 @@ describe("runAgent", () => {
   it("sends the deps' timeout to the Llm", async () => {
     await run("ocr")
     expect(lastRequest().timeoutMs).toBe(TIMEOUT_MS)
+  })
+
+  it("requests DEFAULT_MAX_TOKENS unless the agent sets its own", async () => {
+    await run("ocr")
+    expect(lastRequest().maxTokens).toBe(DEFAULT_MAX_TOKENS)
+
+    await runAgent({ name: "ocr", systemPrompt: "system", userContent: { textContent: "hello" }, schema, maxTokens: 4096, signal: new AbortController().signal, deps: { llm, logger, sampler: noopSampler, timeoutMs: TIMEOUT_MS } })
+    expect(lastRequest().maxTokens).toBe(4096)
+  })
+
+  it("records the sampling settings the Llm reports, not the requested ones", async () => {
+    complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 0.3, maxTokens: 512 })
+    const { meta } = await run("ocr")
+    expect(meta).toMatchObject({ temperature: 0.3, maxTokens: 512 })
   })
 
   it("logs each attempt's start, retries included", async () => {
