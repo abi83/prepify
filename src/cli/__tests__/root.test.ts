@@ -73,6 +73,23 @@ describe("CLI root", () => {
     expect((await readdir(path.join(dir, "samples"), { recursive: true })).length).toBeGreaterThan(0)
   })
 
+  it("logs attempt starts at the default debug level", async () => {
+    const dir = await makePrepFixture()
+
+    await runCli(options(dir, fakeLlm()))
+
+    expect(await readFile(path.join(dir, "logs", "run.log"), "utf-8")).toContain("attempt 1/3 started")
+  })
+
+  it("writes no log below the configured log.level", async () => {
+    const dir = await makePrepFixture()
+    const config = resolveCliConfig({ log: { level: "error" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } })
+
+    await runCli({ ...options(dir, fakeLlm()), config })
+
+    expect(await readdir(dir, { recursive: true })).not.toContain(path.join("logs", "run.log"))
+  })
+
   it("resumes a failed job on rerun", async () => {
     const dir = await makePrepFixture()
     const failing: Llm = { complete: () => { throw new Error("endpoint down") } }

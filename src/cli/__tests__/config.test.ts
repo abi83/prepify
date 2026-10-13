@@ -26,6 +26,8 @@ job:
   timeoutMs: 600000
 run:
   concurrency: 1
+log:
+  level: info
 target:
   questionCount: 3
 `))
@@ -33,6 +35,7 @@ target:
     expect(config.llm).toEqual({ baseUrl: "http://localhost:1234/v1", model: "google/gemma-4-26b-a4b", tier: "default" })
     expect(config.job).toEqual({ ...DEFAULT_CLI_CONFIG.job, timeoutMs: 600000 })
     expect(config.run).toEqual({ ...DEFAULT_CLI_CONFIG.run, concurrency: 1 })
+    expect(config.log).toEqual({ level: "info" })
     expect(config.target).toEqual({ ...DEFAULT_CLI_CONFIG.target, questionCount: 3 })
   })
 
@@ -45,6 +48,7 @@ target:
     [ "unknown section", { network: {} } ],
     [ "non-positive timeout", { job: { timeoutMs: 0 } } ],
     [ "malformed url", { llm: { baseUrl: "localhost" } } ],
+    [ "unknown log level", { log: { level: "trace" } } ],
     [ "unknown question type", { target: { enabledTypes: [ "essay" ] } } ],
   ])("rejects %s", (_name, overrides) => {
     expect(() => resolveCliConfig(overrides as CliConfigOverrides)).toThrow()
