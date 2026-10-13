@@ -44,7 +44,7 @@ function createCliRoot(options: CliOptions) {
   const prep = createFilePrep(prepDir)
   const ports: RunnerPorts = {
     store: prep.store,
-    llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl }),
+    llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl, temperature: config.llm.temperature, maxTokens: config.llm.maxTokens }),
     logger: createLogger({ transport: createFileTransport(path.join(prepDir, "logs", "run.log")), minLevel: config.log.level }),
     sampler: createDiskSampler(samplesRoot, SAMPLE_RATE),
     data: prep.data,
