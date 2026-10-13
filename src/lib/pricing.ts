@@ -13,6 +13,8 @@ const FLEX_PRICING: Record<string, ModelRate> = {
   "gpt-5-nano":  { input: 1.10, output: 4.40 },
   "gpt-5-mini":  { input: 1.10, output: 4.40 },
   "gpt-5":       { input: 15.00, output: 60.00 },
+  // flex = half of standard ($0.10/$0.50); long-context pricing ($0.20/$0.75) not modelled
+  "gpt-6-luna":  { input: 0.05, output: 0.25 },
 }
 
 function scale(rates: Record<string, ModelRate>, factor: number): Record<string, ModelRate> {
