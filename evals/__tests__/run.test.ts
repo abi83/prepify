@@ -36,9 +36,9 @@ async function setup(sampleCount: number) {
   else await mkdir(path.join(dir, cellPrefix(CELL)), { recursive: true })
   const experiment: Experiment = {
     cell: CELL,
-    samplesDir: dir,
+    samples: { dir },
     judge: { llm: { model: "big-judge", tier: "default" }, timeoutMs: 5000, concurrency: 2 },
-    outputDir: dir,
+    results: { dir },
   }
   return { dir, samples, experiment }
 }
