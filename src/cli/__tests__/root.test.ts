@@ -126,11 +126,11 @@ describe("CLI root", () => {
     expect(await createFilePrep(dir).data.loadState("p")).toMatchObject({ images: [ { id: "page-1", ocrDone: true } ], concepts: [] })
   })
 
-  it("fails to run a later stage when no OCR language is available", async () => {
+  it("fails a concepts job whose input image has no OCR language", async () => {
     const dir = await makePrepFixture()
     const prep = createFilePrep(dir)
-    await prep.store.createJob("cli", "prep.meta", [], { model: "m", tier: "default", timeoutMs: 1000, maxRetries: 0 })
+    await prep.store.createJob("cli", "concepts", [ "page-1" ], { model: "m", tier: "default", timeoutMs: 1000, maxRetries: 0 })
 
-    await expect(runCliJobs({ ...options(dir, fakeLlm()), jobIds: [] })).rejects.toThrow("run OCR first")
+    await expect(runCliJobs({ ...options(dir, fakeLlm()), jobIds: [] })).rejects.toThrow("has no language")
   })
 })

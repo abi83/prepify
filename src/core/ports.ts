@@ -1,6 +1,7 @@
 import type { ZodType } from "zod"
 
 import type { AgentImage } from "@/lib/agent"
+import type { SupportedLanguage } from "@/lib/config"
 import type { PrepState } from "@/lib/planner"
 
 import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
@@ -95,6 +96,7 @@ export interface PrepImageRef {
   id: string
   gcsKey: string
   ocrResult: unknown
+  language: SupportedLanguage | null
 }
 
 /** What a runtime fetches to build job inputs — the browser adapter wraps server actions. */

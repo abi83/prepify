@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
 import { generateAndSaveAssets } from "@/lib/assetGeneration"
-import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS, type SupportedLanguage } from "@/lib/config"
+import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
@@ -32,7 +32,6 @@ import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "
 interface Props {
   prepId: string
   pages: Page[]
-  language: SupportedLanguage
   prepTitle: string
   initialProgress: PrepProgress | null
   hasQuestions: boolean
@@ -43,7 +42,6 @@ interface Props {
 export default function GenerationPanel({
   prepId,
   pages,
-  language,
   prepTitle,
   initialProgress,
   hasQuestions,
@@ -95,7 +93,6 @@ export default function GenerationPanel({
         apiKey: keyConfig.key,
         model: keyConfig.model,
         tier: keyConfig.tier,
-        language,
         maxChars: BYOK_TEXT_HARD_LIMIT,
         target: localConfig,
         signal: abortRef.current.signal,

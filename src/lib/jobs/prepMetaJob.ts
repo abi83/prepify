@@ -4,7 +4,8 @@ import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runPrepLabeler } from "@/lib/agents/PrepLabeler"
 import { runPrepNamer } from "@/lib/agents/PrepNamer"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
-import type { Concept } from "@/types/pipeline"
+import { resolveLanguage } from "@/lib/language"
+import type { StoredConcept } from "@/types/pipeline"
 import type { PrepDisciplineId } from "@/types/prep"
 
 import { PREP_META_JOB_TYPE } from "./jobTypes"
@@ -21,7 +22,8 @@ export interface PrepMetaOutput {
  * fetched by the caller; this wraps `PrepNamer` and `PrepLabeler` (the same agents
  * `ShareModal.tsx` calls).
  */
-export function createPrepMetaJobDefinition(concepts: Concept[], language: string, deps: JobDeps): JobDefinition<PrepMetaOutput> {
+export function createPrepMetaJobDefinition(concepts: StoredConcept[], deps: JobDeps): JobDefinition<PrepMetaOutput> {
+  const language = resolveLanguage(concepts)
   return {
     type: PREP_META_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<PrepMetaOutput>> {

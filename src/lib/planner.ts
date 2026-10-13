@@ -3,7 +3,7 @@
  * isolation, like `taskBuilder.ts`.
  */
 import type { QuestionSpec } from "@/core/job"
-import type { Concept } from "@/types/pipeline"
+import type { Concept, StoredConcept } from "@/types/pipeline"
 
 import type { GenerationConfig } from "./generationConfig"
 import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
@@ -12,7 +12,7 @@ import { buildQuestionTasks } from "./taskBuilder"
 /** What a prep already has — completed outputs only, not jobs that exist but haven't run. */
 export interface PrepState {
   images: { id: string; ocrDone: boolean }[]
-  concepts: (Concept & { id: string })[]
+  concepts: (StoredConcept & { id: string })[]
   prepMetaDone: boolean
   questionCount: number
 }

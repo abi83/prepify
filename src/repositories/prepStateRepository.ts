@@ -15,7 +15,7 @@ export async function loadPrepState(prepId: string): Promise<PrepState> {
 
   return {
     images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null })),
-    concepts: concepts.map(({ id, name, description, importance, misconceptions }) => ({ id, name, description, importance, misconceptions })),
+    concepts: concepts.map(({ id, name, description, importance, misconceptions, language }) => ({ id, name, description, importance, misconceptions, language })),
     prepMetaDone: prepMetaJobs > 0,
     questionCount,
   }

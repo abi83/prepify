@@ -3,7 +3,6 @@ import type { ExecutionConfig, Job, QuestionSpec } from "@/core/job"
 import type { Logger } from "@/core/logger"
 import type { Store } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
-import type { SupportedLanguage } from "@/lib/config"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 
 import { browserPrepData } from "./browserPrepData"
@@ -43,7 +42,7 @@ function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKe
   }
 }
 
-export function runOcr(options: Omit<GenerationParams, "language" | "maxChars">): Promise<SupportedLanguage | null> {
+export function runOcr(options: Omit<GenerationParams, "maxChars">): Promise<void> {
   return generation.runOcr(browserPorts(options), runnerOptions(options))
 }
 

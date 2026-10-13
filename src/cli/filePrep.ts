@@ -17,8 +17,6 @@ export interface FilePrep {
   data: PrepData
   store: Store
   listUnfinishedJobs: ListUnfinishedJobs
-  /** The language OCR detected on the first executed OCR job, or null before any ran. */
-  detectedLanguage(): Promise<SupportedLanguage | null>
 }
 
 const jobNumber = (job: Job) => Number(job.id.replace(/^job-/, ""))
@@ -53,11 +51,11 @@ export function createFilePrep(dir: string): FilePrep {
 
   async function listImages(): Promise<PrepImageRef[]> {
     const names = (await readdir(imagesDir)).filter(name => path.extname(name).toLowerCase() in MIME_TYPES).sort()
-    const ocr = await executed<unknown>(OCR_JOB_TYPE)
+    const ocr = await executed<{ language: SupportedLanguage }>(OCR_JOB_TYPE)
     return names.map(name => {
       const id = path.parse(name).name
       const done = ocr.find(({ job }) => job.inputIds[0] === id)
-      return { id, gcsKey: name, ocrResult: done?.output ?? null }
+      return { id, gcsKey: name, ocrResult: done?.output ?? null, language: done?.output.language ?? null }
     })
   }
 
@@ -97,9 +95,5 @@ export function createFilePrep(dir: string): FilePrep {
     data,
     store,
     listUnfinishedJobs: async () => (await readJobs()).filter(job => job.status !== "executed"),
-    async detectedLanguage() {
-      const [ first ] = await executed<{ language: SupportedLanguage }>(OCR_JOB_TYPE)
-      return first?.output.language ?? null
-    },
   }
 }

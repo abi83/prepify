@@ -187,7 +187,6 @@ export default function PrepPage({
         <GenerationPanel
           prepId={prep.id}
           pages={pages}
-          language={prep.language ?? "en"}
           prepTitle={prep.title}
           initialProgress={progress}
           hasQuestions={hasQuestions}

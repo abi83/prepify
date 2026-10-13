@@ -63,7 +63,7 @@ describe("concepts job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "concepts", [ image.id ], CONFIG)
 
-    const definition = createConceptsJobDefinition([], "de", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+    const definition = createConceptsJobDefinition([ { page: 1, text: "t", gcsKey: "k", visual_elements: [], language: "de" } ], 1000, { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -83,6 +83,12 @@ describe("concepts job", () => {
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(3)
     expect(metas[0]).toMatchObject({ jobId: job.id, promptTokens: 10 })
+  })
+
+  it("throws when the input pages span languages", () => {
+    const page = { page: 1, text: "t", gcsKey: "k", visual_elements: [] }
+    expect(() => createConceptsJobDefinition([ { ...page, language: "de" }, { ...page, language: "fr" } ], 1000, { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }))
+      .toThrow("more than one language")
   })
 
   it("rejects a non-owner actor", async () => {

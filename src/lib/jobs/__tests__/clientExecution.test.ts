@@ -6,7 +6,7 @@ import type { PrepState } from "@/lib/planner"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
-const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [] }
+const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 
 const DONE_STATE: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1 }
 
@@ -33,7 +33,7 @@ vi.mock("@/actions/jobs", () => ({
   listUnfinishedJobs: async () => h.unfinished,
 }))
 vi.mock("@/actions/prepImages", () => ({
-  listMyPrepImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: { text: "t", visual_elements: [] } } ],
+  listMyPrepImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: { text: "t", visual_elements: [] }, language: "en" } ],
 }))
 vi.mock("@/actions/prepState", () => ({ loadMyPrepState: async () => h.state }))
 vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: async () => "https://example.test/img" }))
@@ -55,7 +55,7 @@ function job(id: string, type: string, status: "created" | "failed"): Job {
 
 function params(events: GenerationProgress[] = []): GenerationParams {
   return {
-    actorId: "u1", prepId: "p1", apiKey: "sk", model: "m", tier: "flex", language: "en", maxChars: 1000, target: TARGET,
+    actorId: "u1", prepId: "p1", apiKey: "sk", model: "m", tier: "flex", maxChars: 1000, target: TARGET,
     signal: new AbortController().signal,
     logger: { info() {}, warn() {}, error() {} } as unknown as GenerationParams["logger"],
     sampler: {} as GenerationParams["sampler"],
@@ -113,24 +113,24 @@ describe("runGeneration", () => {
 })
 
 describe("runOcr", () => {
-  it("returns null when there is nothing to do", async () => {
-    expect(await runOcr(params())).toBeNull()
+  it("runs nothing when there is nothing to do", async () => {
+    await runOcr(params())
     expect(h.ran).toEqual([])
   })
 
-  it("returns the detected language after OCRing pending images", async () => {
+  it("OCRs pending images", async () => {
     h.state = { ...DONE_STATE, images: [ { id: "i1", ocrDone: false } ] }
 
-    expect(await runOcr(params())).toBe("de")
+    await runOcr(params())
     expect(h.ran).toEqual([ "ocr" ])
   })
 
-  it("re-executes unfinished OCR jobs only and returns their language", async () => {
+  it("re-executes unfinished OCR jobs only", async () => {
     const unfinished = [ job("o1", "ocr", "failed"), job("q1", "question", "created") ]
     h.unfinished = unfinished
     unfinished.forEach(j => h.jobs.set(j.id, j))
 
-    expect(await runOcr(params())).toBe("de")
+    await runOcr(params())
     expect(h.ran).toEqual([ "ocr" ])
   })
 })

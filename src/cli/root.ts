@@ -2,8 +2,7 @@ import path from "path"
 
 import type { Job } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import type { SupportedLanguage } from "@/lib/config"
-import { createNextJobs, runCreatedJobs, runGeneration, runOcr, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
+import { createNextJobs, runCreatedJobs, runGeneration, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { createLogger } from "@/lib/logger/core"
 import { createFileTransport } from "@/lib/logger/fileTransport"
@@ -59,26 +58,18 @@ function createCliRoot(options: CliOptions) {
     signal: new AbortController().signal,
     onProgress: options.onProgress ?? (() => {}),
   }
-  async function language(): Promise<SupportedLanguage> {
-    const detected = await prep.detectedLanguage()
-    if (!detected) throw new Error(`No executed OCR job in ${prepDir} — run OCR first (is ${path.join(prepDir, "images")} empty?)`)
-    return detected
-  }
-  return { ports, params, language }
+  return { ports, params }
 }
 
 /** Executes the given `created`/`failed` jobs, or every unfinished job when `jobIds` is empty. */
 export async function runCliJobs(options: CliOptions & { jobIds: string[] }): Promise<Job[]> {
-  const { ports, params, language } = createCliRoot(options)
-  return runCreatedJobs(ports, { ...params, jobIds: options.jobIds, language, maxChars: options.config.run.maxChars })
+  const { ports, params } = createCliRoot(options)
+  return runCreatedJobs(ports, { ...params, jobIds: options.jobIds, maxChars: options.config.run.maxChars })
 }
 
 /** Runs the whole pipeline: OCR, then everything else the target needs. */
 export async function runCli(options: CliOptions): Promise<void> {
   const { config } = options
-  const { ports, params, language } = createCliRoot(options)
-  const generation = { ...params, config: executionConfig(config), target: config.target }
-
-  await runOcr(ports, generation)
-  await runGeneration(ports, { ...generation, language: await language(), maxChars: config.run.maxChars })
+  const { ports, params } = createCliRoot(options)
+  await runGeneration(ports, { ...params, config: executionConfig(config), target: config.target, maxChars: config.run.maxChars })
 }

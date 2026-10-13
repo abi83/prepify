@@ -19,7 +19,7 @@ vi.mock("../ocrJob", () => ({
   }),
 }))
 
-function params(): Omit<GenerationParams, "language" | "maxChars"> {
+function params(): Omit<GenerationParams, "maxChars"> {
   return {
     actorId: "u1", prepId: "p1", apiKey: "sk", config: { model: "m", tier: "flex", ...DEFAULT_JOB_SETTINGS }, concurrency: DEFAULT_CONCURRENCY, target: TARGET,
     signal: new AbortController().signal,
@@ -36,7 +36,7 @@ function root(llm: Llm, state: PrepState = PENDING_OCR): RunnerPorts {
     sampler: {} as RunnerPorts["sampler"],
     data: {
       loadState: async () => state,
-      listImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: null } ],
+      listImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: null, language: null } ],
       downloadImage: async () => ({ base64: "eA==", mimeType: "image/png" }),
     },
     listUnfinishedJobs: async () => [],
@@ -48,19 +48,19 @@ describe("generation with swapped roots", () => {
     const llmA: Llm = { complete: () => { throw new Error("unused") } }
     const llmB: Llm = { complete: () => { throw new Error("unused") } }
 
-    expect(await runOcr(root(llmA), params())).toBe("de")
-    expect(await runOcr(root(llmB), params())).toBe("de")
+    await runOcr(root(llmA), params())
+    await runOcr(root(llmB), params())
 
     expect(h.llmsSeen).toEqual([ llmA, llmB ])
   })
 
   it("resumes the jobs the root's listUnfinishedJobs port returns", async () => {
-    const done: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [] } ], prepMetaDone: true, questionCount: 1 }
+    const done: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const } ], prepMetaDone: true, questionCount: 1 }
     const ports = root({ complete: () => { throw new Error("unused") } }, done)
     const unfinished = await ports.store.createJob("u1", "ocr", [ "i1" ], CONFIG)
     h.llmsSeen.length = 0
 
-    await runGeneration({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { ...params(), language: "en", maxChars: 1000 })
+    await runGeneration({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { ...params(), maxChars: 1000 })
 
     expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "executed" })
   })
@@ -72,10 +72,10 @@ describe("create/run split", () => {
 
   function twoImageRoot() {
     const ports = root(unusedLlm, TWO_IMAGES)
-    ports.data.listImages = async () => [ { id: "i1", gcsKey: "k1", ocrResult: null }, { id: "i2", gcsKey: "k2", ocrResult: null } ]
+    ports.data.listImages = async () => [ { id: "i1", gcsKey: "k1", ocrResult: null, language: null }, { id: "i2", gcsKey: "k2", ocrResult: null, language: null } ]
     return ports
   }
-  const runParams = (jobIds: string[]) => ({ ...params(), jobIds, language: async () => "en" as const, maxChars: 1000 })
+  const runParams = (jobIds: string[]) => ({ ...params(), jobIds, maxChars: 1000 })
 
   it("createNextJobs persists created jobs carrying the config and runs nothing", async () => {
     const ports = twoImageRoot()
