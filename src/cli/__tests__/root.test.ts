@@ -47,8 +47,11 @@ async function makePrepFixture(): Promise<string> {
   return dir
 }
 
+const samplesRootOf = (prepDir: string) => `${prepDir}-samples-root`
+
 const options = (prepDir: string, llm: Llm) => ({
   prepDir,
+  samplesRoot: samplesRootOf(prepDir),
   apiKey: "unused",
   llm,
   config: resolveCliConfig({ llm: { model: "local-model" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } }),
@@ -70,9 +73,10 @@ describe("CLI root", () => {
       questionCount: 1,
     })
     expect(await readFile(path.join(dir, "logs", "run.log"), "utf-8")).not.toBe("")
-    const files = (await readdir(path.join(dir, "samples"), { recursive: true })).filter((f) => f.endsWith(".json"))
+    const files = (await readdir(path.join(samplesRootOf(dir), "samples"), { recursive: true })).filter((f) => f.endsWith(".json"))
     expect(files.length).toBeGreaterThan(0)
-    expect(files.every((f) => !f.startsWith("samples"))).toBe(true)
+    expect(files.some((f) => f.startsWith(path.join("ocr", "")))).toBe(true)
+    expect(await readdir(dir)).not.toContain("samples")
   })
 
   it("logs attempt starts at the default debug level", async () => {

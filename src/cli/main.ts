@@ -12,7 +12,8 @@ const USAGE = `Usage:
       Run the given jobs, or every unfinished job when no --job is given.
   npm run cli -- all <prepDir> [--config-file <file.yml>]
       Run the whole pipeline: OCR, then everything else the target needs.
-Images are read from <prepDir>/images; jobs, logs and samples are written next to them.
+Images are read from <prepDir>/images; jobs and logs are written next to them.
+Samples always go to ./data/samples/{agent}/{promptHash}/{model}/{id}.json, whatever the <prepDir>.
 API key (run, all): OPENAI_API_KEY (any non-empty value for local endpoints).
 Config file: YAML overrides for llm, job, run, log and target; see src/cli/config.ts.
 Unfinished jobs keep the config they were created with — use a fresh <prepDir> to apply new settings.`
@@ -36,6 +37,7 @@ const configFile = values["config-file"]
 const config = configFile ? await loadCliConfig(configFile) : resolveCliConfig({})
 const jobIds = values.job ?? []
 const apiKey = process.env.OPENAI_API_KEY
+const samplesRoot = "data"
 
 switch (command) {
 case "create": {
@@ -46,12 +48,12 @@ case "create": {
 }
 case "run": {
   if (!apiKey) fail()
-  await runCliJobs({ prepDir, apiKey, config, jobIds, onProgress: logProgress })
+  await runCliJobs({ prepDir, samplesRoot, apiKey, config, jobIds, onProgress: logProgress })
   break
 }
 case "all": {
   if (!apiKey || jobIds.length > 0) fail()
-  await runCli({ prepDir, apiKey, config, onProgress: logProgress })
+  await runCli({ prepDir, samplesRoot, apiKey, config, onProgress: logProgress })
   break
 }
 default:

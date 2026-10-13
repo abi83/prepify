@@ -16,8 +16,10 @@ const PREP_ID = "cli-prep"
 const SAMPLE_RATE = 1
 
 export interface CliOptions {
-  /** Prep directory: `images/` in; `jobs/`, `logs/` and `samples/` out. */
+  /** Prep directory: `images/` in; `jobs/` and `logs/` out. */
   prepDir: string
+  /** Samples are prep-independent: written to `<samplesRoot>/samples/{agent}/{promptHash}/{model}/{id}.json`. */
+  samplesRoot: string
   apiKey: string
   config: CliConfig
   /** Replaces the OpenAI adapter, e.g. with a fake in tests. */
@@ -36,15 +38,15 @@ export async function createCliJobs({ prepDir, config }: Pick<CliOptions, "prepD
   )
 }
 
-/** CLI composition root: files for jobs, logs and samples; any OpenAI-compatible endpoint for the model. */
+/** CLI composition root: files for jobs and logs, a shared root for samples; any OpenAI-compatible endpoint for the model. */
 function createCliRoot(options: CliOptions) {
-  const { prepDir, apiKey, config } = options
+  const { prepDir, samplesRoot, apiKey, config } = options
   const prep = createFilePrep(prepDir)
   const ports: RunnerPorts = {
     store: prep.store,
     llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl }),
     logger: createLogger({ transport: createFileTransport(path.join(prepDir, "logs", "run.log")), minLevel: config.log.level }),
-    sampler: createDiskSampler(prepDir, SAMPLE_RATE),
+    sampler: createDiskSampler(samplesRoot, SAMPLE_RATE),
     data: prep.data,
     listUnfinishedJobs: prep.listUnfinishedJobs,
   }
