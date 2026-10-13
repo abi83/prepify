@@ -47,7 +47,7 @@ beforeEach(async () => {
 
 describe("concepts job", () => {
   it("runs end-to-end: merged Concept rows and a GenerationMeta row per LLM call are persisted", async () => {
-    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: null })
     const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
 
     const extracted = [
@@ -63,7 +63,7 @@ describe("concepts job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "concepts", [ image.id ], CONFIG)
 
-    const definition = createConceptsJobDefinition([], "en", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+    const definition = createConceptsJobDefinition([], "de", { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -77,7 +77,8 @@ describe("concepts job", () => {
 
     const concepts = await prisma.concept.findMany({ where: { producedByJobId: job.id } })
     expect(concepts).toHaveLength(1)
-    expect(concepts[0]).toMatchObject({ name: "Mitosis", importance: 0.9 })
+    expect(concepts[0]).toMatchObject({ name: "Mitosis", importance: 0.9, language: "de" })
+    expect((await prisma.prep.findUniqueOrThrow({ where: { id: prep.id } })).language).toBe("de")
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(3)

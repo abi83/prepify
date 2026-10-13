@@ -51,7 +51,7 @@ async function makeConcept(userId: string) {
     },
   })
   const concept = await prisma.concept.create({
-    data: { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id },
+    data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id },
   })
   return { prep, concept }
 }

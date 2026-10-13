@@ -1,4 +1,4 @@
-import type { Prep, PrepDiscipline, PrepVisibility, Prisma } from "@prisma/client"
+import type { Language, Prep, PrepDiscipline, PrepVisibility, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 
@@ -34,7 +34,7 @@ export async function getPrep(userId: string | null, id: string): Promise<Prep> 
 
 export interface CreatePrepInput {
   title: string
-  language: string | null
+  language: Language | null
 }
 
 export async function createPrep(userId: string, data: CreatePrepInput): Promise<Prep> {
@@ -47,7 +47,7 @@ export interface UpdatePrepInput {
   visibility?: PrepVisibility
   grade?: number | null
   discipline?: PrepDiscipline | null
-  language?: string | null
+  language?: Language | null
   isActive?: boolean
 }
 

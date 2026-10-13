@@ -12,6 +12,20 @@ enum PrepVisibility {
   public
 }
 
+/// Mirrors `SUPPORTED_LANGUAGES` in `src/lib/config.ts`; a test keeps them in sync.
+enum Language {
+  en
+  de
+  fr
+  it
+  es
+  pl
+  nl
+  pt
+  ru
+  uk
+}
+
 enum PrepDiscipline {
   History
   Geography
@@ -41,7 +55,7 @@ model Prep {
   visibility PrepVisibility  @default(private)
   grade      Int?
   discipline PrepDiscipline?
-  language   String?
+  language   Language?
 
   description String          @default("")
   isActive    Boolean         @default(false)
@@ -65,6 +79,8 @@ model PrepImage {
   gcsKey          String
   status          PrepImageStatus @default(pending)
   ocrResult       Json?
+  // Detected by the `ocr` job; null until then.
+  language        Language?
   error           String?
   // Set by the `ocr` job (#270); null until then, or if that job is deleted.
   producedByJobId String?
@@ -81,6 +97,7 @@ model Question {
   type      String
   // Null only for rows created before difficulty tiers existed.
   difficulty String?
+  language  Language
   content   Json
   // Set by the `question` job (#273); null only if that job is deleted.
   producedByJobId String?
@@ -194,6 +211,7 @@ model Concept {
   description     String
   importance      Float
   misconceptions  String[]
+  language        Language
   producedByJobId String
   createdAt       DateTime @default(now())
 

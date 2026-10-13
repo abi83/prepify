@@ -2,11 +2,13 @@ import { Prisma, type Job as JobRow } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import type { Store } from "@/core/ports"
+import type { OcrOutput } from "@/lib/agents/OcrAgent"
 import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
+import { resolveLanguage } from "@/lib/language"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
-import type { Concept } from "@/types/pipeline"
+import type { StoredConcept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
 import { difficultySchema, type GeneratedQuestion } from "@/types/questions"
 
@@ -201,18 +203,19 @@ async function writeDomainRows(tx: Prisma.TransactionClient, job: JobWithInputs,
   await tx.generationMeta.createMany({ data: outcome.wastedMetas.map(meta => toGenerationMeta(job.id, meta, true)) })
 }
 
-/** Writes the OCR text/visual elements straight onto the target `PrepImage` row (ADR point 6, no staging). */
-function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrResult) {
+/** Writes the OCR text/visual elements and detected language straight onto the target `PrepImage` row (ADR point 6, no staging). */
+function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrOutput) {
   const result: OcrResult = { text: output.text, visual_elements: output.visual_elements }
   return tx.prepImage.update({
     where: { id: job.inputs[0].entityId },
-    data: { ocrResult: result as unknown as Prisma.InputJsonValue, producedByJobId: job.id },
+    data: { ocrResult: result as unknown as Prisma.InputJsonValue, language: output.language, producedByJobId: job.id },
   })
 }
 
-/** Creates one `Concept` row per merged concept. */
-function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: Concept[]) {
-  return tx.concept.createMany({ data: output.map(c => ({ ...c, producedByJobId: job.id })) })
+/** Creates one `Concept` row per merged concept, and records their language on the `Prep`. */
+async function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: StoredConcept[]) {
+  await tx.concept.createMany({ data: output.map(c => ({ ...c, producedByJobId: job.id })) })
+  await tx.prep.update({ where: { id: job.prepId }, data: { language: resolveLanguage(output) } })
 }
 
 /** Writes title/description/grade/discipline onto the `Prep` row, resolved through the input concept's `producedByJob`. */
@@ -226,13 +229,15 @@ async function writePrepMetaOutput(tx: Prisma.TransactionClient, job: JobWithInp
   return tx.prep.update({ where: { id: concept.producedByJob.prepId }, data: output })
 }
 
-/** Creates the `Question` row, typed by the job's `questionType`/`difficulty`. */
-function writeQuestionOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: GeneratedQuestion) {
+/** Creates the `Question` row, typed by the job's `questionType`/`difficulty`, in its input concepts' language. */
+async function writeQuestionOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: GeneratedQuestion) {
   if (job.questionType === null || job.difficulty === null) throw new Error(`Job ${job.id} has no questionType/difficulty`)
+  const concepts = await tx.concept.findMany({ where: { id: { in: job.inputs.map(i => i.entityId) } }, select: { language: true } })
   return tx.question.create({
     data: {
       type: job.questionType,
       difficulty: difficultySchema.parse(job.difficulty),
+      language: resolveLanguage(concepts),
       content: output as unknown as Prisma.InputJsonValue,
       prepId: job.prepId,
       producedByJobId: job.id,

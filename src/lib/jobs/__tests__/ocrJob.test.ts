@@ -42,7 +42,7 @@ describe("ocr job", () => {
     const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
 
     runOcrAgent.mockResolvedValue({
-      output: { text: "hello page", confidence: 0.9, language: "en", visual_elements: [] },
+      output: { text: "hello page", confidence: 0.9, language: "de", visual_elements: [] },
       meta: { model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 },
     })
 
@@ -65,6 +65,7 @@ describe("ocr job", () => {
     const reloadedImage = await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })
     expect(reloadedImage.producedByJobId).toBe(job.id)
     expect(reloadedImage.ocrResult).toEqual({ text: "hello page", visual_elements: [] })
+    expect(reloadedImage.language).toBe("de")
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(1)

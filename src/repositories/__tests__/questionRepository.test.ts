@@ -22,7 +22,7 @@ beforeEach(async () => {
 describe("listByPrep", () => {
   it("is visible to the owner", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    await prisma.question.create({ data: { prepId: prep.id, type: "flashcard", difficulty: "easy", content: {} } })
+    await prisma.question.create({ data: { prepId: prep.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
     const questions = await questionRepository.listByPrep(OWNER, prep.id)
     expect(questions).toHaveLength(1)
   })
@@ -35,7 +35,7 @@ describe("listByPrep", () => {
   it("is visible to anyone when the parent prep is public", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     await prepRepository.updatePrep(OWNER, prep.id, { visibility: "public" })
-    await prisma.question.create({ data: { prepId: prep.id, type: "flashcard", difficulty: "easy", content: {} } })
+    await prisma.question.create({ data: { prepId: prep.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 
     const questions = await questionRepository.listByPrep(null, prep.id)
     expect(questions).toHaveLength(1)
