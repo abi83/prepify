@@ -59,7 +59,7 @@ async function makeConcept(userId: string) {
       createdBy: userId, output: [],
     },
   })
-  const concept = await prisma.concept.create({ data: { ...CONCEPT, producedByJobId: conceptsJob.id } })
+  const concept = await prisma.concept.create({ data: { ...CONCEPT, language: "en", producedByJobId: conceptsJob.id } })
   return { prep, concept }
 }
 
@@ -101,7 +101,7 @@ describe("question job", () => {
 
     const questions = await prisma.question.findMany({ where: { producedByJobId: job.id } })
     expect(questions).toHaveLength(1)
-    expect(questions[0]).toMatchObject({ prepId: prep.id, type: "flashcard", difficulty: "easy", content: QUESTION })
+    expect(questions[0]).toMatchObject({ prepId: prep.id, type: "flashcard", difficulty: "easy", language: "en", content: QUESTION })
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(4)

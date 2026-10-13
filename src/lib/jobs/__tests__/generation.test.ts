@@ -75,7 +75,7 @@ describe("create/run split", () => {
     ports.data.listImages = async () => [ { id: "i1", gcsKey: "k1", ocrResult: null }, { id: "i2", gcsKey: "k2", ocrResult: null } ]
     return ports
   }
-  const runParams = (jobIds: string[]) => ({ ...params(), jobIds, language: async () => "en", maxChars: 1000 })
+  const runParams = (jobIds: string[]) => ({ ...params(), jobIds, language: async () => "en" as const, maxChars: 1000 })
 
   it("createNextJobs persists created jobs carrying the config and runs nothing", async () => {
     const ports = twoImageRoot()

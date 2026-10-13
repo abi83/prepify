@@ -86,8 +86,8 @@ describe("listPublicCatalog", () => {
     await prisma.prep.update({ where: { id: pub.id }, data: { isActive: true } })
     await prisma.question.createMany({
       data: [
-        { prepId: pub.id, type: "flashcard", content: {} },
-        { prepId: pub.id, type: "flashcard", content: {} },
+        { prepId: pub.id, language: "en", type: "flashcard", content: {} },
+        { prepId: pub.id, language: "en", type: "flashcard", content: {} },
       ],
     })
 

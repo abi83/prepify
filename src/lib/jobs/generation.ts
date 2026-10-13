@@ -1,7 +1,7 @@
 import type { ExecutionConfig, Job } from "@/core/job"
 import type { ListUnfinishedJobs, Ports, ProgressSink } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
-import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
+import { DEFAULT_TIMEOUT_MS, type SupportedLanguage } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
 import { ocrResultSchema, type Page } from "@/types/prep"
 
@@ -50,7 +50,7 @@ function truncatePages(pages: Page[], maxChars: number): Page[] {
 interface DefinitionOptions {
   prepId: string
   /** Called only for job types that need it, so a stage that doesn't (OCR) never resolves it. */
-  language: () => Promise<string>
+  language: () => Promise<SupportedLanguage>
   maxChars: number
 }
 
@@ -103,7 +103,7 @@ interface RunnerOptions extends DefinitionOptions, RunParams {
 }
 
 export interface GenerationParams extends Omit<RunnerOptions, "language"> {
-  language: string
+  language: SupportedLanguage
   /** Stored on every job this run creates; unfinished jobs keep the config they were created with. */
   config: ExecutionConfig
   target: PlanTarget
@@ -209,13 +209,13 @@ export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedPara
   return jobs
 }
 
-const NO_LANGUAGE_NEEDED = async (): Promise<string> => { throw new Error("OCR jobs need no language") }
+const NO_LANGUAGE_NEEDED = async (): Promise<SupportedLanguage> => { throw new Error("OCR jobs need no language") }
 
 /**
  * Runs OCR for the prep's images that lack it (re-executing unfinished OCR jobs first);
  * returns the language detected on the first job run, or null if there was nothing to do.
  */
-export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams, "language" | "maxChars">): Promise<string | null> {
+export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams, "language" | "maxChars">): Promise<SupportedLanguage | null> {
   const { config, target, ...rest } = options
   const runner = createRunner(ports, { ...rest, language: NO_LANGUAGE_NEEDED, maxChars: 0 })
   const { actorId, prepId } = options
@@ -228,7 +228,7 @@ export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams,
 
   const [ first ] = [ ...rerun, ...created ]
   if (!first) return null
-  const executed = await ports.store.getJob<{ language: string }>(actorId, first.id)
+  const executed = await ports.store.getJob<{ language: SupportedLanguage }>(actorId, first.id)
   if (executed?.status !== "executed") throw new Error(`OCR job ${first.id} did not execute`)
   return executed.output.language
 }

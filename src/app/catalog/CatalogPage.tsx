@@ -3,7 +3,7 @@
 import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepLabeler"
-import { LANGUAGE_LABELS } from "@/lib/config"
+import { LANGUAGE_LABELS, type SupportedLanguage } from "@/lib/config"
 import { disciplineFromEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
 import { useUrlParams } from "@/lib/urlState"
@@ -47,14 +47,14 @@ function parseDisciplineFilter(value: string | null): Discipline | undefined {
   return value !== null && isDiscipline(value) ? value : undefined
 }
 
-function parseLanguageFilter(value: string | null, availableLanguages: string[]): string | undefined {
-  return value !== null && availableLanguages.includes(value) ? value : undefined
+function parseLanguageFilter(value: string | null, availableLanguages: SupportedLanguage[]): SupportedLanguage | undefined {
+  return availableLanguages.find(l => l === value)
 }
 
 export default function CatalogPage({ entries }: Props) {
   const { searchParams, set: setUrlParams } = useUrlParams()
 
-  const availableLanguages = [ ...new Set(entries.map(e => e.language).filter((l): l is string => !!l)) ]
+  const availableLanguages = [ ...new Set(entries.map(e => e.language).filter(l => l !== null)) ]
 
   const gradeFilter = parseGradeFilter(searchParams.get("grade"))
   const disciplineFilter = parseDisciplineFilter(searchParams.get("discipline"))
@@ -124,7 +124,7 @@ export default function CatalogPage({ entries }: Props) {
             <SelectContent>
               <SelectItem value={ALL_LANGUAGES_VALUE}>All languages</SelectItem>
               {availableLanguages.map(l => (
-                <SelectItem key={l} value={l}>{LANGUAGE_LABELS[l as keyof typeof LANGUAGE_LABELS] ?? l.toUpperCase()}</SelectItem>
+                <SelectItem key={l} value={l}>{LANGUAGE_LABELS[l]}</SelectItem>
               ))}
             </SelectContent>
           </Select>

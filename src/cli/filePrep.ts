@@ -4,9 +4,10 @@ import path from "path"
 import { createFileStore } from "@/core/fileStore"
 import type { Job } from "@/core/job"
 import type { ListUnfinishedJobs, PrepData, PrepImageRef, Store } from "@/core/ports"
+import type { SupportedLanguage } from "@/lib/config"
 import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import type { PrepState } from "@/lib/planner"
-import type { Concept } from "@/types/pipeline"
+import type { StoredConcept } from "@/types/pipeline"
 
 const IMAGES_DIR = "images"
 const JOBS_DIR = "jobs"
@@ -17,7 +18,7 @@ export interface FilePrep {
   store: Store
   listUnfinishedJobs: ListUnfinishedJobs
   /** The language OCR detected on the first executed OCR job, or null before any ran. */
-  detectedLanguage(): Promise<string | null>
+  detectedLanguage(): Promise<SupportedLanguage | null>
 }
 
 const jobNumber = (job: Job) => Number(job.id.replace(/^job-/, ""))
@@ -45,8 +46,8 @@ export function createFilePrep(dir: string): FilePrep {
     return jobs.filter(job => job.type === type && job.status === "executed").map(job => ({ job, output: job.output as T }))
   }
 
-  async function concepts(): Promise<(Concept & { id: string })[]> {
-    const outputs = await executed<Concept[]>(CONCEPTS_JOB_TYPE)
+  async function concepts(): Promise<(StoredConcept & { id: string })[]> {
+    const outputs = await executed<StoredConcept[]>(CONCEPTS_JOB_TYPE)
     return outputs.flatMap(({ job, output }) => output.map((concept, i) => ({ ...concept, id: `${job.id}-concept-${i + 1}` })))
   }
 
@@ -97,7 +98,7 @@ export function createFilePrep(dir: string): FilePrep {
     store,
     listUnfinishedJobs: async () => (await readJobs()).filter(job => job.status !== "executed"),
     async detectedLanguage() {
-      const [ first ] = await executed<{ language: string }>(OCR_JOB_TYPE)
+      const [ first ] = await executed<{ language: SupportedLanguage }>(OCR_JOB_TYPE)
       return first?.output.language ?? null
     },
   }

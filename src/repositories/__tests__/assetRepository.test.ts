@@ -21,7 +21,7 @@ beforeEach(async () => {
 })
 
 function makeQuestion(prepId: string) {
-  return prisma.question.create({ data: { prepId, type: "flashcard", difficulty: "easy", content: {} } })
+  return prisma.question.create({ data: { prepId, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 }
 
 describe("insert", () => {

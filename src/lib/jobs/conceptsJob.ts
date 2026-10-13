@@ -3,8 +3,9 @@ import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptExtractor } from "@/lib/agents/ConceptExtractor"
 import { runConceptMerger } from "@/lib/agents/ConceptMerger"
+import type { SupportedLanguage } from "@/lib/config"
 import { deduplicateExact } from "@/lib/mergeConceptLists"
-import type { Concept } from "@/types/pipeline"
+import type { StoredConcept } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 
 import { CONCEPTS_JOB_TYPE } from "./jobTypes"
@@ -14,10 +15,10 @@ import { CONCEPTS_JOB_TYPE } from "./jobTypes"
  * fetched by the caller (OCR text per page); this wraps the extractor → dedupe → merger chain
  * (merger skipped on a single chunk).
  */
-export function createConceptsJobDefinition(pages: Page[], language: string, deps: JobDeps): JobDefinition<Concept[]> {
+export function createConceptsJobDefinition(pages: Page[], language: SupportedLanguage, deps: JobDeps): JobDefinition<StoredConcept[]> {
   return {
     type: CONCEPTS_JOB_TYPE,
-    async run(ctx: JobRunContext): Promise<JobRunResult<Concept[]>> {
+    async run(ctx: JobRunContext): Promise<JobRunResult<StoredConcept[]>> {
       const { model, tier, timeoutMs } = ctx.job.config
       const agentDeps = { ...deps, timeoutMs }
 
@@ -32,7 +33,7 @@ export function createConceptsJobDefinition(pages: Page[], language: string, dep
         concepts = merged.output
       }
 
-      return { output: concepts, metas, wastedMetas: [] }
+      return { output: concepts.map(concept => ({ ...concept, language })), metas, wastedMetas: [] }
     },
   }
 }

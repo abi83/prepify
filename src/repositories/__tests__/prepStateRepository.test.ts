@@ -36,9 +36,9 @@ describe("prepStateRepository", () => {
       data: { prepId: finished.id, type, status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
     })
     const conceptsJob = await job("concepts")
-    await prisma.concept.create({ data: { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+    await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
     await job("prep.meta")
-    await prisma.question.create({ data: { prepId: finished.id, type: "flashcard", difficulty: "easy", content: {} } })
+    await prisma.question.create({ data: { prepId: finished.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 
     const other = await prepRepository.createPrep(OTHER, { title: "Other", language: "en" })
     await prepImageRepository.createImage(OTHER, other.id, "key")
@@ -66,7 +66,7 @@ describe("prepStateRepository", () => {
     it("counts question jobs by status and reports whether concepts exist", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
       const conceptsJob = await addJob(prep.id, "concepts", "executed")
-      await prisma.concept.create({ data: { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+      await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
       await addJob(prep.id, "question", "executed")
       await addJob(prep.id, "question", "executed")
       await addJob(prep.id, "question", "failed")

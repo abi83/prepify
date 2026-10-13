@@ -44,7 +44,7 @@ async function makeConcept(userId: string) {
       createdBy: userId, output: [],
     },
   })
-  const concept = await prisma.concept.create({ data: { ...CONCEPT, producedByJobId: conceptsJob.id } })
+  const concept = await prisma.concept.create({ data: { ...CONCEPT, language: "en", producedByJobId: conceptsJob.id } })
   return { prep, concept }
 }
 

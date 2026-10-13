@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
 import { getApiKey } from "@/lib/apiKey"
-import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { BYOK_TEXT_HARD_LIMIT, type SupportedLanguage } from "@/lib/config"
 import { getGenerationConfig } from "@/lib/generationConfig"
 import { runOcr } from "@/lib/jobs/clientExecution"
 import { consoleLogger } from "@/lib/logger"
@@ -49,7 +49,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setPhase("ocr")
     setOcrProgress({ done: 0, total: files.length })
 
-    let language: string | null
+    let language: SupportedLanguage | null
     try {
       language = await runOcr({
         actorId,
