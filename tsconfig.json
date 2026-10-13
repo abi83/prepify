@@ -31,11 +31,15 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@evals/*": [
+        "./evals/*"
       ]
     }
   },
   "include": [
     "src",
+    "evals",
     "next-env.d.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

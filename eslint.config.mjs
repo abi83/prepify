@@ -45,6 +45,10 @@ const config = [
               pattern: "@/**",
               group: "internal",
             },
+            {
+              pattern: "@evals/**",
+              group: "internal",
+            },
           ],
           pathGroupsExcludedImportTypes: [ "builtin" ],
           alphabetize: {
