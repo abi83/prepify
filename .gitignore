@@ -19,4 +19,3 @@ coverage
 *.tfstate.*
 *.tfvars
 crash.log
-version.txt

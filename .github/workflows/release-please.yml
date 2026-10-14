@@ -16,5 +16,7 @@ jobs:
       - name: Run release-please
         uses: googleapis/release-please-action@v4
         with:
+          # A PAT/App token, not GITHUB_TOKEN: tags pushed with GITHUB_TOKEN don't trigger the tag-based prod CI/CD run
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

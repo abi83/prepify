@@ -12,7 +12,12 @@ on:
       image_tag:
         required: true
         type: string
-      app_version:
+      build_suffix:
+        description: "Build metadata appended to the package.json version (dev only; empty for prod)"
+        type: string
+        default: ""
+      revision_version:
+        description: "Version the Cloud Run revision is named after (dev suffix or prod tag)"
         required: true
         type: string
       build:
@@ -66,7 +71,7 @@ jobs:
         if: inputs.build
         run: |
           docker build \
-            --build-arg APP_VERSION=${{ inputs.app_version }} \
+            --build-arg BUILD_SUFFIX=${{ inputs.build_suffix }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }} \
             .
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}
@@ -81,6 +86,13 @@ jobs:
           echo "::add-mask::$DATABASE_URL_DIRECT"
           export DATABASE_URL_DIRECT
           npx prisma migrate deploy
+      - name: Resolve revision suffix
+        id: revision
+        run: |
+          version="$(echo "${REVISION_VERSION#v}" | tr '[:upper:]._' '[:lower:]--')"
+          echo "suffix=${version}-r${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        env:
+          REVISION_VERSION: ${{ inputs.revision_version }}
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -88,3 +100,4 @@ jobs:
           region: ${{ env.REGION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}
+          revision_suffix: ${{ steps.revision.outputs.suffix }}

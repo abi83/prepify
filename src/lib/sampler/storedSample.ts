@@ -1,5 +1,5 @@
 import type { AgentSample, StoredSample } from "@/core/sampler"
-import { APP_VERSION } from "@/lib/logger/core"
+import { APP_VERSION } from "@/lib/version"
 
 /** The sample directory of one agent × prompt × model cell. */
 export function cellPrefix({ agent, promptHash, model }: { agent: string; promptHash: string; model: string }): string {
