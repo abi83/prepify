@@ -118,6 +118,17 @@ describe("existingIds", () => {
 })
 
 describe("commitJob", () => {
+  it("persists a question job's content unwrapped, without the type envelope", async () => {
+    const { concept } = await makeConcept(OWNER)
+    const job = await store.createJob(OWNER, "question", [ concept.id ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
+    const content = { front: "f", back: "b", back_explanation: "e", asset_hint: { needed: false, type: null, description: null } }
+
+    await store.commitJob(OWNER, job.id, "created", { status: "executed", output: { type: "flashcard", content }, metas: [ META ], wastedMetas: [] })
+
+    const question = await prisma.question.findFirstOrThrow({ where: { producedByJobId: job.id } })
+    expect(question.content).toEqual(content)
+  })
+
   it("retries a failed job: commits failed, then executed", async () => {
     const { image } = await makeImage(OWNER)
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
