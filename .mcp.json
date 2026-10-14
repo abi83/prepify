@@ -2,7 +2,7 @@
   "mcpServers": {
     "neon": {
       "type": "http",
-      "url": "https://mcp.neon.tech/mcp",
+      "url": "https://mcp.neon.tech/mcp?projectId=fragrant-shape-93094350",
       "headers": {
         "Authorization": "Bearer ${NEON_DEV_API_KEY}"
       }
