@@ -4,6 +4,8 @@ import { OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/
 import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 
+import { interruptStaleJobs } from "./jobRepository"
+
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<PrepState> {
   const [ images, concepts, prepMetaJobs, questionCount ] = await Promise.all([
@@ -30,6 +32,7 @@ export interface PrepProgress {
 
 /** What generation has done so far, for the UI. Null until the first job past OCR exists — uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
 export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
+  await interruptStaleJobs({ prepId })
   const [ conceptCount, questionJobs, otherJobs ] = await Promise.all([
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
     prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),

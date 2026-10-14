@@ -5,7 +5,10 @@
 
 import type { AgentMeta } from "@/lib/agent"
 
-export type JobStatus = "created" | "executed" | "failed"
+export type JobStatus = "created" | "running" | "interrupted" | "executed" | "failed"
+
+/** Statuses of a job with no outcome yet. `running` has a live runner; `interrupted` lost it. */
+export type PendingJobStatus = "created" | "running" | "interrupted"
 
 /** Model, tier, timeout, and retry count for one job's execution — fully resolved by the
  *  caller (merging UI input over defaults is the caller's job, not core's). Never carries
@@ -24,11 +27,11 @@ export interface QuestionSpec {
   difficulty: string
 }
 
-/** `created` is re-executable; `failed` is re-executable (retry); `executed` is terminal.
+/** `created`, `interrupted` and `failed` are re-executable; `running` belongs to a live runner; `executed` is terminal.
  *  A discriminated union so only `executed` carries `output` and only `failed` carries
  *  `failureReason` — no reachable state where either is present on the wrong status. */
 export type Job<TOutput = unknown> =
-  | { id: string; type: string; status: "created"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: null }
+  | { id: string; type: string; status: PendingJobStatus; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: null }
   | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: TOutput; failureReason: null }
   | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string }
 

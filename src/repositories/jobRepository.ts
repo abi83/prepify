@@ -14,6 +14,22 @@ import { difficultySchema, type GeneratedQuestion } from "@/types/questions"
 
 import { ForbiddenError, NotFoundError } from "./errors"
 
+/** A `running` job whose heartbeat is older than this lost its runner (OOM/SIGKILL) and is marked `interrupted` on the next read. */
+export const STALE_HEARTBEAT_MS = 5 * 60 * 1000
+
+const staleCutoff = () => new Date(Date.now() - STALE_HEARTBEAT_MS)
+
+const RESUMABLE: JobStatus[] = [ "created", "failed", "interrupted" ]
+
+/** Persists `interrupted` on `running` jobs with a dead heartbeat — the lazy fallback for a runner that died
+ *  without a SIGTERM (OOM/SIGKILL). Conditional on the stale heartbeat, so a live runner's beat wins the race. */
+export async function interruptStaleJobs(where: Prisma.JobWhereInput = {}): Promise<void> {
+  await prisma.job.updateMany({
+    where: { ...where, status: "running", OR: [ { heartbeatAt: null }, { heartbeatAt: { lt: staleCutoff() } } ] },
+    data: { status: "interrupted" },
+  })
+}
+
 /** Looks up which Prep owns a job input entity (ADR point 4). `prepImage` (produced by the
  *  `ocr` job, #270) and `concept` (produced by the `concepts` job, #272 — via its
  *  `producedByJob`, since `Concept` has no direct `prepId`) are the only input entity types
@@ -93,9 +109,9 @@ function toJob<TOutput>(row: JobRow & { inputs: { entityId: string }[] }): Job<T
     return { ...base, status: "failed", output: null, failureReason: row.failureReason }
   }
   if (row.output !== null || row.failureReason !== null) {
-    throw new Error(`Job ${row.id} is created but already has output or a failureReason`)
+    throw new Error(`Job ${row.id} is ${row.status} but already has output or a failureReason`)
   }
-  return { ...base, status: "created", output: null, failureReason: null }
+  return { ...base, status: row.status, output: null, failureReason: null }
 }
 
 /** `Store` port (`src/core/ports.ts`) backed by Postgres via Prisma. Owner-only: every method
@@ -130,6 +146,7 @@ export function createPrismaStore(): Store {
     },
 
     async getJob<TOutput = unknown>(actorId: string, jobId: string): Promise<Job<TOutput> | null> {
+      await interruptStaleJobs({ id: jobId })
       const job = await prisma.job.findUnique({ where: { id: jobId }, include: { inputs: true, prep: true } })
       if (!job) return null
       if (job.prep.userId !== actorId) throw new ForbiddenError(`Job ${jobId} is not owned by ${actorId}`)
@@ -158,7 +175,8 @@ export function createPrismaStore(): Store {
         : { status: "failed" as const, output: Prisma.JsonNull, failureReason: outcome.failureReason, executedBy: actorId, updatedAt: new Date() }
 
       return prisma.$transaction(async tx => {
-        const result = await tx.job.updateMany({ where: { id: jobId, status: fromStatus }, data })
+        // A server runner moves the job to `running` after the caller read `fromStatus`.
+        const result = await tx.job.updateMany({ where: { id: jobId, status: { in: [ fromStatus, "running" ] } }, data })
         if (result.count !== 1) return false
 
         await writeDomainRows(tx, job, outcome)
@@ -168,18 +186,39 @@ export function createPrismaStore(): Store {
   }
 }
 
-/** A prep's `created`/`failed` jobs, oldest first — what "resume" re-executes. */
+/** A prep's re-executable jobs (`created`/`failed`/`interrupted`, stale `running` ones are marked `interrupted` first), oldest first — what "resume" re-executes. */
 export async function listUnfinishedJobs(actorId: string, prepId: string): Promise<Job[]> {
   const prep = await prisma.prep.findUnique({ where: { id: prepId } })
   if (!prep) throw new NotFoundError(`Prep ${prepId} not found`)
   if (prep.userId !== actorId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${actorId}`)
 
+  await interruptStaleJobs({ prepId })
   const rows = await prisma.job.findMany({
-    where: { prepId, status: { in: [ "created", "failed" ] } },
+    where: { prepId, status: { in: RESUMABLE } },
     include: { inputs: true },
     orderBy: { createdAt: "asc" },
   })
   return rows.map(row => toJob(row))
+}
+
+/** Whether a runner is alive on `prepId`: a `running` job with a fresh heartbeat. */
+export async function hasActiveRun(prepId: string): Promise<boolean> {
+  return await prisma.job.count({ where: { prepId, status: "running", heartbeatAt: { gte: staleCutoff() } } }) > 0
+}
+
+/** Moves a re-executable job to `running` with a fresh heartbeat; false if another runner holds it. */
+export async function claimJob(jobId: string): Promise<boolean> {
+  const result = await prisma.job.updateMany({ where: { id: jobId, status: { in: RESUMABLE } }, data: { status: "running", heartbeatAt: new Date() } })
+  return result.count === 1
+}
+
+export async function touchHeartbeat(jobId: string): Promise<void> {
+  await prisma.job.updateMany({ where: { id: jobId, status: "running" }, data: { heartbeatAt: new Date() } })
+}
+
+/** Marks still-`running` jobs `interrupted`; committed ones are left alone. */
+export async function markInterrupted(jobIds: string[]): Promise<void> {
+  await prisma.job.updateMany({ where: { id: { in: jobIds }, status: "running" }, data: { status: "interrupted" } })
 }
 
 type JobWithInputs = JobRow & { inputs: { entityId: string }[] }

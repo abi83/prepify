@@ -82,9 +82,15 @@ function createDefinitionFor({ prepId, maxChars }: DefinitionOptions, { data, ..
   }
 }
 
+/** Wraps a job's `run`, so a runtime can track the job while it executes (claim, heartbeat). */
+export type TrackRun = <T>(job: Job, run: () => Promise<T>) => Promise<T>
+
+export const untracked: TrackRun = (_job, run) => run()
+
 /** What a runtime root supplies: every port except `progress`, which the runner owns. */
 export interface RunnerPorts extends Omit<Ports, "progress"> {
   listUnfinishedJobs: ListUnfinishedJobs
+  trackRun: TrackRun
 }
 
 interface RunnerOptions extends DefinitionOptions, RunParams {
@@ -131,7 +137,7 @@ function createRunner(ports: RunnerPorts, options: RunnerOptions): Runner {
       return {
         type: definition.type,
         async run(ctx) {
-          const result = await definition.run(ctx)
+          const result = await ports.trackRun(job, () => definition.run(ctx))
           progress.report({ done: done + 1, total })
           return result
         },
@@ -183,10 +189,11 @@ async function requireUnfinished(store: RunnerPorts["store"], actorId: string, j
   const job = await store.getJob(actorId, jobId)
   if (!job) throw new Error(`Unknown job "${jobId}"`)
   if (job.status === "executed") throw new Error(`Job "${jobId}" is already executed`)
+  if (job.status === "running") throw new Error(`Job "${jobId}" is already running`)
   return job
 }
 
-/** Executes the given `created`/`failed` jobs (all unfinished when none given), stage by stage; returns them. */
+/** Executes the given `created`/`failed`/`interrupted` jobs (all unfinished when none given), stage by stage; returns them. */
 export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedParams): Promise<Job[]> {
   const { actorId, prepId, jobIds } = options
   const jobs = jobIds.length === 0
