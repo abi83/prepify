@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [ { protocol: "https", hostname: "lh3.googleusercontent.com" } ],
+    // Cloud Run's filesystem is in-memory and the `nextjs` user can't create .next/cache.
+    maximumDiskCacheSize: 0,
   },
   async redirects() {
     return [
