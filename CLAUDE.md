@@ -43,6 +43,16 @@ Never edit an already-committed migration — create a new one instead. Authoriz
 
 ---
 
+## Dev MCP servers
+
+Servers in `.mcp.json`, all dev-only. Credentials come from [`scripts/with-claude-secrets.sh`](scripts/with-claude-secrets.sh); infra in [`terraform/`](terraform/README.md).
+
+- **neon** — pinned to the dev project; omit `project_id`.
+- **gcp_logging** — `parent: "projects/prepify-dev-vk"`.
+- **gcs** — `project_id: "prepify-dev-vk"`; buckets `prepify-dev-vk-storage`, `prepify-dev-vk-samples`.
+
+---
+
 ## Issue Tracking
 
 All work is tracked via **GitHub Issues** on this repo. When the user says "ticket" or "issue", that means a GitHub issue.
