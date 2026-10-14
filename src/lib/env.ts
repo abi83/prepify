@@ -11,6 +11,7 @@ const envSchema = z.object({
   GCS_BUCKET_NAME: z.string().min(1),
   SAMPLES_BUCKET_NAME: z.string().min(1),
   SAMPLE_RATE: z.coerce.number().min(0).max(1),
+  SAMPLE_MAX_PER_CELL: z.coerce.number().int().positive().default(100),
 })
 
 class Config {
@@ -35,6 +36,7 @@ class Config {
   get GCS_BUCKET_NAME() { return this.data.GCS_BUCKET_NAME }
   get SAMPLES_BUCKET_NAME() { return this.data.SAMPLES_BUCKET_NAME }
   get SAMPLE_RATE() { return this.data.SAMPLE_RATE }
+  get SAMPLE_MAX_PER_CELL() { return this.data.SAMPLE_MAX_PER_CELL }
 }
 
 export const config = new Config()
