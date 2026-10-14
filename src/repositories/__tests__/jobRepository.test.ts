@@ -142,6 +142,17 @@ describe("commitJob", () => {
     expect(await store.getJob(OWNER, job.id)).toMatchObject({ status: "executed", output: { text: "hi" }, failureReason: null })
   })
 
+  it("marks the image done on an executed ocr job and failed (with error) on a failed one", async () => {
+    const { image } = await makeImage(OWNER)
+    const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+
+    await store.commitJob(OWNER, job.id, "created", FAILED)
+    expect(await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })).toMatchObject({ status: "failed", error: "boom" })
+
+    await store.commitJob(OWNER, job.id, "failed", executedOcr("hi"))
+    expect(await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })).toMatchObject({ status: "done", error: null })
+  })
+
   it("commits only the winner of a concurrent race on the same job", async () => {
     const { image } = await makeImage(OWNER)
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)

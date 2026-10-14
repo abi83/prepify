@@ -233,6 +233,9 @@ const DOMAIN_WRITERS: Record<string, (tx: Prisma.TransactionClient, job: JobWith
 
 /** Writes an outcome's domain rows and `GenerationMeta` rows (wasted ones flagged) for `job`. */
 async function writeDomainRows(tx: Prisma.TransactionClient, job: JobWithInputs, outcome: JobOutcome<unknown>): Promise<void> {
+  if (outcome.status === "failed" && job.type === OCR_JOB_TYPE) {
+    await tx.prepImage.update({ where: { id: job.inputs[0].entityId }, data: { status: "failed", error: outcome.failureReason } })
+  }
   if (outcome.status === "executed") {
     const write = DOMAIN_WRITERS[job.type]
     if (!write) throw new Error(`Job ${job.id} has unknown type "${job.type}"`)
@@ -247,7 +250,7 @@ function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output
   const result: OcrResult = { text: output.text, visual_elements: output.visual_elements }
   return tx.prepImage.update({
     where: { id: job.inputs[0].entityId },
-    data: { ocrResult: result as unknown as Prisma.InputJsonValue, language: output.language, producedByJobId: job.id },
+    data: { ocrResult: result as unknown as Prisma.InputJsonValue, language: output.language, producedByJobId: job.id, status: "done", error: null },
   })
 }
 
