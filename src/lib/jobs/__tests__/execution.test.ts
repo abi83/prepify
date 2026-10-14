@@ -15,7 +15,7 @@ const concept = { id: "c1", name: "Mitosis", description: "Cell division process
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
 function fakeDeps(failType?: string) {
-  const state: PrepState = { images: [ { id: "i1", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0 }
+  const state: PrepState = { images: [ { id: "i1", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
   const ran: string[] = []
   let inFlight = 0
   let maxInFlight = 0
@@ -38,7 +38,7 @@ function fakeDeps(failType?: string) {
         if (job.type === "ocr") state.images = [ { id: "i1", ocrDone: true } ]
         if (job.type === "concepts") state.concepts = [ concept ]
         if (job.type === "prep.meta") state.prepMetaDone = true
-        if (job.type === "question") state.questionCount++
+        if (job.type === "question") { state.questionCount++; state.questionJobCount++ }
         return { output: null, metas: [], wastedMetas: [] }
       },
     }),

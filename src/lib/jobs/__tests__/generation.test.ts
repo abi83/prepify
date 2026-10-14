@@ -8,7 +8,7 @@ import type { PrepState } from "@/lib/planner"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
-const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0 }
+const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
 
 const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[] }))
 
@@ -17,6 +17,10 @@ vi.mock("../ocrJob", () => ({
     type: "ocr",
     run: async () => { h.llmsSeen.push(deps.llm); return { output: { language: "de" }, metas: [], wastedMetas: [] } },
   }),
+}))
+
+vi.mock("../questionJob", () => ({
+  createQuestionJobDefinition: () => ({ type: "question", run: async () => ({ output: {}, metas: [], wastedMetas: [] }) }),
 }))
 
 function params(): Omit<GenerationParams, "maxChars"> {
@@ -56,7 +60,7 @@ describe("generation with swapped roots", () => {
   })
 
   it("resumes the jobs the root's listUnfinishedJobs port returns", async () => {
-    const done: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const } ], prepMetaDone: true, questionCount: 1 }
+    const done: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const } ], prepMetaDone: true, questionCount: 1, questionJobCount: 1 }
     const ports = root({ complete: () => { throw new Error("unused") } }, done)
     const unfinished = await ports.store.createJob("u1", "ocr", [ "i1" ], CONFIG)
     h.llmsSeen.length = 0
@@ -65,10 +69,23 @@ describe("generation with swapped roots", () => {
 
     expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "executed" })
   })
+
+  it("resumes unfinished question jobs without planning more to reach the target", async () => {
+    const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
+    const planned: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1 }
+    const ports = root({ complete: () => { throw new Error("unused") } }, planned)
+    const unfinished = await ports.store.createJob("u1", "question", [ "c1" ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
+    const createJob = vi.spyOn(ports.store, "createJob")
+
+    await runGeneration({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { ...params(), target: { ...TARGET, questionCount: 10 }, maxChars: 1000 })
+
+    expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "executed" })
+    expect(createJob).not.toHaveBeenCalled()
+  })
 })
 
 describe("create/run split", () => {
-  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false }, { id: "i2", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0 }
+  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false }, { id: "i2", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
   const unusedLlm: Llm = { complete: () => { throw new Error("unused") } }
 
   function twoImageRoot() {
