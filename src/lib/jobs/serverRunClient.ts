@@ -1,3 +1,5 @@
+import { getMyPrepProgress } from "@/actions/prepState"
+
 import type { ServerRunRequest } from "./serverRun"
 
 export type ServerRunOutcome = "triggered" | "already_running"
@@ -19,4 +21,15 @@ export async function requestServerRun(request: Pick<ServerRunRequest, "apiKey" 
   if (response.status === 202) return "triggered"
   if (response.status === 409) return "already_running"
   throw new Error(FAILURES[response.status] ?? `Unexpected response (${response.status}).`)
+}
+
+const START_POLL_MS = 500
+const START_POLL_ATTEMPTS = 20
+
+/** Waits for the triggered run's first job row, so the prep page's first render already shows progress. If it never appears, the page's own polling takes over. */
+export async function awaitRunStart(prepId: string): Promise<void> {
+  for (let attempt = 0; attempt < START_POLL_ATTEMPTS; attempt++) {
+    if (await getMyPrepProgress(prepId)) return
+    await new Promise(resolve => setTimeout(resolve, START_POLL_MS))
+  }
 }

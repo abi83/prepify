@@ -27,16 +27,19 @@ export type RunState = "idle" | "running" | "interrupted"
 
 export interface PrepProgress {
   runState: RunState // any job running, else any interrupted (needs the key to resume)
+  totalPages: number
+  ocrPages: number // pages with an OCR result
   hasConcepts: boolean
   totalQuestions: number // question jobs created so far, any status
   completedQuestions: number // executed
   failedQuestions: number // failed, until resume re-executes them
 }
 
-/** What generation has done so far, for the UI. Null until the first job past OCR exists or a run is live —uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
+/** What generation has done so far, for the UI. Null until the first job past OCR exists or a run is live — uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
 export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
   await interruptStaleJobs({ prepId })
-  const [ conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs ] = await Promise.all([
+  const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs ] = await Promise.all([
+    prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true } }),
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
     prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
     prisma.job.count({ where: { prepId, type: { notIn: [ OCR_JOB_TYPE, QUESTION_JOB_TYPE ] } } }),
@@ -49,6 +52,8 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
   const countOf = (status: JobStatus) => questionJobs.find(group => group.status === status)?._count ?? 0
   return {
     runState,
+    totalPages: images.length,
+    ocrPages: images.filter(image => image.ocrResult !== null).length,
     hasConcepts: conceptCount > 0,
     totalQuestions: questionJobs.reduce((sum, group) => sum + group._count, 0),
     completedQuestions: countOf("executed"),

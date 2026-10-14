@@ -19,12 +19,18 @@ const DEFAULT_TITLE_RE = /^Prep #\d+$/
 
 export function rowsFromProgress(progress: GenerationProgress | null): ChecklistRowData[] {
   const stage = progress?.stage ?? null
+  const ocrDone = stage !== "ocr"
   const conceptsDone = stage === "meta" || stage === "questions" || stage === "done"
   const namingDone = stage === "questions" || stage === "done"
   const questionsDone = stage === "done"
 
   return [
-    { label: "Extract educational concepts", status: conceptsDone ? "done" : "running" },
+    {
+      label: "Recognise pages",
+      status: ocrDone ? "done" : "running",
+      detail: progress?.stage === "ocr" ? `${progress.done}/${progress.total}` : undefined,
+    },
+    { label: "Extract educational concepts", status: conceptsDone ? "done" : ocrDone ? "running" : "pending" },
     { label: "Name the prep", status: namingDone ? "done" : conceptsDone ? "running" : "pending" },
     {
       label: "Craft and validate questions",
@@ -37,6 +43,11 @@ export function rowsFromProgress(progress: GenerationProgress | null): Checklist
 export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRowData[] {
   const titled = !DEFAULT_TITLE_RE.test(prepTitle)
   const rows: ChecklistRowData[] = [
+    {
+      label: "Recognise pages",
+      status: s.totalPages > 0 && s.ocrPages === s.totalPages ? "done" : "pending",
+      detail: s.totalPages > 0 ? `${s.ocrPages}/${s.totalPages}` : undefined,
+    },
     { label: "Extract educational concepts", status: s.hasConcepts ? "done" : "pending" },
     { label: "Name the prep", status: titled ? "done" : "pending" },
     {

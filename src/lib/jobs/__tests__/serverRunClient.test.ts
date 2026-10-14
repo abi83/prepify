@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { requestServerRun } from "@/lib/jobs/serverRunClient"
+const { mockGetProgress } = vi.hoisted(() => ({ mockGetProgress: vi.fn() }))
+vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: mockGetProgress }))
+
+import { awaitRunStart, requestServerRun } from "@/lib/jobs/serverRunClient"
 
 const REQUEST = {
   apiKey: "sk-secret",
@@ -12,7 +15,11 @@ const REQUEST = {
 
 const respondWith = (status: number) => vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status }))
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+  mockGetProgress.mockReset()
+})
 
 describe("requestServerRun", () => {
   it("posts the request as JSON to the generate endpoint", async () => {
@@ -40,5 +47,29 @@ describe("requestServerRun", () => {
   it("throws on an unexpected status", async () => {
     respondWith(500)
     await expect(requestServerRun(REQUEST)).rejects.toThrow("500")
+  })
+})
+
+describe("awaitRunStart", () => {
+  it("resolves once progress exists", async () => {
+    vi.useFakeTimers()
+    mockGetProgress.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ runState: "running" })
+
+    const done = awaitRunStart("p1")
+    await vi.advanceTimersByTimeAsync(1_000)
+    await done
+
+    expect(mockGetProgress).toHaveBeenCalledTimes(3)
+  })
+
+  it("gives up after the poll budget when no job row appears", async () => {
+    vi.useFakeTimers()
+    mockGetProgress.mockResolvedValue(null)
+
+    const done = awaitRunStart("p1")
+    await vi.advanceTimersByTimeAsync(20_000)
+    await done
+
+    expect(mockGetProgress).toHaveBeenCalledTimes(20)
   })
 })

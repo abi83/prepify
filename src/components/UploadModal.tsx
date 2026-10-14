@@ -3,15 +3,18 @@ import { useRef, useState } from "react"
 
 import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
-import { getApiKey } from "@/lib/apiKey"
+import { getApiKey, type ApiKeyConfig } from "@/lib/apiKey"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { getExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import { getGenerationConfig } from "@/lib/generationConfig"
 import { runOcr } from "@/lib/jobs/clientExecution"
+import { awaitRunStart, requestServerRun } from "@/lib/jobs/serverRunClient"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 import { ocrResultSchema } from "@/types/prep"
 
+import { AdditionalSettings } from "./AdditionalSettings"
 import { FilePicker, type RecogniseArgs } from "./FilePicker"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -21,7 +24,7 @@ type Props = {
   onDone: (prepId: string) => void
 }
 
-type Phase = "ocr" | "saving" | "error"
+type Phase = "ocr" | "starting" | "saving" | "error"
 
 export default function UploadModal({ onClose, onDone }: Props) {
   const { data: session } = useSession()
@@ -30,6 +33,25 @@ export default function UploadModal({ onClose, onDone }: Props) {
   const [ phase, setPhase ] = useState<Phase | null>(null)
   const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
+  const [ executionMode, setExecutionMode ] = useState<ExecutionMode>(() => getExecutionMode())
+
+  function fail(message: string) {
+    setPhase("error")
+    setErrorMsg(message)
+  }
+
+  async function runOnServer(prepId: string, config: ApiKeyConfig) {
+    setPhase("starting")
+    try {
+      await updatePrep(prepId, { isActive: true })
+      await requestServerRun({ apiKey: config.key, prepId, model: config.model, tier: config.tier, target: getGenerationConfig() })
+      await awaitRunStart(prepId)
+    } catch (e) {
+      fail(e instanceof Error ? e.message : "Failed to start the server run")
+      return
+    }
+    onDone(prepId)
+  }
 
   async function handleRecognise({ prepId, files }: RecogniseArgs) {
     const config = getApiKey()
@@ -42,6 +64,11 @@ export default function UploadModal({ onClose, onDone }: Props) {
     if (!actorId) {
       setPhase("error")
       setErrorMsg("You are not signed in.")
+      return
+    }
+
+    if (executionMode === "server") {
+      await runOnServer(prepId, config)
       return
     }
 
@@ -101,7 +128,7 @@ export default function UploadModal({ onClose, onDone }: Props) {
     setErrorMsg("")
   }
 
-  const isWorking = phase === "ocr" || phase === "saving"
+  const isWorking = phase === "ocr" || phase === "starting" || phase === "saving"
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !isWorking) onClose() }}>
@@ -115,7 +142,15 @@ export default function UploadModal({ onClose, onDone }: Props) {
           <DialogDescription className="sr-only">Upload photos of textbook pages to create a new prep.</DialogDescription>
         </DialogHeader>
 
-        {phase === null && <FilePicker onRecognise={handleRecognise} />}
+        {phase === null && (
+          <FilePicker onRecognise={handleRecognise}>
+            <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />
+          </FilePicker>
+        )}
+
+        {phase === "starting" && (
+          <p className="py-4 text-sm text-muted-foreground">Starting the server run…</p>
+        )}
 
         {(phase === "ocr" || phase === "saving") && (
           <div className="flex flex-col gap-3 py-4">
