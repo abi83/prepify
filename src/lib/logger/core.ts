@@ -1,17 +1,7 @@
-import { readFileSync } from "fs"
-import path from "path"
-
 import type { FormatArgs, LogFields, LogLevel, Logger, TraceContext } from "@/core/logger"
+import { APP_VERSION } from "@/lib/version"
 
 import { formatGcp } from "./gcp"
-
-export const APP_VERSION = (() => {
-  try {
-    return readFileSync(path.join(process.cwd(), "version.txt"), "utf-8").trim()
-  } catch {
-    return "unknown"
-  }
-})()
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 }
 

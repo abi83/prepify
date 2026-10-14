@@ -42,7 +42,7 @@ export const agentSampleSchema = z.object({
 export type AgentSample = z.infer<typeof agentSampleSchema>
 
 export const storedSampleSchema = agentSampleSchema.extend({
-  /** Build version of the server that stored the sample (git SHA/tag from `version.txt`). */
+  /** Build version of the server that stored the sample (`package.json` version plus build suffix). */
   appVersion: z.string().min(1),
 })
 

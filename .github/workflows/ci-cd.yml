@@ -165,6 +165,7 @@ jobs:
 
   # Dev version: synthetic timestamp+sha — no tag exists on main commits.
   # Prod version: the git tag itself (e.g. v1.2.3) — already meaningful, no job needed.
+  # The runtime version is package.json's; the dev value is only its build suffix.
   resolve-dev-version:
     name: Resolve dev version
     if: |
@@ -188,7 +189,8 @@ jobs:
       environment: dev
       environment_url: https://prepify-529277275400.us-central1.run.app/
       image_tag: ${{ github.sha }}
-      app_version: ${{ needs.resolve-dev-version.outputs.app_version }}
+      build_suffix: ${{ needs.resolve-dev-version.outputs.app_version }}
+      revision_version: ${{ needs.resolve-dev-version.outputs.app_version }}
       build: true
       push_latest: false
     secrets: inherit
@@ -208,7 +210,7 @@ jobs:
       environment: prod
       environment_url: http://prepify.cc/
       image_tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      app_version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      revision_version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       build: ${{ github.event_name != 'workflow_dispatch' }}
       push_latest: ${{ github.event_name != 'workflow_dispatch' }}
     secrets: inherit
