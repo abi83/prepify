@@ -8,11 +8,12 @@ import { interruptStaleJobs } from "./jobRepository"
 
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<PrepState> {
-  const [ images, concepts, prepMetaJobs, questionCount ] = await Promise.all([
+  const [ images, concepts, prepMetaJobs, questionCount, questionJobCount ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
     prisma.concept.findMany({ where: { producedByJob: { prepId } }, orderBy: { createdAt: "asc" } }),
     prisma.job.count({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" } }),
     prisma.question.count({ where: { prepId } }),
+    prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE } }),
   ])
 
   return {
@@ -20,6 +21,7 @@ export async function loadPrepState(prepId: string): Promise<PrepState> {
     concepts: concepts.map(({ id, name, description, importance, misconceptions, language }) => ({ id, name, description, importance, misconceptions, language })),
     prepMetaDone: prepMetaJobs > 0,
     questionCount,
+    questionJobCount,
   }
 }
 

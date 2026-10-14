@@ -62,17 +62,19 @@ export function createFilePrep(dir: string): FilePrep {
   const data: PrepData = {
     listImages,
     async loadState(): Promise<PrepState> {
-      const [ images, allConcepts, meta, questions ] = await Promise.all([
+      const [ images, allConcepts, meta, questions, jobs ] = await Promise.all([
         listImages(),
         concepts(),
         executed<unknown>(PREP_META_JOB_TYPE),
         executed<unknown>(QUESTION_JOB_TYPE),
+        readJobs(),
       ])
       return {
         images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null })),
         concepts: allConcepts,
         prepMetaDone: meta.length > 0,
         questionCount: questions.length,
+        questionJobCount: jobs.filter(job => job.type === QUESTION_JOB_TYPE).length,
       }
     },
     async downloadImage(_prepId, name) {

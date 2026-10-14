@@ -15,9 +15,11 @@ export interface PrepState {
   concepts: (StoredConcept & { id: string })[]
   prepMetaDone: boolean
   questionCount: number
+  /** `question` jobs in any status — once any exist, they are the question plan. */
+  questionJobCount: number
 }
 
-/** `questionCount` is the total the prep should end up with. */
+/** `questionCount` is the total a first question plan should reach. */
 export type PlanTarget = GenerationConfig
 
 export interface JobSpec {
@@ -28,7 +30,8 @@ export interface JobSpec {
 
 /**
  * The jobs for the next unmet stage: OCR → concepts → `prep.meta` → question tasks. Empty
- * when the prep meets `target` (or has no images to start from).
+ * when the prep has no images to start from, or its question jobs are already planned —
+ * unfinished ones are resumed, not topped up to `target`.
  */
 export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   const pendingImages = state.images.filter(image => !image.ocrDone)
@@ -45,11 +48,10 @@ export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
     return [ { type: PREP_META_JOB_TYPE, inputIds: state.concepts.map(concept => concept.id), question: null } ]
   }
 
-  const missing = target.questionCount - state.questionCount
-  if (missing <= 0) return []
+  if (state.questionJobCount > 0) return []
 
   const idByConcept = new Map<Concept, string>(state.concepts.map(concept => [ concept, concept.id ]))
-  return buildQuestionTasks(state.concepts, { ...target, questionCount: missing }).map(task => ({
+  return buildQuestionTasks(state.concepts, target).map(task => ({
     type: QUESTION_JOB_TYPE,
     inputIds: task.concepts.map(concept => idByConcept.get(concept)!),
     question: { questionType: task.type, difficulty: task.difficulty },

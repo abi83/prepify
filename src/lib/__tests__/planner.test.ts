@@ -25,6 +25,7 @@ function state(overrides: Partial<PrepState> = {}): PrepState {
     concepts: CONCEPTS,
     prepMetaDone: true,
     questionCount: 0,
+    questionJobCount: 0,
     ...overrides,
   }
 }
@@ -69,12 +70,7 @@ describe("nextJobs", () => {
     }
   })
 
-  it("plans only the 5 more questions on a prep that already has questions", () => {
-    const specs = nextJobs(state({ questionCount: 10 }), { ...TARGET, questionCount: 15 })
-    expect(specs).toHaveLength(5)
-  })
-
-  it("plans nothing once the target is met", () => {
-    expect(nextJobs(state({ questionCount: 5 }), TARGET)).toEqual([])
+  it("plans nothing once question jobs exist, even with fewer questions than the target", () => {
+    expect(nextJobs(state({ questionCount: 2, questionJobCount: 5 }), { ...TARGET, questionCount: 10 })).toEqual([])
   })
 })

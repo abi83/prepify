@@ -38,6 +38,7 @@ describe("prepStateRepository", () => {
     const conceptsJob = await job("concepts")
     await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
     await job("prep.meta")
+    await job("question")
     await prisma.question.create({ data: { prepId: finished.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 
     const other = await prepRepository.createPrep(OTHER, { title: "Other", language: "en" })
@@ -45,7 +46,7 @@ describe("prepStateRepository", () => {
 
     const preps = await listUnfinishedPreps(OWNER, TARGET)
     expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
-    expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1 })
+    expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1 })
   })
 
   describe("getPrepProgress", () => {
