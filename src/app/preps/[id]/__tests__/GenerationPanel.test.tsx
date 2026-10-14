@@ -26,7 +26,7 @@ import type { PrepProgress } from "@/repositories/prepStateRepository"
 const fetchMock = vi.fn()
 
 const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
-  runState: "idle", hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, ...overrides,
+  runState: "idle", totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, ...overrides,
 })
 
 async function overrideToServer() {
@@ -140,6 +140,13 @@ describe("GenerationPanel execution mode", () => {
 })
 
 describe("GenerationPanel progress from the DB", () => {
+  it("shows OCR progress while a server run is still recognising pages", () => {
+    renderPanel(progress({ runState: "running", totalPages: 3, ocrPages: 1 }))
+
+    expect(screen.getByText("Recognise pages")).toBeInTheDocument()
+    expect(screen.getByText("(1/3)")).toBeInTheDocument()
+  })
+
   it("polls while a server run is live and refreshes the page when it ends", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mockGetProgress.mockResolvedValueOnce(progress({ runState: "running", totalQuestions: 4, completedQuestions: 1 }))

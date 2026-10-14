@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   ran: [] as string[],
   keysSeenByRun: [] as string[],
   failConcepts: false,
+  failOcr: false,
   logs: [] as string[],
   downloads: [] as string[],
 }))
@@ -56,6 +57,7 @@ function fakeDefinition(type: string, output: (key: string) => unknown) {
   return () => ({
     type,
     run: async (ctx: { apiKey: string }) => {
+      if (type === "ocr" && h.failOcr) throw new Error("ocr boom")
       if (type === "concepts" && h.failConcepts) throw new Error("concepts boom")
       h.ran.push(type)
       h.keysSeenByRun.push(ctx.apiKey)
@@ -100,6 +102,7 @@ beforeEach(async () => {
   h.downloads.length = 0
   h.logs.length = 0
   h.failConcepts = false
+  h.failOcr = false
   vi.mocked(serverPorts).mockClear()
   await prisma.question.deleteMany()
   await prisma.concept.deleteMany()
@@ -182,6 +185,31 @@ describe("POST /api/preps/generate", () => {
       jobInputs: await prisma.jobInput.findMany(),
       concepts: await prisma.concept.findMany(),
       questions: await prisma.question.findMany(),
+      metas: await prisma.generationMeta.findMany(),
+    })
+    expect(dump).not.toContain(API_KEY)
+    expect(h.logs.length).toBeGreaterThan(0)
+    expect(h.logs.join("\n")).not.toContain(API_KEY)
+  })
+
+  it("keeps the API key out of every DB row and log when OCR fails and is resumed", async () => {
+    const { prep } = await makePrep()
+    h.failOcr = true
+    await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })
+    await runAfter()
+    expect(h.ran).toEqual([])
+    expect(await prisma.job.count({ where: { prepId: prep.id, type: "ocr", status: "failed" } })).toBe(1)
+
+    h.failOcr = false
+    await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })
+    await runAfter()
+    expect(h.ran[0]).toBe("ocr")
+    expect(h.keysSeenByRun[0]).toBe(API_KEY)
+
+    const dump = JSON.stringify({
+      images: await prisma.prepImage.findMany(),
+      jobs: await prisma.job.findMany(),
+      jobInputs: await prisma.jobInput.findMany(),
       metas: await prisma.generationMeta.findMany(),
     })
     expect(dump).not.toContain(API_KEY)

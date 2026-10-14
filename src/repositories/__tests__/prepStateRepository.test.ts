@@ -73,6 +73,17 @@ describe("prepStateRepository", () => {
       expect(await getPrepProgress(prep.id)).toMatchObject({ runState: "interrupted" })
     })
 
+    it("counts pages with an OCR result while OCR is running", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      const first = await prepImageRepository.createImage(OWNER, prep.id, "k1")
+      await prepImageRepository.createImage(OWNER, prep.id, "k2")
+      await prisma.prepImage.update({ where: { id: first.id }, data: { ocrResult: { text: "t", visual_elements: [] } } })
+      const job = await addJob(prep.id, "ocr", "running")
+      await prisma.job.update({ where: { id: job.id }, data: { heartbeatAt: new Date() } })
+
+      expect(await getPrepProgress(prep.id)).toMatchObject({ runState: "running", totalPages: 2, ocrPages: 1 })
+    })
+
     it("counts question jobs by status and reports whether concepts exist", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
       const conceptsJob = await addJob(prep.id, "concepts", "executed")
@@ -82,7 +93,7 @@ describe("prepStateRepository", () => {
       await addJob(prep.id, "question", "failed")
       await addJob(prep.id, "question", "created")
 
-      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
+      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
     })
   })
 })
