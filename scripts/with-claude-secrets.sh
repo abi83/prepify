@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code's own scoped credentials only — currently just the Neon MCP key.
+# Claude Code's own scoped credentials only — the Neon MCP key and a Cloud Logging MCP token.
 # Claude has no business holding DATABASE_URL_POOLING/DIRECT; use with-secrets.sh
 # for those. Injected only into the child process this execs — never exported
 # into the calling shell, never written to disk.
@@ -22,4 +22,10 @@ echo "Downloading Claude's scoped secrets from $project GCP project..." >&2
 # distinct from shared/secrets.tf's neon_api_key, the account-level bootstrap key for terraform-ci).
 neon_key="$(gcloud secrets versions access latest --secret=neon-dev-api-key --project="$project")"
 
-exec env "NEON_DEV_API_KEY=$neon_key" "$@"
+# Short-lived (~1h) token of claude-logs-reader (logging.viewer only, terraform/modules/environment/logging_mcp.tf)
+# for the Cloud Logging MCP server. Needs roles/iam.serviceAccountTokenCreator on it — no key file.
+logs_token="$(gcloud auth print-access-token \
+  --impersonate-service-account="claude-logs-reader@${project}.iam.gserviceaccount.com" \
+  --scopes=https://www.googleapis.com/auth/logging.read 2>/dev/null)"
+
+exec env "NEON_DEV_API_KEY=$neon_key" "GCP_LOGS_TOKEN=$logs_token" "$@"
