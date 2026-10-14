@@ -3,10 +3,9 @@
 import type { Prep, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { useState, useRef } from "react"
+import { useCallback, useState, useRef } from "react"
 
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
-import { getMyPrepProgress } from "@/actions/prepState"
 import { listMyQuestions } from "@/actions/questions"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -19,6 +18,7 @@ import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
+import { requestServerRun } from "@/lib/jobs/serverRunClient"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
@@ -27,7 +27,9 @@ import type { PrepProgress } from "@/repositories/prepStateRepository"
 import type { Page } from "@/types/prep"
 import type { QuestionType } from "@/types/questions"
 
+import { ExecutionModeToggle } from "./ExecutionModeToggle"
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
+import { useRunProgress } from "./useRunProgress"
 
 interface Props {
   prepId: string
@@ -52,7 +54,7 @@ export default function GenerationPanel({
   const { data: session } = useSession()
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
   const [ progress, setProgress ] = useState<GenerationProgress | null>(null)
-  const [ prepProgress, setPrepProgress ] = useState<PrepProgress | null>(initialProgress)
+  const [ serverMode, setServerMode ] = useState(false)
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
@@ -61,10 +63,8 @@ export default function GenerationPanel({
   const [ textTooLong, setTextTooLong ] = useState<{ length: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
-
-  async function refreshProgress() {
-    setPrepProgress(await getMyPrepProgress(prepId))
-  }
+  const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
+  const { progress: prepProgress, refresh: refreshProgress, expectRun } = useRunProgress(prepId, initialProgress, handlePollError)
 
   function toggleLocalType(type: QuestionType) {
     setLocalConfig(prev => {
@@ -74,7 +74,19 @@ export default function GenerationPanel({
     })
   }
 
-  async function runGeneration() {
+  async function runOnServer() {
+    const keyConfig = getApiKey()!
+    setGenError(null)
+    try {
+      await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target: localConfig })
+      expectRun()
+      await refreshProgress()
+    } catch (e: unknown) {
+      setGenError((e as Error).message)
+    }
+  }
+
+  async function runInBrowser() {
     const keyConfig = getApiKey()!
     setGenError(null)
     setProgress(null)
@@ -147,16 +159,26 @@ export default function GenerationPanel({
       setTextTooLong({ length })
       return
     }
-    await runGeneration()
+    await (serverMode ? runOnServer() : runInBrowser())
   }
 
   async function handleConfirmTruncate() {
     setTextTooLong(null)
-    await runGeneration()
+    await (serverMode ? runOnServer() : runInBrowser())
+  }
+
+  async function handleResumeInterrupted() {
+    if (!getApiKey()) {
+      router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
+      return
+    }
+    await runOnServer()
   }
 
   const isRunning = genPhase === "running"
   const hasPartialRun = prepProgress !== null
+  const isServerRunning = prepProgress?.runState === "running"
+  const isInterrupted = prepProgress?.runState === "interrupted"
 
   if (hasQuestions && genPhase === "idle") return null
 
@@ -193,12 +215,20 @@ export default function GenerationPanel({
               <div className="mt-4 flex items-center gap-2.5">
                 {isRunning ? (
                   <Button variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button>
+                ) : isServerRunning ? (
+                  <p className="text-sm text-muted-foreground">Running on the server. You can close this tab.</p>
+                ) : isInterrupted ? (
+                  <>
+                    <Button onClick={handleResumeInterrupted}>Resume on server</Button>
+                    <p className="text-sm text-error">Interrupted. Resume to send your key again; finished steps are kept.</p>
+                  </>
                 ) : (
                   <Button onClick={handleGenerate}>
                     {hasPartialRun && (prepProgress.completedQuestions > 0 || prepProgress.failedQuestions > 0) ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
+              {!isRunning && !isServerRunning && !isInterrupted && <ExecutionModeToggle serverMode={serverMode} onChange={setServerMode} />}
             </>
           ) : (
             <>
@@ -256,6 +286,7 @@ export default function GenerationPanel({
                 )}
               </div>
 
+              <ExecutionModeToggle serverMode={serverMode} onChange={setServerMode} />
               <Button className="self-start" onClick={handleGenerate}>Generate questions</Button>
             </>
           )}

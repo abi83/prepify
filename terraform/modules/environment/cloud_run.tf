@@ -25,6 +25,9 @@ resource "google_cloud_run_v2_service" "app" {
   template {
     service_account = google_service_account.run_runtime.email
 
+    # Server-assisted generation runs via after() for up to an hour (maxDuration on the route).
+    timeout = "3600s"
+
     scaling {
       min_instance_count = 0
       max_instance_count = 2
@@ -32,6 +35,11 @@ resource "google_cloud_run_v2_service" "app" {
 
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
+
+      # Instance-based billing: without it CPU is throttled once the response is sent and after() work stalls.
+      resources {
+        cpu_idle = false
+      }
 
       env {
         name  = "AUTH_URL"
