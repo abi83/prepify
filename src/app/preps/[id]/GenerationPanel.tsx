@@ -7,6 +7,7 @@ import { useCallback, useState, useRef } from "react"
 
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
+import { AdditionalSettings } from "@/components/AdditionalSettings"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
 import { generateAndSaveAssets } from "@/lib/assetGeneration"
 import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS } from "@/lib/config"
+import { getExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
@@ -27,7 +29,6 @@ import type { PrepProgress } from "@/repositories/prepStateRepository"
 import type { Page } from "@/types/prep"
 import type { QuestionType } from "@/types/questions"
 
-import { ExecutionModeToggle } from "./ExecutionModeToggle"
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
 import { useRunProgress } from "./useRunProgress"
 
@@ -54,7 +55,7 @@ export default function GenerationPanel({
   const { data: session } = useSession()
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
   const [ progress, setProgress ] = useState<GenerationProgress | null>(null)
-  const [ serverMode, setServerMode ] = useState(false)
+  const [ executionMode, setExecutionMode ] = useState<ExecutionMode>(() => getExecutionMode())
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
@@ -159,12 +160,12 @@ export default function GenerationPanel({
       setTextTooLong({ length })
       return
     }
-    await (serverMode ? runOnServer() : runInBrowser())
+    await (executionMode === "server" ? runOnServer() : runInBrowser())
   }
 
   async function handleConfirmTruncate() {
     setTextTooLong(null)
-    await (serverMode ? runOnServer() : runInBrowser())
+    await (executionMode === "server" ? runOnServer() : runInBrowser())
   }
 
   async function handleResumeInterrupted() {
@@ -228,7 +229,7 @@ export default function GenerationPanel({
                   </Button>
                 )}
               </div>
-              {!isRunning && !isServerRunning && !isInterrupted && <ExecutionModeToggle serverMode={serverMode} onChange={setServerMode} />}
+              {!isRunning && !isServerRunning && !isInterrupted && <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />}
             </>
           ) : (
             <>
@@ -286,7 +287,7 @@ export default function GenerationPanel({
                 )}
               </div>
 
-              <ExecutionModeToggle serverMode={serverMode} onChange={setServerMode} />
+              <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />
               <Button className="self-start" onClick={handleGenerate}>Generate questions</Button>
             </>
           )}
