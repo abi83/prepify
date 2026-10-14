@@ -33,6 +33,10 @@ State for all three lives in the same `gs://prepify-tfstate` bucket, under diffe
    ```bash
    gcloud auth application-default login --impersonate-service-account=prepify-run-runtime@prepify-dev-vk.iam.gserviceaccount.com
    ```
+5. GCS MCP for Claude (#65): `@google-cloud/storage-mcp` reads plain ADC, so it gets its own impersonated credentials file, separate from the one above. Dev buckets, read-only (`claude-gcs-reader`):
+   ```bash
+   CLOUDSDK_CONFIG=~/.config/prepify-gcs-reader gcloud auth application-default login --impersonate-service-account=claude-gcs-reader@prepify-dev-vk.iam.gserviceaccount.com
+   ```
 
 ## Usage
 

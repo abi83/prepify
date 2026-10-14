@@ -20,10 +20,25 @@
       "mcp__gcp_logging__get_bucket",
       "mcp__gcp_logging__list_buckets",
       "mcp__gcp_logging__get_view",
-      "mcp__gcp_logging__list_views"
+      "mcp__gcp_logging__list_views",
+      "mcp__gcs__list_objects",
+      "mcp__gcs__read_object_metadata",
+      "mcp__gcs__read_object_content",
+      "mcp__gcs__get_bucket_metadata"
     ],
     "deny": [
-      "mcp__neon__list_projects"
+      "mcp__neon__list_projects",
+      "mcp__gcs__write_object",
+      "mcp__gcs__upload_object",
+      "mcp__gcs__download_object",
+      "mcp__gcs__delete_object",
+      "mcp__gcs__copy_object",
+      "mcp__gcs__move_object",
+      "mcp__gcs__update_object_metadata",
+      "mcp__gcs__create_bucket",
+      "mcp__gcs__delete_bucket",
+      "mcp__gcs__update_bucket_labels",
+      "Read(~/.config/prepify-gcs-reader/**)"
     ]
   }
 }
