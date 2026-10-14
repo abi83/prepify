@@ -14,7 +14,13 @@
       "mcp__neon__get_postgres_role",
       "mcp__neon__list_slow_queries",
       "mcp__neon__explain_sql_statement",
-      "mcp__neon__inspect_database"
+      "mcp__neon__inspect_database",
+      "mcp__gcp_logging__list_log_entries",
+      "mcp__gcp_logging__list_log_names",
+      "mcp__gcp_logging__get_bucket",
+      "mcp__gcp_logging__list_buckets",
+      "mcp__gcp_logging__get_view",
+      "mcp__gcp_logging__list_views"
     ],
     "deny": [
       "mcp__neon__list_projects"
