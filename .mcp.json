@@ -14,6 +14,15 @@
         "Authorization": "Bearer ${GCP_LOGS_TOKEN}",
         "x-goog-user-project": "prepify-dev-vk"
       }
+    },
+    "gcs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@google-cloud/storage-mcp@0.6.0"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "prepify-dev-vk",
+        "GOOGLE_APPLICATION_CREDENTIALS": "${HOME}/.config/prepify-gcs-reader/application_default_credentials.json"
+      }
     }
   }
 }
