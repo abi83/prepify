@@ -277,7 +277,7 @@ async function writeQuestionOutput(tx: Prisma.TransactionClient, job: JobWithInp
       type: job.questionType,
       difficulty: difficultySchema.parse(job.difficulty),
       language: resolveLanguage(concepts),
-      content: output as unknown as Prisma.InputJsonValue,
+      content: output.content as unknown as Prisma.InputJsonValue,
       prepId: job.prepId,
       producedByJobId: job.id,
     },

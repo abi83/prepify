@@ -106,7 +106,7 @@ describe("question job", () => {
 
     const questions = await prisma.question.findMany({ where: { producedByJobId: job.id } })
     expect(questions).toHaveLength(1)
-    expect(questions[0]).toMatchObject({ prepId: prep.id, type: "flashcard", difficulty: "easy", language: "en", content: QUESTION })
+    expect(questions[0]).toMatchObject({ prepId: prep.id, type: "flashcard", difficulty: "easy", language: "en", content: QUESTION.content })
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(4)
