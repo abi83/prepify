@@ -5,6 +5,13 @@ import { NonRetryableLlmError, type Llm, type LlmMessage, type LlmRequest, type 
 
 const NON_RETRYABLE_STATUSES = [ 400, 401, 403 ]
 
+/** OpenAI's 401 carries no CORS headers, so in the browser a bad key surfaces as a status-less connection error. A real network drop looks identical. */
+const INVALID_KEY_MESSAGE = "Request blocked or failed to connect — check your OpenAI API key in Settings"
+
+function isBlockedConnection(err: unknown): boolean {
+  return err instanceof OpenAI.APIConnectionError && !(err instanceof OpenAI.APIConnectionTimeoutError)
+}
+
 /** OpenAI accepts only `[a-zA-Z0-9_-]{1,64}` as a json_schema name. */
 export function toSchemaName(label: string): string {
   const name = label.replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -41,13 +48,14 @@ export class OpenAiLlm implements Llm {
     this.client = new OpenAI({ apiKey, baseURL: baseUrl, dangerouslyAllowBrowser: true, maxRetries: 0 })
   }
 
-  /** `false` when the provider rejects the key (401/403); any other failure throws. */
+  /** `false` when the provider rejects the key (401/403, or a CORS-blocked 401); any other failure throws. */
   async isKeyValid(): Promise<boolean> {
     try {
       await this.client.models.list()
       return true
     } catch (err) {
       if (err instanceof OpenAI.APIError && (err.status === 401 || err.status === 403)) return false
+      if (isBlockedConnection(err)) return false
       throw err
     }
   }
@@ -80,6 +88,7 @@ export class OpenAiLlm implements Llm {
       if (err instanceof OpenAI.APIError && err.status !== undefined && NON_RETRYABLE_STATUSES.includes(err.status)) {
         throw new NonRetryableLlmError(err.message, err)
       }
+      if (isBlockedConnection(err)) throw new NonRetryableLlmError(INVALID_KEY_MESSAGE, err)
       throw err
     }
   }
