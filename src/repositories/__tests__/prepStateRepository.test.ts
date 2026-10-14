@@ -49,7 +49,7 @@ describe("prepStateRepository", () => {
   })
 
   describe("getPrepProgress", () => {
-    const addJob = (prepId: string, type: string, status: "created" | "executed" | "failed") => prisma.job.create({
+    const addJob = (prepId: string, type: string, status: "created" | "executed" | "failed" | "running" | "interrupted") => prisma.job.create({
       data: {
         prepId, type, status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
         ...(status === "executed" ? { output: [] } : {}),
@@ -63,6 +63,16 @@ describe("prepStateRepository", () => {
       expect(await getPrepProgress(prep.id)).toBeNull()
     })
 
+    it("reports a running or interrupted OCR job even before later jobs exist", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      const job = await addJob(prep.id, "ocr", "running")
+      await prisma.job.update({ where: { id: job.id }, data: { heartbeatAt: new Date() } })
+      expect(await getPrepProgress(prep.id)).toMatchObject({ runState: "running", totalQuestions: 0 })
+
+      await prisma.job.update({ where: { id: job.id }, data: { status: "interrupted" } })
+      expect(await getPrepProgress(prep.id)).toMatchObject({ runState: "interrupted" })
+    })
+
     it("counts question jobs by status and reports whether concepts exist", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
       const conceptsJob = await addJob(prep.id, "concepts", "executed")
@@ -72,7 +82,7 @@ describe("prepStateRepository", () => {
       await addJob(prep.id, "question", "failed")
       await addJob(prep.id, "question", "created")
 
-      expect(await getPrepProgress(prep.id)).toEqual({ hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
+      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
     })
   })
 })

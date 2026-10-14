@@ -36,7 +36,7 @@ export function rowsFromProgress(progress: GenerationProgress | null): Checklist
 
 export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRowData[] {
   const titled = !DEFAULT_TITLE_RE.test(prepTitle)
-  return [
+  const rows: ChecklistRowData[] = [
     { label: "Extract educational concepts", status: s.hasConcepts ? "done" : "pending" },
     { label: "Name the prep", status: titled ? "done" : "pending" },
     {
@@ -46,6 +46,10 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
       failed: s.failedQuestions,
     },
   ]
+  if (s.runState !== "running") return rows
+  const current = rows.find(row => row.status === "pending")
+  if (current) current.status = "running"
+  return rows
 }
 
 export function ChecklistRow({ row }: { row: ChecklistRowData }) {
