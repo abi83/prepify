@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
 
 import { getTotalTokens } from "@/actions/preps"
+import { ExecutionModeSelect } from "@/components/ExecutionModeSelect"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
 import type { ModelId, ServiceTier } from "@/lib/apiKey"
+import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import {
   getGenerationConfig, setGenerationConfig,
@@ -37,6 +39,7 @@ export default function SettingsPage() {
 
   const [ genConfig, setGenConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigSaved, setGenConfigSaved ] = useState(false)
+  const [ executionMode, setExecutionModeState ] = useState<ExecutionMode>(() => getExecutionMode())
 
   useEffect(() => {
     getTotalTokens().then(setTotalTokens)
@@ -46,6 +49,11 @@ export default function SettingsPage() {
     setGenerationConfig(genConfig)
     setGenConfigSaved(true)
     setTimeout(() => setGenConfigSaved(false), 1500)
+  }
+
+  function handleExecutionModeChange(mode: ExecutionMode) {
+    setExecutionMode(mode)
+    setExecutionModeState(mode)
   }
 
   function toggleType(type: QuestionType) {
@@ -182,6 +190,14 @@ export default function SettingsPage() {
         {testState === "error" && (
           <p className="text-sm text-error">Connection failed — check your internet connection.</p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-bold tracking-tight">Execution mode</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Where OCR and generation run. Saved in this browser; you can override it per run.
+        </p>
+        <ExecutionModeSelect value={executionMode} onChange={handleExecutionModeChange} />
       </section>
 
       <section className="flex flex-col gap-4">

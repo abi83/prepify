@@ -29,6 +29,11 @@ const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
   runState: "idle", hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, ...overrides,
 })
 
+async function overrideToServer() {
+  await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
+  await userEvent.click(screen.getByRole("radio", { name: /server-assisted/i }))
+}
+
 function renderPanel(initialProgress: PrepProgress | null = null) {
   return render(
     <GenerationPanel
@@ -45,6 +50,7 @@ function renderPanel(initialProgress: PrepProgress | null = null) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   vi.stubGlobal("fetch", fetchMock)
   fetchMock.mockResolvedValue({ status: 202 })
   mockGetProgress.mockResolvedValue(progress())
@@ -59,8 +65,30 @@ describe("GenerationPanel execution mode", () => {
     mockRunInBrowser.mockResolvedValue(undefined)
     renderPanel()
 
-    expect(screen.getByRole("checkbox", { name: /run on the server/i })).not.toBeChecked()
-    expect(screen.getByText(/never leaves the browser/i)).toBeInTheDocument()
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
+    expect(screen.getByRole("radio", { name: /client/i })).toBeChecked()
+    await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
+
+    expect(mockRunInBrowser).toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("uses the saved server preference without any override", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    renderPanel()
+    await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(mockRunInBrowser).not.toHaveBeenCalled()
+  })
+
+  it("lets a run override the saved preference", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    mockRunInBrowser.mockResolvedValue(undefined)
+    renderPanel()
+    await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
+    await userEvent.click(screen.getByRole("radio", { name: /client/i }))
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(mockRunInBrowser).toHaveBeenCalled()
@@ -69,8 +97,7 @@ describe("GenerationPanel execution mode", () => {
 
   it("posts the key, prep and user settings in server mode, without running in the browser", async () => {
     renderPanel()
-    await userEvent.click(screen.getByRole("checkbox", { name: /run on the server/i }))
-    expect(screen.getByText(/never stored/i)).toBeInTheDocument()
+    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(fetchMock).toHaveBeenCalledOnce()
@@ -94,7 +121,7 @@ describe("GenerationPanel execution mode", () => {
   ])("shows an error for a %i response", async (status, message) => {
     fetchMock.mockResolvedValue({ status })
     renderPanel()
-    await userEvent.click(screen.getByRole("checkbox", { name: /run on the server/i }))
+    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(await screen.findByText(message)).toBeInTheDocument()
@@ -104,7 +131,7 @@ describe("GenerationPanel execution mode", () => {
     fetchMock.mockResolvedValue({ status: 409 })
     mockGetProgress.mockResolvedValue(progress({ runState: "running" }))
     renderPanel()
-    await userEvent.click(screen.getByRole("checkbox", { name: /run on the server/i }))
+    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(await screen.findByText(/running on the server/i)).toBeInTheDocument()
