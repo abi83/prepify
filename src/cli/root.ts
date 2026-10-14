@@ -2,7 +2,7 @@ import path from "path"
 
 import type { Job } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import { createNextJobs, runCreatedJobs, runGeneration, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
+import { createNextJobs, runCreatedJobs, runGeneration, untracked, type GenerationProgress, type RunnerPorts } from "@/lib/jobs/generation"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { createLogger } from "@/lib/logger/core"
 import { createFileTransport } from "@/lib/logger/fileTransport"
@@ -49,6 +49,7 @@ function createCliRoot(options: CliOptions) {
     sampler: createDiskSampler(samplesRoot, SAMPLE_RATE),
     data: prep.data,
     listUnfinishedJobs: prep.listUnfinishedJobs,
+    trackRun: untracked,
   }
   const params = {
     actorId: ACTOR_ID,

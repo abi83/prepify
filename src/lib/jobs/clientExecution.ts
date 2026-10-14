@@ -39,6 +39,7 @@ function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKe
     sampler,
     data: browserPrepData,
     listUnfinishedJobs: (_actorId, prepId) => jobActions.listUnfinishedJobs(prepId),
+    trackRun: generation.untracked,
   }
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm } from "@/core/ports"
-import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, createNextJobs, runCreatedJobs, runGeneration, runOcr, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
+import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, createNextJobs, runCreatedJobs, runGeneration, runOcr, untracked, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
 import type { PrepState } from "@/lib/planner"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -40,6 +40,7 @@ function root(llm: Llm, state: PrepState = PENDING_OCR): RunnerPorts {
       downloadImage: async () => ({ base64: "eA==", mimeType: "image/png" }),
     },
     listUnfinishedJobs: async () => [],
+    trackRun: untracked,
   }
 }
 

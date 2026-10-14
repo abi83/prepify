@@ -156,6 +156,8 @@ model Asset {
 // enforced by PrismaStore (src/repositories/jobRepository.ts), not by the database.
 enum JobStatus {
   created
+  running
+  interrupted
   executed
   failed
 }
@@ -176,6 +178,8 @@ model Job {
   difficulty    String?
   output        Json?
   failureReason String?
+  // Set while `running` and refreshed by the runner (~30s); a stale one means the process died (read as `interrupted`).
+  heartbeatAt   DateTime?
   createdBy     String
   executedBy    String?
   createdAt     DateTime  @default(now())
