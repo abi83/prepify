@@ -3,7 +3,7 @@
 import { agentSampleSchema, type AgentSample } from "@/core/sampler"
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
-import { writeSample } from "@/lib/sampler/gcsSampleStore"
+import { writeSampleWithinCap } from "@/lib/sampler/gcsSampleStore"
 
 // Just under the 12mb server-action body limit in next.config.ts.
 const MAX_SAMPLE_BYTES = 11 * 1024 * 1024
@@ -16,11 +16,11 @@ export async function getSampleRate(): Promise<number> {
 
 /**
  * Persists a sample from the client-side pipeline. The client has already decided to keep it,
- * so this writes unconditionally. Samples carry no BYOK key.
+ * so this only enforces the per-cell cap. Samples carry no BYOK key.
  */
 export async function recordSample(sample: AgentSample): Promise<void> {
   await requireUserId()
   const size = Buffer.byteLength(JSON.stringify(sample))
   if (size > MAX_SAMPLE_BYTES) throw new Error(`Sample too large: ${size} bytes`)
-  await writeSample(agentSampleSchema.parse(sample))
+  await writeSampleWithinCap(agentSampleSchema.parse(sample))
 }

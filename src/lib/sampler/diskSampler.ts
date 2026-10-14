@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir, readdir, writeFile } from "fs/promises"
 import path from "path"
 
 import type { AgentSample, Sampler } from "@/core/sampler"
 
+import { capPerCell } from "./cellCap"
 import { createRateSampler } from "./rateSampler"
 import { serializeSample } from "./storedSample"
 
@@ -16,6 +17,17 @@ export function createDiskSampleWriter(dir: string): (sample: AgentSample) => Pr
   }
 }
 
-export function createDiskSampler(dir: string, rate: number): Sampler {
-  return createRateSampler(() => rate, createDiskSampleWriter(dir))
+function createDiskCellCounter(dir: string): (prefix: string) => Promise<number> {
+  return async (prefix) => {
+    try {
+      return (await readdir(path.join(dir, prefix))).length
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0
+      throw error
+    }
+  }
+}
+
+export function createDiskSampler(dir: string, rate: number, maxPerCell: number): Sampler {
+  return createRateSampler(() => rate, capPerCell(createDiskSampleWriter(dir), createDiskCellCounter(dir), () => maxPerCell))
 }

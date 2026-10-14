@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { writeSample, requireUserId } = vi.hoisted(() => ({ writeSample: vi.fn(), requireUserId: vi.fn() }))
+const { writeSampleWithinCap, requireUserId } = vi.hoisted(() => ({ writeSampleWithinCap: vi.fn(), requireUserId: vi.fn() }))
 
-vi.mock("@/lib/sampler/gcsSampleStore", () => ({ writeSample }))
+vi.mock("@/lib/sampler/gcsSampleStore", () => ({ writeSampleWithinCap }))
 vi.mock("@/lib/currentUser", () => ({ requireUserId }))
 vi.mock("@/lib/env", () => ({ config: { SAMPLE_RATE: 0.25 } }))
 
@@ -25,30 +25,30 @@ const SAMPLE: AgentSample = {
 
 describe("recordSample", () => {
   beforeEach(() => {
-    writeSample.mockReset()
+    writeSampleWithinCap.mockReset()
     requireUserId.mockReset().mockResolvedValue("user-1")
   })
 
   it("writes a valid sample", async () => {
     await recordSample(SAMPLE)
-    expect(writeSample).toHaveBeenCalledWith(SAMPLE)
+    expect(writeSampleWithinCap).toHaveBeenCalledWith(SAMPLE)
   })
 
   it("requires a signed-in user", async () => {
     requireUserId.mockRejectedValue(new Error("Unauthorized"))
     await expect(recordSample(SAMPLE)).rejects.toThrow("Unauthorized")
-    expect(writeSample).not.toHaveBeenCalled()
+    expect(writeSampleWithinCap).not.toHaveBeenCalled()
   })
 
   it("rejects a payload that fails the schema", async () => {
     await expect(recordSample({ ...SAMPLE, promptHash: "bad" })).rejects.toThrow()
-    expect(writeSample).not.toHaveBeenCalled()
+    expect(writeSampleWithinCap).not.toHaveBeenCalled()
   })
 
   it("rejects an oversized payload", async () => {
     const huge = { ...SAMPLE, input: { textContent: "x".repeat(12 * 1024 * 1024), images: [] } }
     await expect(recordSample(huge)).rejects.toThrow("too large")
-    expect(writeSample).not.toHaveBeenCalled()
+    expect(writeSampleWithinCap).not.toHaveBeenCalled()
   })
 })
 

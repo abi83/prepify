@@ -14,6 +14,7 @@ import { createFilePrep } from "./filePrep"
 const ACTOR_ID = "cli"
 const PREP_ID = "cli-prep"
 const SAMPLE_RATE = 1
+const SAMPLE_MAX_PER_CELL = 100
 
 export interface CliOptions {
   /** Prep directory: `images/` in; `jobs/` and `logs/` out. */
@@ -46,7 +47,7 @@ function createCliRoot(options: CliOptions) {
     store: prep.store,
     llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl, temperature: config.llm.temperature, maxTokens: config.llm.maxTokens }),
     logger: createLogger({ transport: createFileTransport(path.join(prepDir, "logs", "run.log")), minLevel: config.log.level }),
-    sampler: createDiskSampler(samplesRoot, SAMPLE_RATE),
+    sampler: createDiskSampler(samplesRoot, SAMPLE_RATE, SAMPLE_MAX_PER_CELL),
     data: prep.data,
     listUnfinishedJobs: prep.listUnfinishedJobs,
     trackRun: untracked,
