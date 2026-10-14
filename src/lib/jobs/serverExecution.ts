@@ -1,6 +1,6 @@
 import type { PrepData } from "@/core/ports"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
-import { consoleLogger } from "@/lib/logger"
+import { serverLogger } from "@/lib/logger/server"
 import { createGcsSampler } from "@/lib/sampler/gcsSampleStore"
 import * as jobRepository from "@/repositories/jobRepository"
 
@@ -12,7 +12,7 @@ export function serverPorts(apiKey: string, data: PrepData): RunnerPorts {
   return {
     store: jobRepository.createPrismaStore(),
     llm: new OpenAiLlm({ apiKey }),
-    logger: consoleLogger,
+    logger: serverLogger,
     sampler: createGcsSampler(),
     data,
     listUnfinishedJobs: jobRepository.listUnfinishedJobs,
