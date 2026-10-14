@@ -27,7 +27,7 @@ resource "google_storage_bucket" "this" {
 
   cors {
     origin          = var.environment == "dev" ? [var.auth_url, "http://localhost:3000"] : [var.auth_url]
-    method          = ["PUT", "OPTIONS"]
+    method          = ["GET", "HEAD", "PUT", "OPTIONS"]
     response_header = ["Content-Type", "x-goog-content-length-range"]
     max_age_seconds = 3600
   }
