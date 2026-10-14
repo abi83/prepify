@@ -3,7 +3,8 @@ import { z } from "zod"
 import { AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { DEFAULT_GEN_CONFIG } from "@/lib/generationConfig"
-import { consoleLogger, serializeError } from "@/lib/logger"
+import { serializeError } from "@/lib/logger"
+import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"
 import { difficultySchema, questionTypeSchema } from "@/types/questions"
 
@@ -64,7 +65,7 @@ export async function runServerGeneration(userId: string, { apiKey, prepId, mode
     })
   } catch (error) {
     // Nobody awaits this background task; progress and failures are already in the job rows.
-    consoleLogger.error("Server generation failed", { prepId, error: serializeError(error) })
+    serverLogger.error("Server generation failed", { prepId, error: serializeError(error) })
   } finally {
     releasePrepRun(prepId)
   }

@@ -1,4 +1,5 @@
-import { consoleLogger, serializeError } from "@/lib/logger"
+import { serializeError } from "@/lib/logger"
+import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"
 
 import type { TrackRun } from "./generation"
@@ -19,7 +20,7 @@ function installSigtermHandler(): void {
   if (sigtermHandlerInstalled) return
   sigtermHandlerInstalled = true
   process.on("SIGTERM", () => {
-    interruptActiveJobs().catch(error => consoleLogger.error("Marking jobs interrupted on SIGTERM failed", { error: serializeError(error) }))
+    interruptActiveJobs().catch(error => serverLogger.error("Marking jobs interrupted on SIGTERM failed", { error: serializeError(error) }))
   })
 }
 
@@ -35,7 +36,7 @@ export const trackServerRun: TrackRun = async (job, run) => {
   installSigtermHandler()
   activeJobIds.add(job.id)
   const heartbeat = setInterval(() => {
-    jobRepository.touchHeartbeat(job.id).catch(error => consoleLogger.error("Job heartbeat failed", { jobId: job.id, error: serializeError(error) }))
+    jobRepository.touchHeartbeat(job.id).catch(error => serverLogger.error("Job heartbeat failed", { jobId: job.id, error: serializeError(error) }))
   }, HEARTBEAT_INTERVAL_MS).unref()
   try {
     if (!await jobRepository.claimJob(job.id)) throw claimLost(job.id)

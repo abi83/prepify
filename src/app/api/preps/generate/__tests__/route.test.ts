@@ -42,9 +42,9 @@ vi.mock("@google-cloud/storage", () => ({
     }
   },
 }))
-vi.mock("@/lib/logger/console", () => {
-  const record = (...args: unknown[]) => { h.logs.push(JSON.stringify(args)) }
-  return { consoleLogger: { debug: record, info: record, warn: record, error: record } }
+vi.mock("@/lib/logger/server", async () => {
+  const { createLogger } = await import("@/lib/logger/core")
+  return { serverLogger: createLogger({ transport: line => { h.logs.push(line) } }) }
 })
 vi.mock("@/lib/sampler/gcsSampleStore", () => ({ createGcsSampler: () => ({}) }))
 vi.mock("@/lib/jobs/serverExecution", async importOriginal => {
