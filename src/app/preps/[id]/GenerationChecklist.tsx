@@ -20,9 +20,10 @@ const DEFAULT_TITLE_RE = /^Prep #\d+$/
 export function rowsFromProgress(progress: GenerationProgress | null): ChecklistRowData[] {
   const stage = progress?.stage ?? null
   const ocrDone = stage !== "ocr"
-  const conceptsDone = stage === "meta" || stage === "questions" || stage === "done"
-  const namingDone = stage === "questions" || stage === "done"
-  const questionsDone = stage === "done"
+  const conceptsDone = stage === "meta" || stage === "questions" || stage === "assets" || stage === "done"
+  const namingDone = stage === "questions" || stage === "assets" || stage === "done"
+  const questionsDone = stage === "assets" || stage === "done"
+  const assetsDone = stage === "done"
 
   return [
     {
@@ -36,6 +37,11 @@ export function rowsFromProgress(progress: GenerationProgress | null): Checklist
       label: "Craft and validate questions",
       status: questionsDone ? "done" : stage === "questions" ? "running" : "pending",
       detail: progress?.stage === "questions" ? `${progress.done}/${progress.total}` : undefined,
+    },
+    {
+      label: "Draw formulas and diagrams",
+      status: assetsDone ? "done" : stage === "assets" ? "running" : "pending",
+      detail: progress?.stage === "assets" ? `${progress.done}/${progress.total}` : undefined,
     },
   ]
 }

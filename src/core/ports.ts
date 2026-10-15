@@ -99,10 +99,17 @@ export interface PrepImageRef {
   language: SupportedLanguage | null
 }
 
+/** The `Question` fields jobs read. */
+export interface QuestionRef {
+  id: string
+  content: unknown
+}
+
 /** What a runtime fetches to build job inputs — the browser adapter wraps server actions. */
 export interface PrepData {
   loadState(prepId: string): Promise<PrepState>
   listImages(prepId: string): Promise<PrepImageRef[]>
+  loadQuestion(prepId: string, questionId: string): Promise<QuestionRef>
   downloadImage(prepId: string, gcsKey: string): Promise<AgentImage>
 }
 

@@ -6,7 +6,7 @@ import type { QuestionSpec } from "@/core/job"
 import type { Concept, PageConcepts, StoredConcept } from "@/types/pipeline"
 
 import type { GenerationConfig } from "./generationConfig"
-import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
 import { buildQuestionTasks } from "./taskBuilder"
 
 /** A page's concept extraction: not run yet, or its outcome. */
@@ -20,6 +20,8 @@ export interface PrepState {
   questionCount: number
   /** `question` jobs in any status — once any exist, they are the question plan. */
   questionJobCount: number
+  /** Questions whose `asset_hint` asks for an asset and that have neither an asset nor an `asset` job (any status). */
+  assetQuestionIds: string[]
 }
 
 /** `questionCount` is the total a first question plan should reach. */
@@ -50,9 +52,9 @@ export function assertConceptsFound(state: PrepState): void {
 
 /**
  * The jobs for the next unmet stage: OCR → concept extraction (per page) → concepts merge →
- * `prep.meta` → question tasks. Empty when the prep has no images to start from, every page
- * came up empty (see `assertConceptsFound`), or its question jobs are already planned —
- * unfinished ones are resumed, not topped up to `target`.
+ * `prep.meta` → question tasks → one asset job per question that needs one. Empty when the prep
+ * has no images to start from, every page came up empty (see `assertConceptsFound`), or its
+ * question and asset jobs are already planned — unfinished ones are resumed, not topped up to `target`.
  */
 export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   const pendingImages = state.images.filter(image => !image.ocrDone)
@@ -67,7 +69,9 @@ export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
     return [ { type: PREP_META_JOB_TYPE, inputIds: state.concepts.map(concept => concept.id), question: null } ]
   }
 
-  if (state.questionJobCount > 0) return []
+  if (state.questionJobCount > 0) {
+    return state.assetQuestionIds.map(questionId => ({ type: ASSET_JOB_TYPE, inputIds: [ questionId ], question: null }))
+  }
 
   const idByConcept = new Map<Concept, string>(state.concepts.map(concept => [ concept, concept.id ]))
   return buildQuestionTasks(state.concepts, target).map(task => ({

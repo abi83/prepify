@@ -5,16 +5,17 @@ import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
 import { ocrResultSchema } from "@/types/prep"
 
+import { createAssetJobDefinition } from "./assetJob"
 import { createConceptsExtractJobDefinition, type OcrPage } from "./conceptsExtractJob"
 import { createConceptsJobDefinition } from "./conceptsJob"
 import { createJobs, executePrep, runJobs, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
-import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
 import { createOcrJobDefinition } from "./ocrJob"
 import { createPrepMetaJobDefinition } from "./prepMetaJob"
 import { createQuestionJobDefinition } from "./questionJob"
 
 /** A stage's progress: the planner's stages in order. */
-export type GenerationStage = "ocr" | "concepts" | "meta" | "questions"
+export type GenerationStage = "ocr" | "concepts" | "meta" | "questions" | "assets"
 export type GenerationProgress =
   | { stage: GenerationStage; done: number; total: number }
   | { stage: "done" }
@@ -30,8 +31,9 @@ const STAGE_BY_JOB_TYPE: Record<string, GenerationStage> = {
   [CONCEPTS_JOB_TYPE]: "concepts",
   [PREP_META_JOB_TYPE]: "meta",
   [QUESTION_JOB_TYPE]: "questions",
+  [ASSET_JOB_TYPE]: "assets",
 }
-const STAGES: GenerationStage[] = [ "ocr", "concepts", "meta", "questions" ]
+const STAGES: GenerationStage[] = [ "ocr", "concepts", "meta", "questions", "assets" ]
 
 function stageOf(jobType: string): GenerationStage {
   const stage = STAGE_BY_JOB_TYPE[jobType]
@@ -83,6 +85,8 @@ function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: D
       return createPrepMetaJobDefinition(await conceptsFor(job), deps)
     case QUESTION_JOB_TYPE:
       return createQuestionJobDefinition(await conceptsFor(job), deps)
+    case ASSET_JOB_TYPE:
+      return createAssetJobDefinition(await data.loadQuestion(prepId, job.inputIds[0]), deps)
     default:
       throw new Error(`Unknown job type "${job.type}"`)
     }

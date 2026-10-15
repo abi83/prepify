@@ -2,8 +2,9 @@ import { Prisma, type Job as JobRow } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import type { Store } from "@/core/ports"
+import type { AssetOutput } from "@/lib/agents/assets/assetRouter"
 import type { OcrOutput } from "@/lib/agents/OcrAgent"
-import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
 import { resolveLanguage } from "@/lib/language"
 import { prisma } from "@/lib/prisma"
@@ -30,7 +31,7 @@ export async function interruptStaleJobs(where: Prisma.JobWhereInput = {}): Prom
   })
 }
 
-/** Looks up which Prep owns a job input entity (ADR point 4). `prepImage` (produced by the
+/** Looks up which Prep owns a job input entity (ADR point 4). `question` (the `asset` job's input) is looked up directly. `prepImage` (produced by the
  *  `ocr` job, #270) and `concept` (produced by the `concepts` merge job, #272 — via its
  *  `producedByJob`, since `Concept` has no direct `prepId`) are the only input entity types
  *  any job produces today — a new one (#273's questions) adds a branch here, not a schema change. */
@@ -43,6 +44,9 @@ async function findInputOwner(entityId: string): Promise<{ entityType: string; p
     select: { producedByJob: { select: { prepId: true } } },
   })
   if (concept) return { entityType: "concept", prepId: concept.producedByJob.prepId }
+
+  const question = await prisma.question.findUnique({ where: { id: entityId }, select: { prepId: true } })
+  if (question) return { entityType: "question", prepId: question.prepId }
 
   return null
 }
@@ -155,11 +159,12 @@ export function createPrismaStore(): Store {
 
     async existingIds(actorId: string, ids: string[]): Promise<Set<string>> {
       if (ids.length === 0) return new Set()
-      const [ images, concepts ] = await Promise.all([
+      const [ images, concepts, questions ] = await Promise.all([
         prisma.prepImage.findMany({ where: { id: { in: ids }, prep: { userId: actorId } }, select: { id: true } }),
         prisma.concept.findMany({ where: { id: { in: ids }, producedByJob: { prep: { userId: actorId } } }, select: { id: true } }),
+        prisma.question.findMany({ where: { id: { in: ids }, prep: { userId: actorId } }, select: { id: true } }),
       ])
-      return new Set([ ...images.map(i => i.id), ...concepts.map(c => c.id) ])
+      return new Set([ ...images.map(i => i.id), ...concepts.map(c => c.id), ...questions.map(q => q.id) ])
     },
 
     async commitJob<TOutput>(
@@ -231,6 +236,7 @@ const DOMAIN_WRITERS: Record<string, (tx: Prisma.TransactionClient, job: JobWith
   [CONCEPTS_JOB_TYPE]: writeConceptsOutput,
   [PREP_META_JOB_TYPE]: writePrepMetaOutput,
   [QUESTION_JOB_TYPE]: writeQuestionOutput,
+  [ASSET_JOB_TYPE]: writeAssetOutput,
 }
 
 /** Writes an outcome's domain rows and `GenerationMeta` rows (wasted ones flagged) for `job`. */
@@ -287,4 +293,10 @@ async function writeQuestionOutput(tx: Prisma.TransactionClient, job: JobWithInp
       producedByJobId: job.id,
     },
   })
+}
+
+/** Creates the question's `Asset` row; an empty blob (the router skips `table`/`svg`) writes nothing. */
+async function writeAssetOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: AssetOutput) {
+  if (output.blob === "") return
+  return tx.asset.create({ data: { questionId: job.inputs[0].entityId, type: output.type, blob: output.blob, producedByJobId: job.id } })
 }

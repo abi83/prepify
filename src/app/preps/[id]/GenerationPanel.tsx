@@ -13,14 +13,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
-import { generateAndSaveAssets } from "@/lib/assetGeneration"
-import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { getExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
 import { requestServerRun } from "@/lib/jobs/serverRunClient"
-import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
@@ -117,16 +114,6 @@ export default function GenerationPanel({
 
       const elapsed = Math.round(performance.now() - genStartRef.current)
       const savedQuestions = await listMyQuestions(prepId)
-
-      if (savedQuestions.length > 0) {
-        void generateAndSaveAssets(
-          savedQuestions,
-          keyConfig.model,
-          keyConfig.tier,
-          abortRef.current.signal,
-          { llm: new OpenAiLlm({ apiKey: keyConfig.key }), logger: consoleLogger, sampler: clientSampler, timeoutMs: DEFAULT_TIMEOUT_MS },
-        )
-      }
 
       const [ freshPrep, tokensAfter ] = await Promise.all([ getMyPrep(prepId), getPrepTokens(prepId) ])
       onComplete(savedQuestions, freshPrep)

@@ -3,6 +3,8 @@ import type { Llm, ProgressSink, Store } from "@/core/ports"
 import { runJob, type JobDefinition } from "@/core/runJob"
 import { assertConceptsFound, nextJobs, type JobSpec, type PlanTarget, type PrepState } from "@/lib/planner"
 
+import { ASSET_JOB_TYPE } from "./jobTypes"
+
 export interface RunDeps {
   store: Store
   llm: Llm
@@ -52,7 +54,8 @@ export async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: 
   return results
 }
 
-/** Runs `jobs` through `runJob`; throws once all have settled if any failed, lost its commit race, or threw. */
+/** Runs `jobs` through `runJob`; throws once all have settled if any failed, lost its commit race, or threw.
+ *  A failed `asset` job doesn't count: it stays `failed` for resume, and the prep completes without that asset. */
 export async function runJobs(deps: RunDeps, params: RunParams, jobs: Job[]): Promise<void> {
   const { store, llm, progress } = deps
   const { actorId, apiKey, signal, concurrency } = params
@@ -68,7 +71,7 @@ export async function runJobs(deps: RunDeps, params: RunParams, jobs: Job[]): Pr
   const failures = settled.flatMap((result, i) => {
     if (result.status === "rejected") return [ `${jobs[i].id}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}` ]
     if (!result.value.committed) return [ `${jobs[i].id}: lost the commit race` ]
-    if (result.value.status === "failed") return [ `${jobs[i].id}: ${result.value.failureReason}` ]
+    if (result.value.status === "failed" && jobs[i].type !== ASSET_JOB_TYPE) return [ `${jobs[i].id}: ${result.value.failureReason}` ]
     return []
   })
   if (failures.length > 0) throw new Error(`${failures.length} of ${jobs.length} job(s) failed:\n${failures.join("\n")}`)

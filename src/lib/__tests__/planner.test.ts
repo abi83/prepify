@@ -30,6 +30,7 @@ function state(overrides: Partial<PrepState> = {}): PrepState {
     prepMetaDone: true,
     questionCount: 0,
     questionJobCount: 0,
+    assetQuestionIds: [],
     ...overrides,
   }
 }
@@ -109,6 +110,14 @@ describe("nextJobs", () => {
 
   it("plans nothing once question jobs exist, even with fewer questions than the target", () => {
     expect(nextJobs(state({ questionCount: 2, questionJobCount: 5 }), { ...TARGET, questionCount: 10 })).toEqual([])
+  })
+
+  it("plans one asset job per question needing an asset once question jobs exist", () => {
+    const specs = nextJobs(state({ questionCount: 3, questionJobCount: 3, assetQuestionIds: [ "q1", "q3" ] }), TARGET)
+    expect(specs).toEqual([
+      { type: "asset", inputIds: [ "q1" ], question: null },
+      { type: "asset", inputIds: [ "q3" ], question: null },
+    ])
   })
 })
 

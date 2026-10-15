@@ -4,6 +4,7 @@ import type { PrepData } from "@/core/ports"
 import { config } from "@/lib/env"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepStateRepository from "@/repositories/prepStateRepository"
+import * as questionRepository from "@/repositories/questionRepository"
 
 const storage = new Storage()
 
@@ -12,6 +13,7 @@ export function serverPrepData(userId: string): PrepData {
   return {
     loadState: prepStateRepository.loadPrepState,
     listImages: prepId => prepImageRepository.listImages(userId, prepId),
+    loadQuestion: (prepId, questionId) => questionRepository.getOwned(userId, prepId, questionId),
     async downloadImage(_prepId, gcsKey) {
       const file = storage.bucket(config.GCS_BUCKET_NAME).file(gcsKey)
       const [ [ bytes ], [ metadata ] ] = await Promise.all([ file.download(), file.getMetadata() ])

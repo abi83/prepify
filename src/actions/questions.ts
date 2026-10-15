@@ -9,6 +9,10 @@ export async function listMyQuestions(prepId: string): Promise<Question[]> {
   return questionRepository.listByPrep(await requireUserId(), prepId)
 }
 
+export async function loadMyQuestion(prepId: string, questionId: string): Promise<Question> {
+  return questionRepository.getOwned(await requireUserId(), prepId, questionId)
+}
+
 export async function listSharedQuestions(prepId: string): Promise<Question[]> {
   return questionRepository.listByPrep(null, prepId)
 }

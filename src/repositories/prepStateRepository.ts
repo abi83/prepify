@@ -1,6 +1,7 @@
 import type { JobStatus, Prep } from "@prisma/client"
 
-import { CONCEPTS_EXTRACT_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { activeAssetHint } from "@/lib/assetHint"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
@@ -9,7 +10,7 @@ import { interruptStaleJobs } from "./jobRepository"
 
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<PrepState> {
-  const [ images, concepts, extractJobs, prepMetaJobs, questionCount, questionJobCount ] = await Promise.all([
+  const [ images, concepts, extractJobs, prepMetaJobs, questions, questionJobCount, assets, assetJobInputs ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
     prisma.concept.findMany({ where: { producedByJob: { prepId } }, orderBy: { createdAt: "asc" } }),
     prisma.job.findMany({
@@ -18,17 +19,23 @@ export async function loadPrepState(prepId: string): Promise<PrepState> {
       orderBy: { createdAt: "asc" },
     }),
     prisma.job.count({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" } }),
-    prisma.question.count({ where: { prepId } }),
+    prisma.question.findMany({ where: { prepId }, select: { id: true, content: true }, orderBy: { createdAt: "asc" } }),
     prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE } }),
+    prisma.asset.findMany({ where: { question: { prepId } }, select: { questionId: true } }),
+    prisma.jobInput.findMany({ where: { entityType: "question", job: { prepId, type: ASSET_JOB_TYPE } }, select: { entityId: true } }),
   ])
+
+  const assetHandled = new Set([ ...assets.map(asset => asset.questionId), ...assetJobInputs.map(input => input.entityId) ])
+  const assetQuestionIds = questions.filter(question => activeAssetHint(question.content) && !assetHandled.has(question.id)).map(question => question.id)
 
   const pageConcepts = indexPageConcepts(extractJobs.map(job => ({ inputIds: job.inputs.map(input => input.entityId), output: job.output })))
   return {
     images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" } })),
     concepts: concepts.map(({ id, name, description, importance, misconceptions, language }) => ({ id, name, description, importance, misconceptions, language })),
     prepMetaDone: prepMetaJobs > 0,
-    questionCount,
+    questionCount: questions.length,
     questionJobCount,
+    assetQuestionIds,
   }
 }
 

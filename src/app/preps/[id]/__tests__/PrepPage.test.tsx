@@ -13,7 +13,6 @@ vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
 vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: vi.fn() }))
 vi.mock("@/actions/attempts", () => ({ insertAttempt: vi.fn() }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
-vi.mock("@/lib/assetGeneration", () => ({ generateAndSaveAssets: vi.fn() }))
 vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: vi.fn() }))
 vi.mock("@/lib/apiKey", () => ({ getApiKey: () => null }))
 

@@ -143,12 +143,16 @@ model GenerationMeta {
 
 model Asset {
   id         String   @id @default(uuid())
-  questionId String
+  // One asset per question.
+  questionId String   @unique
   type       String
   blob       String
+  // Set by the `asset` job; null for assets generated before it existed, or if that job is deleted.
+  producedByJobId String?
   createdAt  DateTime @default(now())
 
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  producedByJob Job?     @relation(fields: [producedByJobId], references: [id], onDelete: SetNull)
 }
 
 // Runtime-agnostic job model — see wiki ADR-Pipeline-Job-Model. Mirrors the `Job` discriminated
@@ -190,6 +194,7 @@ model Job {
   concepts          Concept[]
   producedImages    PrepImage[]
   producedQuestions Question[]
+  producedAssets    Asset[]
   generationMetas   GenerationMeta[]
 }
 

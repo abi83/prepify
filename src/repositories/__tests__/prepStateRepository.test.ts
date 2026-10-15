@@ -16,6 +16,7 @@ const OTHER = "user-other"
 const TARGET: PlanTarget = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 
 beforeEach(async () => {
+  await prisma.asset.deleteMany()
   await prisma.jobInput.deleteMany()
   await prisma.question.deleteMany()
   await prisma.concept.deleteMany()
@@ -47,6 +48,25 @@ describe("prepStateRepository", () => {
     const preps = await listUnfinishedPreps(OWNER, TARGET)
     expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
     expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1 })
+  })
+
+  it("lists questions that need an asset and have neither an asset nor an asset job", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Assets", language: "en" })
+    const hint = (needed: boolean) => ({ needed, type: needed ? "formula" : null, description: needed ? "E=mc^2" : null })
+    const question = (needed: boolean) => prisma.question.create({ data: { prepId: prep.id, language: "en", type: "flashcard", content: { asset_hint: hint(needed) } } })
+    const [ plain, pending, withAsset, withJob ] = await Promise.all([ question(false), question(true), question(true), question(true) ])
+    await prisma.asset.create({ data: { questionId: withAsset.id, type: "formula", blob: "<svg></svg>" } })
+    await prisma.job.create({
+      data: {
+        prepId: prep.id, type: "asset", status: "failed", failureReason: "boom", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
+        inputs: { create: [ { entityType: "question", entityId: withJob.id } ] },
+      },
+    })
+
+    const state = await loadPrepState(prep.id)
+
+    expect(state.assetQuestionIds).toEqual([ pending.id ])
+    expect(state.assetQuestionIds).not.toContain(plain.id)
   })
 
   describe("getPrepProgress", () => {

@@ -27,6 +27,8 @@ function executedOcr(text: string): Extract<JobOutcome<unknown>, { status: "exec
 const store = createPrismaStore()
 
 beforeEach(async () => {
+  await prisma.asset.deleteMany()
+  await prisma.question.deleteMany()
   await prisma.jobInput.deleteMany()
   await prisma.concept.deleteMany()
   await prisma.generationMeta.deleteMany()
@@ -127,6 +129,45 @@ describe("commitJob", () => {
 
     const question = await prisma.question.findFirstOrThrow({ where: { producedByJobId: job.id } })
     expect(question.content).toEqual(content)
+  })
+
+  describe("asset job", () => {
+    async function makeAssetJob() {
+      const { concept } = await makeConcept(OWNER)
+      const prep = await prisma.prep.findFirstOrThrow()
+      const question = await prisma.question.create({ data: { prepId: prep.id, type: "flashcard", language: "en", content: {} } })
+      const job = await store.createJob(OWNER, "asset", [ question.id ], CONFIG)
+      return { question, job, concept }
+    }
+    const executedAsset = (blob: string): Extract<JobOutcome<unknown>, { status: "executed" }> =>
+      ({ status: "executed", output: { type: "formula", blob }, metas: [ META ], wastedMetas: [] })
+
+    it("writes the asset and attributes its cost to the asset job", async () => {
+      const { question, job } = await makeAssetJob()
+
+      await store.commitJob(OWNER, job.id, "created", executedAsset("<svg></svg>"))
+
+      expect(await prisma.asset.findMany({ where: { questionId: question.id } })).toMatchObject([ { type: "formula", blob: "<svg></svg>", producedByJobId: job.id } ])
+      expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(1)
+    })
+
+    it("leaves exactly one asset after a failed attempt is retried", async () => {
+      const { question, job } = await makeAssetJob()
+
+      await store.commitJob(OWNER, job.id, "created", FAILED)
+      expect(await prisma.asset.count({ where: { questionId: question.id } })).toBe(0)
+      await store.commitJob(OWNER, job.id, "failed", executedAsset("<svg></svg>"))
+
+      expect(await prisma.asset.count({ where: { questionId: question.id } })).toBe(1)
+    })
+
+    it("writes no asset for an empty blob", async () => {
+      const { question, job } = await makeAssetJob()
+
+      await store.commitJob(OWNER, job.id, "created", executedAsset(""))
+
+      expect(await prisma.asset.count({ where: { questionId: question.id } })).toBe(0)
+    })
   })
 
   it("retries a failed job: commits failed, then executed", async () => {
