@@ -54,3 +54,11 @@ export async function getPrepTokens(id: string): Promise<number> {
 export async function getTotalTokens(): Promise<number> {
   return prepRepository.getOwnedTokens(await requireUserId())
 }
+
+export async function getPrepCost(id: string): Promise<number> {
+  return prepRepository.getPrepCost(await requireUserId(), id)
+}
+
+export async function getTotalCost(): Promise<number> {
+  return prepRepository.getOwnedCost(await requireUserId())
+}

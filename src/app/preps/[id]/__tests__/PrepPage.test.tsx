@@ -44,7 +44,7 @@ function concept(overrides: Partial<StatedConcept> = {}): StatedConcept {
 
 function renderPage(concepts: StatedConcept[]) {
   return render(
-    <PrepPage prep={prep} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} concepts={concepts} images={[]} />,
+    <PrepPage prep={prep} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={concepts} images={[]} />,
   )
 }
 

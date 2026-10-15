@@ -71,6 +71,12 @@ async function sumTokens(where: Prisma.GenerationMetaWhereInput): Promise<number
   return (_sum.promptTokens ?? 0) + (_sum.completionTokens ?? 0)
 }
 
+/** Stored `costUsd` over every LLM call matching `where`, wasted calls included. */
+async function sumCost(where: Prisma.GenerationMetaWhereInput): Promise<number> {
+  const { _sum } = await prisma.generationMeta.aggregate({ where, _sum: { costUsd: true } })
+  return _sum.costUsd ?? 0
+}
+
 export async function getPrepTokens(userId: string | null, id: string): Promise<number> {
   await getPrep(userId, id)
   return sumTokens({ job: { prepId: id } })
@@ -78,4 +84,13 @@ export async function getPrepTokens(userId: string | null, id: string): Promise<
 
 export function getOwnedTokens(userId: string): Promise<number> {
   return sumTokens({ job: { prep: { userId, isActive: true } } })
+}
+
+export async function getPrepCost(userId: string | null, id: string): Promise<number> {
+  await getPrep(userId, id)
+  return sumCost({ job: { prepId: id } })
+}
+
+export function getOwnedCost(userId: string): Promise<number> {
+  return sumCost({ job: { prep: { userId, isActive: true } } })
 }

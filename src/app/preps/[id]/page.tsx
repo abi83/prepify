@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { listMyAssets } from "@/actions/assets"
 import { listMyAttempts } from "@/actions/attempts"
 import { listMyPrepImages } from "@/actions/prepImages"
-import { getMyPrep, getPrepTokens } from "@/actions/preps"
+import { getMyPrep, getPrepCost, getPrepTokens } from "@/actions/preps"
 import { getMyPrepProgress, loadMyPrepState } from "@/actions/prepState"
 import { listMyQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
@@ -43,11 +43,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const [ questions, attempts, progress, tokensUsed, state, images ] = await Promise.all([
+  const [ questions, attempts, progress, tokensUsed, costUsd, state, images ] = await Promise.all([
     listMyQuestions(id),
     listMyAttempts(id),
     getMyPrepProgress(id),
     getPrepTokens(id),
+    getPrepCost(id),
     loadMyPrepState(id),
     listMyPrepImages(id),
   ])
@@ -62,6 +63,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       assets={assets}
       progress={progress}
       tokensUsed={tokensUsed}
+      costUsd={costUsd}
       concepts={state.concepts}
       images={images}
     />

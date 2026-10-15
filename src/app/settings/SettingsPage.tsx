@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
 
-import { getTotalTokens } from "@/actions/preps"
+import { getTotalCost, getTotalTokens } from "@/actions/preps"
 import { ExecutionModeSelect } from "@/components/ExecutionModeSelect"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -19,7 +19,7 @@ import {
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from "@/lib/generationConfig"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
-import { estimateCost, formatCost } from "@/lib/pricing"
+import { formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
 import type { QuestionType } from "@/types/questions"
 
@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [ saved, setSaved ] = useState(false)
   const [ testState, setTestState ] = useState<TestState>("idle")
   const [ totalTokens, setTotalTokens ] = useState(0)
+  const [ totalCost, setTotalCost ] = useState(0)
 
   const [ genConfig, setGenConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigSaved, setGenConfigSaved ] = useState(false)
@@ -43,6 +44,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     getTotalTokens().then(setTotalTokens)
+    getTotalCost().then(setTotalCost)
   }, [])
 
   function handleGenConfigSave() {
@@ -256,12 +258,10 @@ export default function SettingsPage() {
           <span className="text-sm text-muted-foreground">Total tokens (all preps)</span>
           <span className="text-sm font-semibold whitespace-nowrap">{totalTokens.toLocaleString()}</span>
         </div>
-        {totalTokens > 0 && model && (
+        {totalTokens > 0 && (
           <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-background px-4 py-3.5">
-            <span className="text-sm text-muted-foreground">Estimated cost ({model})</span>
-            <span className="text-sm font-semibold whitespace-nowrap">
-                ~{formatCost(estimateCost(totalTokens * 0.8, totalTokens * 0.2, model, tier))}
-            </span>
+            <span className="text-sm text-muted-foreground">Total cost</span>
+            <span className="text-sm font-semibold whitespace-nowrap">{formatCost(totalCost)}</span>
           </div>
         )}
       </section>
