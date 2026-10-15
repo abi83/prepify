@@ -10,6 +10,8 @@ const { mockPush, mockRefresh, mockGetProgress, mockRunInBrowser, mockRetryTermi
   mockRunInBrowser: vi.fn(),
 }))
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+vi.mock("sonner", () => ({ toast: { error: toastError } }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush, refresh: mockRefresh }) }))
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "u1" } } }) }))
 vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: mockGetProgress }))
@@ -20,6 +22,7 @@ vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
 vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: mockRunInBrowser }))
 vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }) }))
 
+import { getMyPrep } from "@/actions/preps"
 import GenerationPanel from "@/app/preps/[id]/GenerationPanel"
 import { POLL_INTERVAL_MS } from "@/app/preps/[id]/useRunProgress"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
@@ -72,6 +75,19 @@ describe("GenerationPanel execution mode", () => {
 
     expect(mockRunInBrowser).toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("shows an error toast when the generated title cannot be loaded", async () => {
+    vi.mocked(getMyPrep).mockRejectedValue(new Error("boom"))
+    mockRunInBrowser.mockImplementation(async ({ onProgress }) => {
+      onProgress({ stage: "questions" })
+      await vi.waitFor(() => expect(toastError).toHaveBeenCalled())
+    })
+    renderPanel()
+
+    await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
+
+    expect(toastError).toHaveBeenCalledWith("Could not load the generated title")
   })
 
   it("uses the saved server preference without any override", async () => {

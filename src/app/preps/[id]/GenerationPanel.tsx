@@ -4,6 +4,7 @@ import type { Prep, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useCallback, useState, useRef } from "react"
+import { toast } from "sonner"
 
 import { retryTerminalJobs } from "@/actions/jobs"
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
@@ -108,7 +109,9 @@ export default function GenerationPanel({
           // The `prep.meta` job has committed by the time questions start.
           if (event.stage === "questions" && !titleNotified) {
             titleNotified = true
-            void getMyPrep(prepId).then(fresh => onTitleReady(fresh.title))
+            void getMyPrep(prepId)
+              .then(fresh => onTitleReady(fresh.title))
+              .catch(() => toast.error("Could not load the generated title"))
           }
         },
       })

@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react"
 
 import AppFooter from "@/components/AppFooter"
 import AppHeader from "@/components/AppHeader"
+import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
 import "@/index.css"
 
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AppHeader />
           <div className="flex flex-1 flex-col">{children}</div>
           <AppFooter />
+          <Toaster />
         </SessionProvider>
       </body>
     </html>
