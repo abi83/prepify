@@ -5,6 +5,7 @@ import type { ExecutionConfig } from "@/core/job"
 import type { Llm } from "@/core/ports"
 import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, createNextJobs, runCreatedJobs, runGeneration, runOcr, untracked, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
 import type { PrepState } from "@/lib/planner"
+import { testCatalog } from "@/test/modelCatalog"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
@@ -38,6 +39,7 @@ function root(llm: Llm, state: PrepState = PENDING_OCR): RunnerPorts {
     llm,
     logger: { info() {}, warn() {}, error() {} } as unknown as RunnerPorts["logger"],
     sampler: {} as RunnerPorts["sampler"],
+    catalog: testCatalog,
     data: {
       loadState: async () => state,
       listImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: null, language: null } ],

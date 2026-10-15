@@ -1,0 +1,20 @@
+# Whitelist of usable models, grouped by provider. USD per 1M tokens at the base tier.
+# A model not listed here cannot be selected or priced. Model ids are unique across providers.
+# `tiers` is optional: a provider without it has the single tier `default`. A tier's multiplier scales the base prices.
+openai:
+  tiers:
+    flex: { label: "Flex (cheapest, slower)", multiplier: 0.5 }
+    default: { label: "Standard", multiplier: 1 }
+    priority: { label: "Priority (fastest, most expensive)", multiplier: 2 }
+  models:
+    gpt-5-nano: { label: "GPT-5 Nano", input: 0.05, cachedInput: 0.005, output: 0.40 }
+    gpt-5-mini: { label: "GPT-5 Mini", input: 0.25, cachedInput: 0.025, output: 2.00 }
+    gpt-5.4-nano: { label: "GPT-5.4 Nano", input: 0.20, cachedInput: 0.02, output: 1.25 }
+    gpt-5.4-mini: { label: "GPT-5.4 Mini", input: 0.75, cachedInput: 0.075, output: 4.50 }
+    gpt-6-luna: { label: "GPT-6 Luna", input: 0.10, cachedInput: 0.01, output: 0.50 }
+    gpt-6.1-sol: { label: "GPT-6.1 Sol", input: 2.00, cachedInput: 0.10, output: 10.00 }
+# Local OpenAI-compatible server (LM Studio): free, so priced at 0.
+lmstudio:
+  models:
+    qwen/qwen3.8-27b: { label: "Qwen 3.8 27B (local)", input: 0, cachedInput: 0, output: 0 }
+    google/gemma-4-26b-a4b: { label: "Gemma 4 26B A4B (local)", input: 0, cachedInput: 0, output: 0 }

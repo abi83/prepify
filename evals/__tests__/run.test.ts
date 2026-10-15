@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest"
 import type { Llm, LlmRequest } from "@/core/ports"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { cellPrefix } from "@/lib/sampler/storedSample"
+import { testCatalog } from "@/test/modelCatalog"
 import { createDiskResultSink, createDiskSampleSource } from "@evals/diskAdapters"
 import { ocrEvaluator } from "@evals/evaluators/ocr"
 import type { Experiment } from "@evals/experiment"
@@ -48,6 +49,7 @@ const deps = (dir: string, llm: Llm) => ({
   sink: createDiskResultSink(dir),
   llm,
   logger: silent,
+  catalog: testCatalog,
   gitSha: "abc123",
 })
 

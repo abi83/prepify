@@ -55,7 +55,7 @@ const options = (prepDir: string, llm: Llm) => ({
   samplesRoot: samplesRootOf(prepDir),
   apiKey: "unused",
   llm,
-  config: resolveCliConfig({ llm: { model: "local-model" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } }),
+  config: resolveCliConfig({ llm: { model: "google/gemma-4-26b-a4b" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } }),
 })
 
 describe("CLI root", () => {
@@ -119,7 +119,7 @@ describe("CLI root", () => {
     const created = await createCliJobs(opts)
 
     expect(calls).toEqual([])
-    expect(created).toMatchObject([ { type: "ocr", status: "created", config: { model: "local-model" } } ])
+    expect(created).toMatchObject([ { type: "ocr", status: "created", config: { model: "google/gemma-4-26b-a4b" } } ])
 
     await runCliJobs({ ...opts, jobIds: [ created[0].id ] })
 

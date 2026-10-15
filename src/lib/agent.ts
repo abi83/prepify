@@ -104,7 +104,7 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, prom
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
   const { name, promptVersion, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
-  const { llm, logger, sampler, timeoutMs } = deps
+  const { llm, logger, sampler, catalog, timeoutMs } = deps
 
   const promptHash = await hashPrompt(systemPrompt)
   const promptIdentity = { promptVersion, promptHash }
@@ -150,7 +150,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         cachedTokens,
         completionTokens,
         totalTokens: promptTokens + completionTokens,
-        costUsd: computeCost({ promptTokens, cachedTokens, completionTokens }, model, tier),
+        costUsd: computeCost(catalog, { promptTokens, cachedTokens, completionTokens }, model, tier),
         toolCalls: 0,
         executionMs,
       }

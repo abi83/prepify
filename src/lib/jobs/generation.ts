@@ -45,7 +45,7 @@ interface DefinitionOptions {
   prepId: string
 }
 
-type DefinitionPorts = Pick<Ports, "llm" | "logger" | "sampler" | "data">
+type DefinitionPorts = Pick<Ports, "llm" | "logger" | "sampler" | "catalog" | "data">
 
 /** Builds each job type's definition, fetching the inputs its `run` needs. */
 function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: DefinitionPorts): RunDeps["definitionFor"] {

@@ -2,6 +2,7 @@ import type { Prep } from "@prisma/client"
 import { render, screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
+vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
 vi.mock("next/navigation", async () => {
   const { createNavigationMock } = await import("@/testUtils/navigationMock")
   return createNavigationMock()

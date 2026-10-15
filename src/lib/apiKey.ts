@@ -1,27 +1,12 @@
 const STORAGE_KEY = "prepify_api_key"
 
-export const AVAILABLE_MODELS = [
-  { id: "gpt-5-nano", label: "GPT-5 Nano (fastest, cheapest)" },
-  { id: "gpt-5-mini", label: "GPT-5 Mini (balanced)" },
-  { id: "gpt-5", label: "GPT-5 (best quality)" },
-] as const
-
-export type ModelId = typeof AVAILABLE_MODELS[number]["id"]
-
-export const AVAILABLE_TIERS = [
-  { id: "flex", label: "Flex (cheapest, slower)" },
-  { id: "default", label: "Standard" },
-  { id: "priority", label: "Priority (fastest, most expensive)" },
-] as const
-
-export type ServiceTier = typeof AVAILABLE_TIERS[number]["id"]
-
-const DEFAULT_TIER: ServiceTier = "flex"
+export const DEFAULT_MODEL = "gpt-5-nano"
+export const DEFAULT_TIER = "flex"
 
 export interface ApiKeyConfig {
   provider: "openai"
-  model: ModelId
-  tier: ServiceTier
+  model: string
+  tier: string
   key: string
 }
 
@@ -33,8 +18,8 @@ export function getApiKey(): ApiKeyConfig | null {
     if (!parsed.key) return null
     return {
       provider: "openai",
-      model: (parsed.model ?? "gpt-5-nano") as ModelId,
-      tier: (parsed.tier ?? DEFAULT_TIER) as ServiceTier,
+      model: parsed.model ?? DEFAULT_MODEL,
+      tier: parsed.tier ?? DEFAULT_TIER,
       key: parsed.key,
     }
   } catch {
@@ -42,7 +27,7 @@ export function getApiKey(): ApiKeyConfig | null {
   }
 }
 
-export function setApiKey(key: string, model: ModelId = "gpt-5-nano", tier: ServiceTier = DEFAULT_TIER): void {
+export function setApiKey(key: string, model = DEFAULT_MODEL, tier = DEFAULT_TIER): void {
   const config: ApiKeyConfig = { provider: "openai", model, tier, key }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
 }

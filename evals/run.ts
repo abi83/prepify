@@ -3,6 +3,7 @@ import type { Llm } from "@/core/ports"
 import type { StoredSample } from "@/core/sampler"
 import { runAgent } from "@/lib/agent"
 import { withConcurrency } from "@/lib/jobs/execution"
+import type { ModelCatalog } from "@/lib/modelCatalog"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 
@@ -32,6 +33,7 @@ export interface RunDeps {
   sink: ResultSink
   llm: Llm
   logger: Logger
+  catalog: ModelCatalog
   gitSha: string
 }
 
@@ -59,7 +61,7 @@ function agentPromptVersion(cell: Experiment["cell"], samples: StoredSample[]): 
 }
 
 /** Judges every sample of the experiment's cell, writes per-sample results and the cell summary. Judges up to `judge.concurrency` samples at once; any failure aborts. */
-export async function runExperiment(experiment: Experiment, { source, sink, llm, logger, gitSha }: RunDeps): Promise<CellSummary> {
+export async function runExperiment(experiment: Experiment, { source, sink, llm, logger, catalog, gitSha }: RunDeps): Promise<CellSummary> {
   const { cell, judge } = experiment
   const evaluator = getEvaluator(cell.agent)
   const judgePrompt = { promptVersion: evaluator.prompt.version, promptHash: await hashPrompt(evaluator.prompt.text) }
@@ -69,7 +71,7 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
 
   const sampling = { tier: single(cell, samples, "tier"), temperature: single(cell, samples, "temperature"), maxTokens: single(cell, samples, "maxTokens") }
 
-  const deps = { llm, logger, sampler: noopSampler, timeoutMs: judge.timeoutMs }
+  const deps = { llm, logger, sampler: noopSampler, catalog, timeoutMs: judge.timeoutMs }
   const signal = new AbortController().signal
   const settled = await withConcurrency(
     samples.map(sample => async () => {

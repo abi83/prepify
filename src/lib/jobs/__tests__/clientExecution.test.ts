@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   nextId: 0,
 }))
 
+vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
 vi.mock("@/actions/jobs", () => ({
   createJob: async (type: string, inputIds: string[], config: unknown, question?: unknown) => {
     const job = { id: `new-${h.nextId++}`, type, status: "created", inputIds, config, question: question ?? null, output: null, failureReason: null }

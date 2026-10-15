@@ -21,6 +21,7 @@ import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { loadPrepState } from "@/repositories/prepStateRepository"
+import { testCatalog } from "@/test/modelCatalog"
 import type { PageConcepts } from "@/types/pipeline"
 
 const OWNER = "user-owner"
@@ -51,7 +52,7 @@ async function extract(output: PageConcepts, imageId: string) {
   const store = createPrismaStore()
   const job = await store.createJob(OWNER, "concepts.extract", [ imageId ], CONFIG)
   const result = await runJob(
-    createConceptsExtractJobDefinition(PAGE, { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }),
+    createConceptsExtractJobDefinition(PAGE, { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }),
     { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },
     { actorId: OWNER, jobId: job.id, apiKey: "sk-test", signal: new AbortController().signal },
   )
