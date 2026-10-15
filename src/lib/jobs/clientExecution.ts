@@ -43,7 +43,7 @@ function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKe
   }
 }
 
-export function runOcr(options: Omit<GenerationParams, "maxChars">): Promise<void> {
+export function runOcr(options: GenerationParams): Promise<void> {
   return generation.runOcr(browserPorts(options), runnerOptions(options))
 }
 

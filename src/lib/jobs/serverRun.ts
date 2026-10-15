@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 import { AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
-import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { DEFAULT_GEN_CONFIG } from "@/lib/generationConfig"
 import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
@@ -58,7 +57,6 @@ export async function runServerGeneration(userId: string, { apiKey, prepId, mode
       apiKey,
       config: { model, tier, ...DEFAULT_JOB_SETTINGS },
       target,
-      maxChars: BYOK_TEXT_HARD_LIMIT,
       concurrency: DEFAULT_CONCURRENCY,
       signal: new AbortController().signal,
       onProgress: () => {},

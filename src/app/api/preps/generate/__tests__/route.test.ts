@@ -66,6 +66,12 @@ function fakeDefinition(type: string, output: (key: string) => unknown) {
   })
 }
 vi.mock("@/lib/jobs/ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", () => ({ language: "en", text: "t", visual_elements: [] })) }))
+vi.mock("@/lib/jobs/conceptsExtractJob", () => ({
+  createConceptsExtractJobDefinition: fakeDefinition("concepts.extract", () => ({
+    status: "found",
+    concepts: [ { name: "Mitosis", description: "Cell division process in eukaryotes that yields two identical cells", importance: 0.9, misconceptions: [], language: "en" } ],
+  })),
+}))
 vi.mock("@/lib/jobs/conceptsJob", () => ({
   createConceptsJobDefinition: fakeDefinition("concepts", () => [ { name: "Mitosis", description: "Cell division process", importance: 0.9, misconceptions: [], language: "en" } ]),
 }))
@@ -129,7 +135,7 @@ describe("POST /api/preps/generate", () => {
     expect(serverPorts).toHaveBeenCalledTimes(1)
     expect(vi.mocked(serverPorts).mock.calls[0][0]).toBe(API_KEY)
     expect(h.downloads).toEqual([ "prep-pages/p/page-0.png" ])
-    expect(h.ran.slice(0, 3)).toEqual([ "ocr", "concepts", "prep.meta" ])
+    expect(h.ran.slice(0, 4)).toEqual([ "ocr", "concepts.extract", "concepts", "prep.meta" ])
     expect(await prisma.question.count({ where: { prepId: prep.id } })).toBe(5)
     expect(await prisma.job.count({ where: { prepId: prep.id, status: { not: "executed" } } })).toBe(0)
   })
@@ -222,15 +228,17 @@ describe("POST /api/preps/generate", () => {
     h.failConcepts = true
     await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })
     await runAfter()
-    expect(h.ran).toEqual([ "ocr" ])
+    expect(h.ran).toEqual([ "ocr", "concepts.extract" ])
 
     h.failConcepts = false
     await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })
     await runAfter()
 
     expect(h.ran.filter(type => type === "ocr")).toHaveLength(1)
+    expect(h.ran.filter(type => type === "concepts.extract")).toHaveLength(1)
     expect(h.ran.filter(type => type === "concepts")).toHaveLength(1)
     expect(await prisma.job.count({ where: { prepId: prep.id, type: "ocr" } })).toBe(1)
+    expect(await prisma.job.count({ where: { prepId: prep.id, type: "concepts.extract" } })).toBe(1)
     expect(await prisma.job.count({ where: { prepId: prep.id, type: "concepts" } })).toBe(1)
     expect(await prisma.question.count({ where: { prepId: prep.id } })).toBe(5)
   })
@@ -238,9 +246,9 @@ describe("POST /api/preps/generate", () => {
   it("resumes an interrupted job (stale heartbeat) without re-planning finished steps", async () => {
     const { prep, image } = await makePrep()
     await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { text: "t", visual_elements: [] }, language: "en" } })
-    const concepts = await prisma.job.create({
+    const extraction = await prisma.job.create({
       data: {
-        prepId: prep.id, type: "concepts", status: "running", heartbeatAt: new Date(Date.now() - STALE_HEARTBEAT_MS - 1000),
+        prepId: prep.id, type: "concepts.extract", status: "running", heartbeatAt: new Date(Date.now() - STALE_HEARTBEAT_MS - 1000),
         model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: "u1",
         inputs: { create: [ { entityType: "prepImage", entityId: image.id } ] },
       },
@@ -250,8 +258,8 @@ describe("POST /api/preps/generate", () => {
     await runAfter()
 
     expect(h.ran).not.toContain("ocr")
-    expect(h.ran.filter(type => type === "concepts")).toHaveLength(1)
-    expect(await prisma.job.count({ where: { prepId: prep.id, type: "concepts" } })).toBe(1)
-    expect((await prisma.job.findUniqueOrThrow({ where: { id: concepts.id } })).status).toBe("executed")
+    expect(h.ran.filter(type => type === "concepts.extract")).toHaveLength(1)
+    expect(await prisma.job.count({ where: { prepId: prep.id, type: "concepts.extract" } })).toBe(1)
+    expect((await prisma.job.findUniqueOrThrow({ where: { id: extraction.id } })).status).toBe("executed")
   })
 })

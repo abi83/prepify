@@ -1,9 +1,7 @@
 import type { AgentDeps } from "@/core/ports"
-import type { AgentMeta } from "@/core/sampler"
-import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
-import { CHUNK_SIZE } from "@/lib/config"
-import { conceptsResponseSchema } from "@/types/pipeline"
-import type { Concept } from "@/types/pipeline"
+import { runAgent, type AgentResult } from "@/lib/agent"
+import { MAX_PAGE_CHARS, type SupportedLanguage } from "@/lib/config"
+import { conceptsResponseSchema, type PageConcepts } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 
 const SYSTEM_PROMPT = `You are a specialized concept extraction assistant for test preparation systems.
@@ -18,7 +16,11 @@ EXTRACTION RULES:
 - Focus on: facts, definitions, processes, mechanisms, relationships, principles
 - Assign each concept an importance score (0.0–1.0) reflecting how central it is to the material
 - Include 0-3 misconceptions per concept (can be empty list)
-- If the text contains no assessable concepts, return an empty list
+- If the text contains no assessable concepts, return an empty list and set "emptyReason":
+  - "not_educational": the page is not study material (e.g. a photo of something unrelated)
+  - "unreadable": the text is too garbled or too short to judge
+  - "no_assessable_content": it is study material, but nothing in it is testable
+  Otherwise "emptyReason" is null.
 
 AVOID REDUNDANCY:
 - Before adding a concept, check if it is already fully covered as a sub-point of a broader concept you've already listed — if so, skip it
@@ -46,15 +48,8 @@ NOT ASSESSABLE (skip):
 - Instructions, exam logistics, scoring rubrics
 - Unrelated asides or parenthetical remarks
 
-Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ] }
+Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ], "emptyReason": null }
 The list will be capped at 20 entries — prioritise by importance if you have more.`
-
-export interface ConceptExtractorResult extends AgentResult<Concept[]> {
-  chunkCount: number
-  /** One entry per chunk call — `meta` above sums these; the `concepts` job
-   *  (#272) needs per-call granularity to record one GenerationMeta row per call. */
-  metas: AgentMeta[]
-}
 
 function serializePage(page: Page): string {
   const parts = [ `=== Page ${page.page} ===\n${page.text}` ]
@@ -71,67 +66,34 @@ function serializePage(page: Page): string {
   return parts.join("\n\n")
 }
 
-function chunkPages(pages: Page[], chunkSize: number): string[] {
-  const chunks: string[] = []
-  let current = ""
-
-  for (const page of pages) {
-    const serialized = serializePage(page)
-    if (current.length > 0 && current.length + serialized.length + 2 > chunkSize) {
-      chunks.push(current)
-      current = serialized
-    } else {
-      current = current.length > 0 ? current + "\n\n" + serialized : serialized
-    }
-  }
-
-  if (current.length > 0) chunks.push(current)
-  return chunks.length > 0 ? chunks : [ "" ]
-}
-
+/** One LLM call for one page. Concepts below importance 0.5 are dropped; if none are left, the page counts as empty. */
 export async function runConceptExtractor(
-  pages: Page[],
+  page: Page,
   model: string,
   tier: string,
-  language: string,
+  language: SupportedLanguage,
   signal: AbortSignal,
   deps: AgentDeps,
-): Promise<ConceptExtractorResult> {
-  const chunks = chunkPages(pages, CHUNK_SIZE)
+): Promise<AgentResult<PageConcepts>> {
+  const serialized = serializePage(page)
+  if (serialized.length > MAX_PAGE_CHARS) {
+    throw new Error(`Page ${page.page} is ${serialized.length} characters, over the ${MAX_PAGE_CHARS} limit`)
+  }
   const langInstruction = language !== "en" ? `\nRespond in the same language as the source text (${language}).` : ""
 
-  let meta: AgentMeta = EMPTY_AGENT_META
-  const allConcepts: Concept[] = []
-  const metas: AgentMeta[] = []
+  const { output, meta } = await runAgent({
+    name: "ConceptExtractor",
+    systemPrompt: SYSTEM_PROMPT + langInstruction,
+    userContent: { textContent: `Source text:\n\n${serialized}` },
+    schema: conceptsResponseSchema,
+    model,
+    tier,
+    signal,
+    deps,
+  })
 
-  for (const chunk of chunks) {
-    const result = await runAgent({
-      name: "ConceptExtractor",
-      systemPrompt: SYSTEM_PROMPT + langInstruction,
-      userContent: { textContent: `Source text:\n\n${chunk}` },
-      schema: conceptsResponseSchema,
-      model,
-      tier,
-      signal,
-      deps,
-    })
-    const filtered = result.output.concepts.filter(c => c.importance >= 0.5)
-    allConcepts.push(...filtered)
-    metas.push(result.meta)
-    meta = {
-      model: result.meta.model,
-      tier: result.meta.tier,
-      temperature: result.meta.temperature,
-      maxTokens: result.meta.maxTokens,
-      promptTokens: meta.promptTokens + result.meta.promptTokens,
-      cachedTokens: meta.cachedTokens + result.meta.cachedTokens,
-      completionTokens: meta.completionTokens + result.meta.completionTokens,
-      totalTokens: meta.totalTokens + result.meta.totalTokens,
-      costUsd: meta.costUsd + result.meta.costUsd,
-      toolCalls: meta.toolCalls + result.meta.toolCalls,
-      executionMs: meta.executionMs + result.meta.executionMs,
-    }
-  }
-
-  return { output: allConcepts, meta, chunkCount: chunks.length, metas }
+  if (output.emptyReason !== null) return { output: { status: "empty", reason: output.emptyReason }, meta }
+  const concepts = output.concepts.filter(c => c.importance >= 0.5).map(c => ({ ...c, language }))
+  if (concepts.length === 0) return { output: { status: "empty", reason: "no_assessable_content" }, meta }
+  return { output: { status: "found", concepts }, meta }
 }

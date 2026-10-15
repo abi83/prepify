@@ -1,7 +1,7 @@
 import type { ExecutionConfig, Job } from "@/core/job"
 import type { Llm, ProgressSink, Store } from "@/core/ports"
 import { runJob, type JobDefinition } from "@/core/runJob"
-import { nextJobs, type JobSpec, type PlanTarget, type PrepState } from "@/lib/planner"
+import { assertConceptsFound, nextJobs, type JobSpec, type PlanTarget, type PrepState } from "@/lib/planner"
 
 export interface RunDeps {
   store: Store
@@ -76,13 +76,17 @@ export async function runJobs(deps: RunDeps, params: RunParams, jobs: Job[]): Pr
 
 /**
  * Drives a prep to `target`: plans the next stage, creates and runs its jobs, and repeats
- * (OCR → concepts → prep.meta → N question jobs) until the planner has nothing left. A failed
- * stage throws rather than re-planning, since the unmet stage would plan the same jobs again.
+ * (OCR → concept extraction → concepts → prep.meta → N question jobs) until the planner has nothing left,
+ * throwing if no page yielded concepts. A failed stage throws rather than re-planning, since the unmet stage would plan the same jobs again.
  */
 export async function executePrep(deps: ExecutionDeps, params: ExecutionParams): Promise<void> {
   for (;;) {
-    const specs = nextJobs(await deps.loadState(params.prepId), params.target)
-    if (specs.length === 0) return
+    const state = await deps.loadState(params.prepId)
+    const specs = nextJobs(state, params.target)
+    if (specs.length === 0) {
+      assertConceptsFound(state)
+      return
+    }
 
     const jobs = await createJobs(deps.store, params.actorId, params.config, specs)
     await runJobs(deps, params, jobs)

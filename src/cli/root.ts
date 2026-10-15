@@ -66,12 +66,12 @@ function createCliRoot(options: CliOptions) {
 /** Executes the given `created`/`failed` jobs, or every unfinished job when `jobIds` is empty. */
 export async function runCliJobs(options: CliOptions & { jobIds: string[] }): Promise<Job[]> {
   const { ports, params } = createCliRoot(options)
-  return runCreatedJobs(ports, { ...params, jobIds: options.jobIds, maxChars: options.config.run.maxChars })
+  return runCreatedJobs(ports, { ...params, jobIds: options.jobIds })
 }
 
 /** Runs the whole pipeline: OCR, then everything else the target needs. */
 export async function runCli(options: CliOptions): Promise<void> {
   const { config } = options
   const { ports, params } = createCliRoot(options)
-  await runGeneration(ports, { ...params, config: executionConfig(config), target: config.target, maxChars: config.run.maxChars })
+  await runGeneration(ports, { ...params, config: executionConfig(config), target: config.target })
 }

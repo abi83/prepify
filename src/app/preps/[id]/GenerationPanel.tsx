@@ -10,12 +10,11 @@ import { listMyQuestions } from "@/actions/questions"
 import { AdditionalSettings } from "@/components/AdditionalSettings"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
 import { generateAndSaveAssets } from "@/lib/assetGeneration"
-import { BYOK_TEXT_HARD_LIMIT, DEFAULT_TIMEOUT_MS } from "@/lib/config"
+import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { getExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
@@ -26,7 +25,6 @@ import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { Page } from "@/types/prep"
 import type { QuestionType } from "@/types/questions"
 
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
@@ -34,7 +32,6 @@ import { useRunProgress } from "./useRunProgress"
 
 interface Props {
   prepId: string
-  pages: Page[]
   prepTitle: string
   initialProgress: PrepProgress | null
   hasQuestions: boolean
@@ -44,7 +41,6 @@ interface Props {
 
 export default function GenerationPanel({
   prepId,
-  pages,
   prepTitle,
   initialProgress,
   hasQuestions,
@@ -61,7 +57,6 @@ export default function GenerationPanel({
   const [ genMs, setGenMs ] = useState(0)
   const [ totalTokens, setTotalTokens ] = useState(0)
   const [ genError, setGenError ] = useState<string | null>(null)
-  const [ textTooLong, setTextTooLong ] = useState<{ length: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
   const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
@@ -106,7 +101,6 @@ export default function GenerationPanel({
         apiKey: keyConfig.key,
         model: keyConfig.model,
         tier: keyConfig.tier,
-        maxChars: BYOK_TEXT_HARD_LIMIT,
         target: localConfig,
         signal: abortRef.current.signal,
         logger: consoleLogger,
@@ -155,16 +149,6 @@ export default function GenerationPanel({
       router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
       return
     }
-    const length = pages.reduce((sum, p) => sum + p.text.length, 0)
-    if (length > BYOK_TEXT_HARD_LIMIT) {
-      setTextTooLong({ length })
-      return
-    }
-    await (executionMode === "server" ? runOnServer() : runInBrowser())
-  }
-
-  async function handleConfirmTruncate() {
-    setTextTooLong(null)
     await (executionMode === "server" ? runOnServer() : runInBrowser())
   }
 
@@ -189,23 +173,6 @@ export default function GenerationPanel({
 
   return (
     <>
-      <Dialog open={!!textTooLong} onOpenChange={open => !open && setTextTooLong(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Text too long</DialogTitle>
-            <DialogDescription>
-              Your text is <strong>{textTooLong?.length.toLocaleString()}</strong> characters.
-              Only pages up to <strong>{BYOK_TEXT_HARD_LIMIT.toLocaleString()}</strong> characters will be processed —
-              later pages will be ignored.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTextTooLong(null)}>Cancel</Button>
-            <Button onClick={handleConfirmTruncate}>Continue anyway</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {!hasQuestions && (
         <div className="flex flex-col gap-3">
           {checklistRows ? (
