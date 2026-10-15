@@ -18,21 +18,21 @@ import type { Prompt } from "@/lib/prompt"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { prompt as judgeOcr } from "@evals/evaluators/ocr"
 
-const PROMPTS: Prompt[] = [
-  ocr, conceptExtractor, conceptMerger, prepLabeler, prepNamer, questionReviewer,
-  singleChoice, multipleChoice, fillTheGap, flashcard, sorting, diagram, formula, molecule, judgeOcr,
-]
+const PROMPTS: Record<string, Prompt> = {
+  "ocr": ocr, "concept-extractor": conceptExtractor, "concept-merger": conceptMerger, "prep-labeler": prepLabeler, "prep-namer": prepNamer,
+  "question-reviewer": questionReviewer, "single-choice": singleChoice, "multiple-choice": multipleChoice, "fill-the-gap": fillTheGap,
+  "flashcard": flashcard, "sorting": sorting, "diagram": diagram, "formula": formula, "molecule": molecule, "judge/ocr": judgeOcr,
+}
 
 describe("prompt identity", () => {
-  it("gives every prompt a unique id and a semver version", () => {
-    expect(new Set(PROMPTS.map(p => p.id)).size).toBe(PROMPTS.length)
-    for (const p of PROMPTS) expect(p.version).toMatch(/^\d+\.\d+\.\d+$/)
+  it("gives every prompt a semver version", () => {
+    for (const p of Object.values(PROMPTS)) expect(p.version).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
   // Fails when a prompt's text changes: bump its `version`, then update the snapshot (`vitest -u`).
   it("matches the committed id → version → hash snapshot", async () => {
     const actual = Object.fromEntries(await Promise.all(
-      [ ...PROMPTS ].sort((a, b) => a.id.localeCompare(b.id)).map(async p => [ p.id, { version: p.version, hash: await hashPrompt(p.text) } ]),
+      Object.entries(PROMPTS).sort(([ a ], [ b ]) => a.localeCompare(b)).map(async ([ id, p ]) => [ id, { version: p.version, hash: await hashPrompt(p.text) } ]),
     ))
     await expect(JSON.stringify(actual, null, 2) + "\n").toMatchFileSnapshot("./prompts.snapshot.json")
   })

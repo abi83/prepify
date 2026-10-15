@@ -40,7 +40,7 @@ VALIDATION (internal before output):
 
 Return JSON: { "content": { "question": "...", "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
-export const prompt: Prompt = { id: "sorting", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 function formatConcepts(concepts: QuestionTask["concepts"]): string {
   if (concepts.length === 1) {
@@ -67,7 +67,6 @@ export async function runSortingBuilder(
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
     name: "SortingBuilder",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "no-distractors")}${rewriteInstructions(rewrite)}` },

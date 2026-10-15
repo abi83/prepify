@@ -9,8 +9,7 @@ export interface Cell {
 
 export interface SampleResult {
   executionId: string
-  /** The judge prompt's identity. */
-  promptId: string
+  /** The judge prompt. */
   promptVersion: string
   promptHash: string
   judgeModel: string

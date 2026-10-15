@@ -40,7 +40,7 @@ ASSET HINT: Decide if a visual asset would significantly improve this question.
 
 Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
-export const prompt: Prompt = { id: "fill-the-gap", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 function formatConcepts(concepts: QuestionTask["concepts"]): string {
   if (concepts.length === 1) {
@@ -67,7 +67,6 @@ export async function runFillTheGapBuilder(
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
     name: "FillTheGapBuilder",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "with-distractors")}${rewriteInstructions(rewrite)}` },

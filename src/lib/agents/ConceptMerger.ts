@@ -22,7 +22,7 @@ RULES:
 Return a JSON object: { "groups": [["Mitose", "cell division"], ["DNA replication"], ...] }
 Every input name must appear in exactly one group.`
 
-export const prompt: Prompt = { id: "concept-merger", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 const mergerResponseSchema = z.object({
   groups: z.array(z.array(z.string())),
@@ -44,7 +44,6 @@ export async function runConceptMerger(
 
   const result = await runAgent({
     name: "ConceptMerger",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: JSON.stringify(payload) },

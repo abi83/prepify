@@ -59,8 +59,8 @@ describe("runExperiment (OCR)", () => {
     const summary = await runExperiment(experiment, deps(dir, llm))
 
     const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
-    const judgePrompt = { promptId: "judge/ocr", promptVersion: ocrEvaluator.prompt.version, promptHash }
-    expect(summary).toMatchObject({ cell: CELL, agentPromptId: "ocr", agentPromptVersion: "1.0.0", ...judgePrompt, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
+    const judgePrompt = { promptVersion: ocrEvaluator.prompt.version, promptHash }
+    expect(summary).toMatchObject({ cell: CELL, agentPromptVersion: "1.0.0", ...judgePrompt, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
     expect(summary.score).toEqual({ mean: 0.75, median: 0.75, p95: 1 })
     expect(summary.latencyMs.mean).toBe(1500)
 

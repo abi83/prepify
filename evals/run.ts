@@ -14,11 +14,9 @@ import type { ResultSink, SampleSource } from "./ports"
 
 export interface CellSummary extends CellStats {
   cell: Experiment["cell"]
-  /** The evaluated agent prompt; its hash is `cell.promptHash`. */
-  agentPromptId: string
+  /** The evaluated agent prompt's version; its hash is `cell.promptHash`. */
   agentPromptVersion: string
   /** The judge prompt. */
-  promptId: string
   promptVersion: string
   promptHash: string
   judgeModel: string
@@ -50,24 +48,24 @@ function single<K extends SamplingSetting>(cell: Experiment["cell"], samples: St
   return samples[0].meta[setting]
 }
 
-/** The agent prompt's id and version shared by every sample; throws if samples differ. */
-function agentPrompt(cell: Experiment["cell"], samples: StoredSample[]): { promptId: string; promptVersion: string } {
-  const { promptId, promptVersion } = samples[0]
-  const mismatch = samples.find(s => s.promptId !== promptId || s.promptVersion !== promptVersion)
+/** The agent prompt version shared by every sample; throws if samples differ. */
+function agentPromptVersion(cell: Experiment["cell"], samples: StoredSample[]): string {
+  const { promptVersion } = samples[0]
+  const mismatch = samples.find(s => s.promptVersion !== promptVersion)
   if (mismatch) {
-    throw new Error(`Cell ${cell.agent}/${cell.promptHash}/${cell.model} mixes prompt versions: ${promptId}@${promptVersion} and ${mismatch.promptId}@${mismatch.promptVersion}.`)
+    throw new Error(`Cell ${cell.agent}/${cell.promptHash}/${cell.model} mixes prompt versions: ${promptVersion} and ${mismatch.promptVersion}.`)
   }
-  return { promptId, promptVersion }
+  return promptVersion
 }
 
 /** Judges every sample of the experiment's cell, writes per-sample results and the cell summary. Judges up to `judge.concurrency` samples at once; any failure aborts. */
 export async function runExperiment(experiment: Experiment, { source, sink, llm, logger, gitSha }: RunDeps): Promise<CellSummary> {
   const { cell, judge } = experiment
   const evaluator = getEvaluator(cell.agent)
-  const judgePrompt = { promptId: evaluator.prompt.id, promptVersion: evaluator.prompt.version, promptHash: await hashPrompt(evaluator.prompt.text) }
+  const judgePrompt = { promptVersion: evaluator.prompt.version, promptHash: await hashPrompt(evaluator.prompt.text) }
   const samples = await source.readCell(cell)
   if (samples.length === 0) throw new Error(`No samples for cell ${cell.agent}/${cell.promptHash}/${cell.model}`)
-  const agent = agentPrompt(cell, samples)
+  const agentVersion = agentPromptVersion(cell, samples)
 
   const sampling = { tier: single(cell, samples, "tier"), temperature: single(cell, samples, "temperature"), maxTokens: single(cell, samples, "maxTokens") }
 
@@ -77,7 +75,6 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
     samples.map(sample => async () => {
       const { output } = await runAgent({
         name: `eval:${cell.agent}`,
-        promptId: judgePrompt.promptId,
         promptVersion: judgePrompt.promptVersion,
         systemPrompt: evaluator.prompt.text,
         userContent: evaluator.buildJudgeInput(sample),
@@ -105,7 +102,7 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
   const rows = settled.flatMap(result => (result.status === "fulfilled" ? [ result.value ] : []))
 
   const summary: CellSummary = {
-    cell, agentPromptId: agent.promptId, agentPromptVersion: agent.promptVersion, ...judgePrompt,
+    cell, agentPromptVersion: agentVersion, ...judgePrompt,
     judgeModel: judge.llm.model, gitSha, ...sampling, ...summarizeCell(rows),
   }
   await sink.writeSummary(cell, judgePrompt.promptHash, summary)

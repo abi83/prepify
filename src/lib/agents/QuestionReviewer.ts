@@ -89,7 +89,7 @@ Also give an overall comment (max 200 chars) on the most important change needed
 
 Return JSON: { "scores": { "correctness": {"score": <0-1>, "comment": "..."}, "conceptAlignment": {...}, "clarity": {...}, "cognitiveDemand": {...}, "distractorQuality": {...} or null }, "comment": "..." }`
 
-export const prompt: Prompt = { id: "question-reviewer", version: "1.0.0", text: SYSTEM_PROMPT_BASE }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT_BASE }
 
 function difficultyRubric(task: QuestionTask): string {
   const withDistractors = hasDistractors(task.type)
@@ -133,7 +133,6 @@ export async function runQuestionReviewer(
   const langInstruction = language !== "en" ? `\nAll comments must be in ${language}.` : ""
   const result = await runAgent({
     name: "QuestionReviewer",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: `${SYSTEM_PROMPT_BASE}\n\n${difficultyRubric(task)}${langInstruction}`,
     userContent: { textContent: `${formatConcepts(task)}\n\nQuestion to review:\n${JSON.stringify(question, null, 2)}` },

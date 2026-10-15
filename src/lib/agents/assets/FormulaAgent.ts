@@ -22,7 +22,7 @@ Rules:
 
 Return JSON: { "latex": "...", "is_chemical": false }`
 
-export const prompt: Prompt = { id: "formula", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 export async function runFormulaAgent(
   description: string,
@@ -33,7 +33,6 @@ export async function runFormulaAgent(
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "FormulaAgent",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate LaTeX for: ${description}` },

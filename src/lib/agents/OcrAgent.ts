@@ -31,7 +31,7 @@ const SUPPORTED_LANGUAGE_NAMES = SUPPORTED_LANGUAGES.map(l => LANGUAGE_LABELS[l]
 
 const SYSTEM_PROMPT = "You are an OCR agent. Extract all text and visual elements from the textbook page image provided."
 
-export const prompt: Prompt = { id: "ocr", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 const USER_PROMPT = `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
 
@@ -78,7 +78,6 @@ export async function runOcrAgent(
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: "ocr",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: USER_PROMPT, images },

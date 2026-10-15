@@ -52,7 +52,7 @@ NOT ASSESSABLE (skip):
 Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ], "emptyReason": null }
 The list will be capped at 20 entries — prioritise by importance if you have more.`
 
-export const prompt: Prompt = { id: "concept-extractor", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 function serializePage(page: Page): string {
   const parts = [ `=== Page ${page.page} ===\n${page.text}` ]
@@ -86,7 +86,6 @@ export async function runConceptExtractor(
 
   const { output, meta } = await runAgent({
     name: "ConceptExtractor",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Source text:\n\n${serialized}` },

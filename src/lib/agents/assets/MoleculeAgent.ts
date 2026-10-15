@@ -23,7 +23,7 @@ Rules:
 
 Return JSON: { "molecules": [{ "name": "...", "smiles": "..." }] }`
 
-export const prompt: Prompt = { id: "molecule", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 const smilesDrawerJs = "https://unpkg.com/smiles-drawer@1.1.23/dist/smiles-drawer.min.js"
 
@@ -36,7 +36,6 @@ export async function runMoleculeAgent(
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "MoleculeAgent",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate SMILES for: ${description}` },

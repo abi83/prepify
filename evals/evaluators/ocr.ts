@@ -13,7 +13,7 @@ Score from 0.0 to 1.0:
 
 Penalize invented text or visual elements as heavily as omissions. Use intermediate values between the anchors. In "reasoning", name the specific errors you found in two to four sentences.`
 
-export const prompt: Prompt = { id: "judge/ocr", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 export const ocrEvaluator: Evaluator = {
   agent: "ocr",

@@ -25,7 +25,7 @@ Description requirements:
 
 Return JSON: { "title": "...", "description": "..." }`
 
-export const prompt: Prompt = { id: "prep-namer", version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 export async function runPrepNamer(
   concepts: Concept[],
@@ -45,7 +45,6 @@ export async function runPrepNamer(
 
   return runAgent({
     name: "PrepNamer",
-    promptId: prompt.id,
     promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Concepts:\n${conceptList}` },

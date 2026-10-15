@@ -40,7 +40,6 @@ export interface AgentInput {
 
 interface RunAgentConfig<T> {
   name: string
-  promptId: string
   /** Semver, bumped by hand when the prompt text changes. */
   promptVersion: string
   systemPrompt: string
@@ -94,7 +93,6 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, prom
     executionId: crypto.randomUUID(),
     agent: config.name,
     systemPrompt: config.systemPrompt,
-    promptId: config.promptId,
     promptVersion: config.promptVersion,
     promptHash,
     input: { textContent: config.userContent.textContent, images: config.userContent.images ?? [] },
@@ -105,11 +103,11 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, prom
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, promptId, promptVersion, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
+  const { name, promptVersion, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
   const { llm, logger, sampler, timeoutMs } = deps
 
   const promptHash = await hashPrompt(systemPrompt)
-  const promptIdentity = { promptId, promptVersion, promptHash }
+  const promptIdentity = { promptVersion, promptHash }
   let lastError: unknown
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
