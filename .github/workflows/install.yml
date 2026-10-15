@@ -23,9 +23,9 @@ permissions:
 
 jobs:
   install:
-    uses: abi83/interns/.github/workflows/install.yml@v0
+    uses: abi83/interns/.github/workflows/install.yml@next
     secrets: inherit
     with:
       # Fall back to the exact tag this wrapper is pinned to, never to the
       # consumer's commit SHA.
-      ref: ${{ inputs.ref || 'v0' }}
+      ref: ${{ inputs.ref || 'next' }}
