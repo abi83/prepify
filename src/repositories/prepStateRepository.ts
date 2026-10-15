@@ -1,6 +1,7 @@
 import type { JobStatus, Prep } from "@prisma/client"
 
-import { OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { CONCEPTS_EXTRACT_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 
@@ -8,16 +9,22 @@ import { interruptStaleJobs } from "./jobRepository"
 
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<PrepState> {
-  const [ images, concepts, prepMetaJobs, questionCount, questionJobCount ] = await Promise.all([
+  const [ images, concepts, extractJobs, prepMetaJobs, questionCount, questionJobCount ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
     prisma.concept.findMany({ where: { producedByJob: { prepId } }, orderBy: { createdAt: "asc" } }),
+    prisma.job.findMany({
+      where: { prepId, type: CONCEPTS_EXTRACT_JOB_TYPE, status: "executed" },
+      select: { output: true, inputs: { select: { entityId: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
     prisma.job.count({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" } }),
     prisma.question.count({ where: { prepId } }),
     prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE } }),
   ])
 
+  const pageConcepts = indexPageConcepts(extractJobs.map(job => ({ inputIds: job.inputs.map(input => input.entityId), output: job.output })))
   return {
-    images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null })),
+    images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" } })),
     concepts: concepts.map(({ id, name, description, importance, misconceptions, language }) => ({ id, name, description, importance, misconceptions, language })),
     prepMetaDone: prepMetaJobs > 0,
     questionCount,

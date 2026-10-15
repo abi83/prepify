@@ -3,15 +3,18 @@
  * isolation, like `taskBuilder.ts`.
  */
 import type { QuestionSpec } from "@/core/job"
-import type { Concept, StoredConcept } from "@/types/pipeline"
+import type { Concept, PageConcepts, StoredConcept } from "@/types/pipeline"
 
 import type { GenerationConfig } from "./generationConfig"
-import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
+import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
 import { buildQuestionTasks } from "./taskBuilder"
+
+/** A page's concept extraction: not run yet, or its outcome. */
+export type PageConceptsState = PageConcepts | { status: "pending" }
 
 /** What a prep already has — completed outputs only, not jobs that exist but haven't run. */
 export interface PrepState {
-  images: { id: string; ocrDone: boolean }[]
+  images: { id: string; ocrDone: boolean; concepts: PageConceptsState }[]
   concepts: (StoredConcept & { id: string })[]
   prepMetaDone: boolean
   questionCount: number
@@ -28,9 +31,27 @@ export interface JobSpec {
   question: QuestionSpec | null
 }
 
+function nextConceptsJobs(images: PrepState["images"]): JobSpec[] {
+  const pending = images.filter(image => image.concepts.status === "pending")
+  if (pending.length > 0) {
+    return pending.map(image => ({ type: CONCEPTS_EXTRACT_JOB_TYPE, inputIds: [ image.id ], question: null }))
+  }
+  const found = images.filter(image => image.concepts.status === "found")
+  if (found.length === 0) return []
+  return [ { type: CONCEPTS_JOB_TYPE, inputIds: found.map(image => image.id), question: null } ]
+}
+
+/** Throws when the planner stopped because no page yielded concepts, naming why. Call once it has nothing left to plan. */
+export function assertConceptsFound(state: PrepState): void {
+  if (state.images.length === 0 || state.concepts.length > 0) return
+  const reasons = state.images.flatMap(image => image.concepts.status === "empty" ? [ image.concepts.reason ] : [])
+  throw new Error(`No concepts found in any page (${[ ...new Set(reasons) ].join(", ")})`)
+}
+
 /**
- * The jobs for the next unmet stage: OCR → concepts → `prep.meta` → question tasks. Empty
- * when the prep has no images to start from, or its question jobs are already planned —
+ * The jobs for the next unmet stage: OCR → concept extraction (per page) → concepts merge →
+ * `prep.meta` → question tasks. Empty when the prep has no images to start from, every page
+ * came up empty (see `assertConceptsFound`), or its question jobs are already planned —
  * unfinished ones are resumed, not topped up to `target`.
  */
 export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
@@ -40,9 +61,7 @@ export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   }
   if (state.images.length === 0) return []
 
-  if (state.concepts.length === 0) {
-    return [ { type: CONCEPTS_JOB_TYPE, inputIds: state.images.map(image => image.id), question: null } ]
-  }
+  if (state.concepts.length === 0) return nextConceptsJobs(state.images)
 
   if (!state.prepMetaDone) {
     return [ { type: PREP_META_JOB_TYPE, inputIds: state.concepts.map(concept => concept.id), question: null } ]

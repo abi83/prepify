@@ -38,7 +38,6 @@ function renderPanel(initialProgress: PrepProgress | null = null) {
   return render(
     <GenerationPanel
       prepId="prep-1"
-      pages={[ { page: 1, text: "short", visual_elements: [], gcsKey: "k" } ]}
       prepTitle="Prep #1"
       initialProgress={initialProgress}
       hasQuestions={false}

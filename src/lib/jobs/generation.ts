@@ -5,9 +5,10 @@ import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
 import { ocrResultSchema } from "@/types/prep"
 
-import { createConceptsJobDefinition, type OcrPage } from "./conceptsJob"
+import { createConceptsExtractJobDefinition, type OcrPage } from "./conceptsExtractJob"
+import { createConceptsJobDefinition } from "./conceptsJob"
 import { createJobs, executePrep, runJobs, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
-import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
+import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
 import { createOcrJobDefinition } from "./ocrJob"
 import { createPrepMetaJobDefinition } from "./prepMetaJob"
 import { createQuestionJobDefinition } from "./questionJob"
@@ -25,6 +26,7 @@ export const DEFAULT_CONCURRENCY = 5
 
 const STAGE_BY_JOB_TYPE: Record<string, GenerationStage> = {
   [OCR_JOB_TYPE]: "ocr",
+  [CONCEPTS_EXTRACT_JOB_TYPE]: "concepts",
   [CONCEPTS_JOB_TYPE]: "concepts",
   [PREP_META_JOB_TYPE]: "meta",
   [QUESTION_JOB_TYPE]: "questions",
@@ -39,13 +41,12 @@ function stageOf(jobType: string): GenerationStage {
 
 interface DefinitionOptions {
   prepId: string
-  maxChars: number
 }
 
 type DefinitionPorts = Pick<Ports, "llm" | "logger" | "sampler" | "data">
 
 /** Builds each job type's definition, fetching the inputs its `run` needs. */
-function createDefinitionFor({ prepId, maxChars }: DefinitionOptions, { data, ...deps }: DefinitionPorts): RunDeps["definitionFor"] {
+function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: DefinitionPorts): RunDeps["definitionFor"] {
   async function conceptsFor(job: Job) {
     const { concepts } = await data.loadState(prepId)
     return job.inputIds.map(id => {
@@ -62,15 +63,21 @@ function createDefinitionFor({ prepId, maxChars }: DefinitionOptions, { data, ..
       if (!image) throw new Error(`PrepImage ${job.inputIds[0]} not found for job ${job.id}`)
       return createOcrJobDefinition([ await data.downloadImage(prepId, image.gcsKey) ], deps)
     }
+    case CONCEPTS_EXTRACT_JOB_TYPE: {
+      const image = (await data.listImages(prepId)).find(i => i.id === job.inputIds[0])
+      if (!image) throw new Error(`PrepImage ${job.inputIds[0]} not found for job ${job.id}`)
+      if (!image.language) throw new Error(`PrepImage ${image.id} has no language for job ${job.id}`)
+      const page: OcrPage = { page: 1, gcsKey: image.gcsKey, language: image.language, ...ocrResultSchema.parse(image.ocrResult) }
+      return createConceptsExtractJobDefinition(page, deps)
+    }
     case CONCEPTS_JOB_TYPE: {
-      const images = await data.listImages(prepId)
-      const pages: OcrPage[] = job.inputIds.map((id, i) => {
-        const image = images.find(img => img.id === id)
-        if (!image) throw new Error(`PrepImage ${id} not found for job ${job.id}`)
-        if (!image.language) throw new Error(`PrepImage ${id} has no language for job ${job.id}`)
-        return { page: i + 1, gcsKey: image.gcsKey, language: image.language, ...ocrResultSchema.parse(image.ocrResult) }
+      const { images } = await data.loadState(prepId)
+      const pages = job.inputIds.map(id => {
+        const concepts = images.find(image => image.id === id)?.concepts
+        if (concepts?.status !== "found") throw new Error(`PrepImage ${id} has no extracted concepts for job ${job.id}`)
+        return concepts.concepts
       })
-      return createConceptsJobDefinition(pages, maxChars, deps)
+      return createConceptsJobDefinition(pages, deps)
     }
     case PREP_META_JOB_TYPE:
       return createPrepMetaJobDefinition(await conceptsFor(job), deps)
@@ -205,9 +212,9 @@ export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedPara
 }
 
 /** Runs OCR for the prep's images that lack it, re-executing unfinished OCR jobs first. */
-export async function runOcr(ports: RunnerPorts, options: Omit<GenerationParams, "maxChars">): Promise<void> {
+export async function runOcr(ports: RunnerPorts, options: GenerationParams): Promise<void> {
   const { config, target, ...rest } = options
-  const runner = createRunner(ports, { ...rest, maxChars: 0 })
+  const runner = createRunner(ports, rest)
   const { actorId, prepId } = options
 
   const rerun = (await ports.listUnfinishedJobs(actorId, prepId)).filter(job => job.type === OCR_JOB_TYPE)

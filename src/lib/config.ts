@@ -14,8 +14,8 @@ export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   uk: "Українська",
 }
 
-/** Characters per chunk sent to ConceptExtractor. */
-export const CHUNK_SIZE = 15_000
+/** Largest serialized page ConceptExtractor accepts; a larger one is a broken OCR result, not a case to split. */
+export const MAX_PAGE_CHARS = 15_000
 
 /** Hard limit for BYOK users — inputs beyond this require user confirmation before truncation. */
 export const BYOK_TEXT_HARD_LIMIT = 100_000

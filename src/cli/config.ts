@@ -10,7 +10,7 @@ import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS } from "@/lib/jobs/generation
 export interface CliConfig {
   llm: { baseUrl: string | undefined; model: string; tier: string; temperature: number | undefined; maxTokens: number | undefined }
   job: { timeoutMs: number; maxRetries: number }
-  run: { concurrency: number; maxChars: number }
+  run: { concurrency: number }
   log: { level: LogLevel }
   target: GenerationConfig
 }
@@ -18,7 +18,7 @@ export interface CliConfig {
 export const DEFAULT_CLI_CONFIG: CliConfig = {
   llm: { baseUrl: undefined, model: "gpt-5-mini", tier: "default", temperature: undefined, maxTokens: undefined },
   job: DEFAULT_JOB_SETTINGS,
-  run: { concurrency: DEFAULT_CONCURRENCY, maxChars: 60_000 },
+  run: { concurrency: DEFAULT_CONCURRENCY },
   log: { level: "debug" },
   target: DEFAULT_GEN_CONFIG,
 }
@@ -36,7 +36,7 @@ const overridesSchema = z.strictObject({
     maxTokens: positiveInt,
   }).partial(),
   job: z.strictObject({ timeoutMs: positiveInt, maxRetries: z.number().int().nonnegative() }).partial(),
-  run: z.strictObject({ concurrency: positiveInt, maxChars: positiveInt }).partial(),
+  run: z.strictObject({ concurrency: positiveInt }).partial(),
   log: z.strictObject({ level: z.enum(LOG_LEVELS) }).partial(),
   target: z.strictObject({
     questionCount: positiveInt,

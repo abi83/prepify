@@ -5,7 +5,8 @@ import { createFileStore } from "@/core/fileStore"
 import type { Job } from "@/core/job"
 import type { ListUnfinishedJobs, PrepData, PrepImageRef, Store } from "@/core/ports"
 import type { SupportedLanguage } from "@/lib/config"
-import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import type { PrepState } from "@/lib/planner"
 import type { StoredConcept } from "@/types/pipeline"
 
@@ -62,15 +63,17 @@ export function createFilePrep(dir: string): FilePrep {
   const data: PrepData = {
     listImages,
     async loadState(): Promise<PrepState> {
-      const [ images, allConcepts, meta, questions, jobs ] = await Promise.all([
+      const [ images, allConcepts, extractions, meta, questions, jobs ] = await Promise.all([
         listImages(),
         concepts(),
+        executed<unknown>(CONCEPTS_EXTRACT_JOB_TYPE),
         executed<unknown>(PREP_META_JOB_TYPE),
         executed<unknown>(QUESTION_JOB_TYPE),
         readJobs(),
       ])
+      const pageConcepts = indexPageConcepts(extractions.map(({ job, output }) => ({ inputIds: job.inputIds, output })))
       return {
-        images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null })),
+        images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" as const } })),
         concepts: allConcepts,
         prepMetaDone: meta.length > 0,
         questionCount: questions.length,

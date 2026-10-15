@@ -3,7 +3,7 @@ import { Prisma, type Job as JobRow } from "@prisma/client"
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import type { Store } from "@/core/ports"
 import type { OcrOutput } from "@/lib/agents/OcrAgent"
-import { CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
 import { resolveLanguage } from "@/lib/language"
 import { prisma } from "@/lib/prisma"
@@ -31,7 +31,7 @@ export async function interruptStaleJobs(where: Prisma.JobWhereInput = {}): Prom
 }
 
 /** Looks up which Prep owns a job input entity (ADR point 4). `prepImage` (produced by the
- *  `ocr` job, #270) and `concept` (produced by the `concepts` job, #272 — via its
+ *  `ocr` job, #270) and `concept` (produced by the `concepts` merge job, #272 — via its
  *  `producedByJob`, since `Concept` has no direct `prepId`) are the only input entity types
  *  any job produces today — a new one (#273's questions) adds a branch here, not a schema change. */
 async function findInputOwner(entityId: string): Promise<{ entityType: string; prepId: string } | null> {
@@ -226,6 +226,8 @@ type JobWithInputs = JobRow & { inputs: { entityId: string }[] }
 /** Runs inside `commitJob`'s transaction, after the conditional status update won. */
 const DOMAIN_WRITERS: Record<string, (tx: Prisma.TransactionClient, job: JobWithInputs, output: never) => Promise<unknown>> = {
   [OCR_JOB_TYPE]: writeOcrOutput,
+  // A page's outcome stays in `Job.output`; `loadPrepState` reads it back from there.
+  [CONCEPTS_EXTRACT_JOB_TYPE]: async () => {},
   [CONCEPTS_JOB_TYPE]: writeConceptsOutput,
   [PREP_META_JOB_TYPE]: writePrepMetaOutput,
   [QUESTION_JOB_TYPE]: writeQuestionOutput,

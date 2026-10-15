@@ -8,7 +8,7 @@ const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, max
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 
-const DONE_STATE: PrepState = { images: [ { id: "i1", ocrDone: true } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1 }
+const DONE_STATE: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1 }
 
 const h = vi.hoisted(() => ({
   jobs: new Map<string, unknown>(),
@@ -42,12 +42,12 @@ function fakeDefinition(type: string, output: unknown) {
   return () => ({ type, run: async () => { h.ran.push(type); return { output, metas: [], wastedMetas: [] } } })
 }
 vi.mock("../ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", { language: "de" }) }))
-vi.mock("../conceptsJob", () => ({ createConceptsJobDefinition: fakeDefinition("concepts", null) }))
+vi.mock("../conceptsExtractJob", () => ({ createConceptsExtractJobDefinition: fakeDefinition("concepts.extract", null) }))
 vi.mock("../prepMetaJob", () => ({ createPrepMetaJobDefinition: fakeDefinition("prep.meta", null) }))
 vi.mock("../questionJob", () => ({ createQuestionJobDefinition: fakeDefinition("question", null) }))
 
 function job(id: string, type: string, status: "created" | "failed"): Job {
-  const base = { id, type, inputIds: type === "ocr" || type === "concepts" ? [ "i1" ] : [ "c1" ], config: CONFIG, question: null }
+  const base = { id, type, inputIds: type === "ocr" || type === "concepts.extract" ? [ "i1" ] : [ "c1" ], config: CONFIG, question: null }
   return status === "created"
     ? { ...base, status, output: null, failureReason: null }
     : { ...base, status, output: null, failureReason: "boom" }
@@ -55,7 +55,7 @@ function job(id: string, type: string, status: "created" | "failed"): Job {
 
 function params(events: GenerationProgress[] = []): GenerationParams {
   return {
-    actorId: "u1", prepId: "p1", apiKey: "sk", model: "m", tier: "flex", maxChars: 1000, target: TARGET,
+    actorId: "u1", prepId: "p1", apiKey: "sk", model: "m", tier: "flex", target: TARGET,
     signal: new AbortController().signal,
     logger: { info() {}, warn() {}, error() {} } as unknown as GenerationParams["logger"],
     sampler: {} as GenerationParams["sampler"],
@@ -79,13 +79,13 @@ beforeEach(() => {
 
 describe("runGeneration", () => {
   it("re-executes unfinished jobs in stage order, regardless of listing order", async () => {
-    const unfinished = [ job("q1", "question", "created"), job("o1", "ocr", "failed"), job("c1", "concepts", "created") ]
+    const unfinished = [ job("q1", "question", "created"), job("o1", "ocr", "failed"), job("c1", "concepts.extract", "created") ]
     h.unfinished = unfinished
     unfinished.forEach(j => h.jobs.set(j.id, j))
 
     await runGeneration(params())
 
-    expect(h.ran).toEqual([ "ocr", "concepts", "question" ])
+    expect(h.ran).toEqual([ "ocr", "concepts.extract", "question" ])
   })
 
   it("runs nothing when no jobs are unfinished and the target is met", async () => {
@@ -119,7 +119,7 @@ describe("runOcr", () => {
   })
 
   it("OCRs pending images", async () => {
-    h.state = { ...DONE_STATE, images: [ { id: "i1", ocrDone: false } ] }
+    h.state = { ...DONE_STATE, images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ] }
 
     await runOcr(params())
     expect(h.ran).toEqual([ "ocr" ])

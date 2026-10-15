@@ -5,6 +5,7 @@ import type { ExecutionConfig } from "@/core/job"
 import type { Llm, ProgressSink } from "@/core/ports"
 import { executePrep, type ExecutionDeps, type ExecutionParams } from "@/lib/jobs/execution"
 import type { PlanTarget, PrepState } from "@/lib/planner"
+import type { PageConcepts } from "@/types/pipeline"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET: PlanTarget = { questionCount: 3, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
@@ -13,9 +14,11 @@ const NOOP_PROGRESS: ProgressSink = { report: () => {} }
 
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 
+const FOUND: PageConcepts = { status: "found", concepts: [ concept ] }
+
 /** Simulates each job type's persisted effect on the state the planner sees. */
-function fakeDeps(failType?: string) {
-  const state: PrepState = { images: [ { id: "i1", ocrDone: false } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
+function fakeDeps(failType?: string, extraction: PageConcepts = FOUND) {
+  const state: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
   const ran: string[] = []
   let inFlight = 0
   let maxInFlight = 0
@@ -35,7 +38,8 @@ function fakeDeps(failType?: string) {
         inFlight--
         if (job.type === failType) throw new Error("boom")
         ran.push(job.type)
-        if (job.type === "ocr") state.images = [ { id: "i1", ocrDone: true } ]
+        if (job.type === "ocr") state.images = [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ]
+        if (job.type === "concepts.extract") state.images = [ { id: "i1", ocrDone: true, concepts: extraction } ]
         if (job.type === "concepts") state.concepts = [ concept ]
         if (job.type === "prep.meta") state.prepMetaDone = true
         if (job.type === "question") { state.questionCount++; state.questionJobCount++ }
@@ -51,10 +55,10 @@ const params = (concurrency: number): ExecutionParams => ({
 })
 
 describe("executePrep", () => {
-  it("chains OCR → concepts → prep.meta → question jobs until the target is met", async () => {
+  it("chains OCR → concept extraction → concepts → prep.meta → question jobs until the target is met", async () => {
     const { deps, ran } = fakeDeps()
     await executePrep(deps, params(2))
-    expect(ran).toEqual([ "ocr", "concepts", "prep.meta", "question", "question", "question" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract", "concepts", "prep.meta", "question", "question", "question" ])
   })
 
   it("never runs more jobs at once than the concurrency limit", async () => {
@@ -66,6 +70,12 @@ describe("executePrep", () => {
   it("throws when a stage fails instead of re-planning it", async () => {
     const { deps, ran } = fakeDeps("concepts")
     await expect(executePrep(deps, params(2))).rejects.toThrow(/boom/)
-    expect(ran).toEqual([ "ocr" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract" ])
+  })
+
+  it("throws once, without re-planning, when no page yields concepts", async () => {
+    const { deps, ran } = fakeDeps(undefined, { status: "empty", reason: "not_educational" })
+    await expect(executePrep(deps, params(2))).rejects.toThrow("No concepts found in any page (not_educational)")
+    expect(ran).toEqual([ "ocr", "concepts.extract" ])
   })
 })

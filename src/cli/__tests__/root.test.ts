@@ -17,6 +17,7 @@ const RESPONSES: Record<string, unknown> = {
   ocr: { text: "Mitosis is the division of a cell nucleus into two identical nuclei.", confidence: 0.9, language: "en", visual_elements: [] },
   ConceptExtractor: {
     concepts: [ { name: "Mitosis", description: "Division of a cell nucleus into two identical daughter nuclei.", importance: 0.9, misconceptions: [] } ],
+    emptyReason: null,
   },
   PrepNamer: { title: "Mitosis Basics", description: "Covers mitosis, the process by which a cell nucleus divides into two identical daughter nuclei." },
   PrepLabeler: { grade: 9, discipline: "Biology", confidence: 0.9 },
@@ -126,10 +127,29 @@ describe("CLI root", () => {
     expect(await createFilePrep(dir).data.loadState("p")).toMatchObject({ images: [ { id: "page-1", ocrDone: true } ], concepts: [] })
   })
 
-  it("fails a concepts job whose input image has no OCR language", async () => {
+  it("stops with the reason, without replanning, when no page yields concepts", async () => {
+    const dir = await makePrepFixture()
+    const calls: string[] = []
+    const base = fakeLlm(calls)
+    const noConcepts: Llm = {
+      async complete(request, signal) {
+        if (request.responseFormat.name !== "ConceptExtractor") return base.complete(request, signal)
+        calls.push("ConceptExtractor")
+        return { content: JSON.stringify({ concepts: [], emptyReason: "not_educational" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
+      },
+    }
+
+    await expect(runCli(options(dir, noConcepts))).rejects.toThrow("No concepts found in any page (not_educational)")
+    await expect(runCli(options(dir, noConcepts))).rejects.toThrow("No concepts found in any page (not_educational)")
+
+    expect(calls.filter(name => name === "ConceptExtractor")).toHaveLength(1)
+    expect(calls).not.toContain("PrepNamer")
+  })
+
+  it("fails a concepts.extract job whose input image has no OCR language", async () => {
     const dir = await makePrepFixture()
     const prep = createFilePrep(dir)
-    await prep.store.createJob("cli", "concepts", [ "page-1" ], { model: "m", tier: "default", timeoutMs: 1000, maxRetries: 0 })
+    await prep.store.createJob("cli", "concepts.extract", [ "page-1" ], { model: "m", tier: "default", timeoutMs: 1000, maxRetries: 0 })
 
     await expect(runCliJobs({ ...options(dir, fakeLlm()), jobIds: [] })).rejects.toThrow("has no language")
   })
