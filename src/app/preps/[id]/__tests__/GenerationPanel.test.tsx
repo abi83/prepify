@@ -15,7 +15,6 @@ vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: mockGetProgress }))
 vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn() }))
 vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
-vi.mock("@/lib/assetGeneration", () => ({ generateAndSaveAssets: vi.fn() }))
 vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: mockRunInBrowser }))
 vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }) }))
 

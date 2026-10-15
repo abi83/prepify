@@ -6,3 +6,5 @@ export const CONCEPTS_EXTRACT_JOB_TYPE = "concepts.extract"
 export const CONCEPTS_JOB_TYPE = "concepts"
 export const PREP_META_JOB_TYPE = "prep.meta"
 export const QUESTION_JOB_TYPE = "question"
+/** One per question; its output is the generated asset blob. */
+export const ASSET_JOB_TYPE = "asset"

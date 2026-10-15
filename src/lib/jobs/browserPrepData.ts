@@ -1,5 +1,6 @@
 import { listMyPrepImages } from "@/actions/prepImages"
 import { loadMyPrepState } from "@/actions/prepState"
+import { loadMyQuestion } from "@/actions/questions"
 import { getReadSignedUrl } from "@/actions/uploads"
 import type { PrepData } from "@/core/ports"
 
@@ -16,6 +17,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 export const browserPrepData: PrepData = {
   loadState: loadMyPrepState,
   listImages: listMyPrepImages,
+  loadQuestion: loadMyQuestion,
   async downloadImage(prepId, gcsKey) {
     const blob = await fetch(await getReadSignedUrl(prepId, gcsKey)).then(r => r.blob())
     return { base64: await blobToBase64(blob), mimeType: blob.type }

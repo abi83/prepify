@@ -18,7 +18,7 @@ const FOUND: PageConcepts = { status: "found", concepts: [ concept ] }
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
 function fakeDeps(failType?: string, extraction: PageConcepts = FOUND) {
-  const state: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0 }
+  const state: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
   const ran: string[] = []
   let inFlight = 0
   let maxInFlight = 0
@@ -36,13 +36,14 @@ function fakeDeps(failType?: string, extraction: PageConcepts = FOUND) {
         maxInFlight = Math.max(maxInFlight, inFlight)
         await new Promise(resolve => setTimeout(resolve, 1))
         inFlight--
+        if (job.type === "asset") state.assetQuestionIds = []
         if (job.type === failType) throw new Error("boom")
         ran.push(job.type)
         if (job.type === "ocr") state.images = [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ]
         if (job.type === "concepts.extract") state.images = [ { id: "i1", ocrDone: true, concepts: extraction } ]
         if (job.type === "concepts") state.concepts = [ concept ]
         if (job.type === "prep.meta") state.prepMetaDone = true
-        if (job.type === "question") { state.questionCount++; state.questionJobCount++ }
+        if (job.type === "question") { state.questionCount++; state.questionJobCount++; state.assetQuestionIds = [ "q1" ] }
         return { output: null, metas: [], wastedMetas: [] }
       },
     }),
@@ -58,7 +59,18 @@ describe("executePrep", () => {
   it("chains OCR → concept extraction → concepts → prep.meta → question jobs until the target is met", async () => {
     const { deps, ran } = fakeDeps()
     await executePrep(deps, params(2))
-    expect(ran).toEqual([ "ocr", "concepts.extract", "concepts", "prep.meta", "question", "question", "question" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract", "concepts", "prep.meta", "question", "question", "question", "asset" ])
+  })
+
+  it("plans an asset job per question needing one after the question jobs", async () => {
+    const { deps, ran } = fakeDeps()
+    await executePrep(deps, params(2))
+    expect(ran.slice(-2)).toEqual([ "question", "asset" ])
+  })
+
+  it("completes when an asset job fails", async () => {
+    const { deps } = fakeDeps("asset")
+    await expect(executePrep(deps, params(2))).resolves.toBeUndefined()
   })
 
   it("never runs more jobs at once than the concurrency limit", async () => {

@@ -12,7 +12,3 @@ export async function listMyAssets(questionIds: string[]): Promise<Asset[]> {
 export async function listSharedAssets(questionIds: string[]): Promise<Asset[]> {
   return assetRepository.listByQuestionIds(null, questionIds)
 }
-
-export async function insertAsset(questionId: string, type: string, blob: string): Promise<Asset> {
-  return assetRepository.insert(await requireUserId(), questionId, type, blob)
-}

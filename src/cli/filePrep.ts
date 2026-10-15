@@ -4,11 +4,13 @@ import path from "path"
 import { createFileStore } from "@/core/fileStore"
 import type { Job } from "@/core/job"
 import type { ListUnfinishedJobs, PrepData, PrepImageRef, Store } from "@/core/ports"
+import { activeAssetHint } from "@/lib/assetHint"
 import type { SupportedLanguage } from "@/lib/config"
-import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import type { PrepState } from "@/lib/planner"
 import type { StoredConcept } from "@/types/pipeline"
+import type { GeneratedQuestion } from "@/types/questions"
 
 const IMAGES_DIR = "images"
 const JOBS_DIR = "jobs"
@@ -60,24 +62,34 @@ export function createFilePrep(dir: string): FilePrep {
     })
   }
 
+  /** A question is identified by its `question` job's id; its asset, if any, is the output of its `asset` job. */
+  const questions = () => executed<GeneratedQuestion>(QUESTION_JOB_TYPE)
+
   const data: PrepData = {
     listImages,
+    async loadQuestion(_prepId, questionId) {
+      const question = (await questions()).find(({ job }) => job.id === questionId)
+      if (!question) throw new Error(`Question ${questionId} not found`)
+      return { id: questionId, content: question.output.content }
+    },
     async loadState(): Promise<PrepState> {
-      const [ images, allConcepts, extractions, meta, questions, jobs ] = await Promise.all([
+      const [ images, allConcepts, extractions, meta, allQuestions, jobs ] = await Promise.all([
         listImages(),
         concepts(),
         executed<unknown>(CONCEPTS_EXTRACT_JOB_TYPE),
         executed<unknown>(PREP_META_JOB_TYPE),
-        executed<unknown>(QUESTION_JOB_TYPE),
+        questions(),
         readJobs(),
       ])
+      const assetJobQuestionIds = new Set(jobs.filter(job => job.type === ASSET_JOB_TYPE).flatMap(job => job.inputIds))
       const pageConcepts = indexPageConcepts(extractions.map(({ job, output }) => ({ inputIds: job.inputIds, output })))
       return {
         images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" as const } })),
         concepts: allConcepts,
         prepMetaDone: meta.length > 0,
-        questionCount: questions.length,
+        questionCount: allQuestions.length,
         questionJobCount: jobs.filter(job => job.type === QUESTION_JOB_TYPE).length,
+        assetQuestionIds: allQuestions.filter(({ job, output }) => activeAssetHint(output.content) && !assetJobQuestionIds.has(job.id)).map(({ job }) => job.id),
       }
     },
     async downloadImage(_prepId, name) {
@@ -89,9 +101,13 @@ export function createFilePrep(dir: string): FilePrep {
   const fileStore = createFileStore(jobsDir)
   const store: Store = {
     ...fileStore,
-    // Job inputs are images and concepts, not jobs.
+    // Job inputs are images, concepts and questions, not jobs.
     async existingIds(_actorId, ids) {
-      const known = new Set([ ...(await listImages()).map(image => image.id), ...(await concepts()).map(concept => concept.id) ])
+      const known = new Set([
+        ...(await listImages()).map(image => image.id),
+        ...(await concepts()).map(concept => concept.id),
+        ...(await questions()).map(({ job }) => job.id),
+      ])
       return new Set(ids.filter(id => known.has(id)))
     },
   }
