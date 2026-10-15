@@ -9,7 +9,9 @@ export interface Cell {
 
 export interface SampleResult {
   executionId: string
-  evaluatorId: string
+  /** The judge prompt. */
+  promptVersion: string
+  promptHash: string
   judgeModel: string
   score: number
   reasoning: string
@@ -22,5 +24,5 @@ export interface SampleSource {
 
 export interface ResultSink {
   writeSampleResult(cell: Cell, result: SampleResult): Promise<void>
-  writeSummary(cell: Cell, evaluatorId: string, summary: unknown): Promise<void>
+  writeSummary(cell: Cell, promptHash: string, summary: unknown): Promise<void>
 }

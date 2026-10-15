@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 
 const responseSchema = z.object({
   latex: z.string(),
@@ -21,6 +22,8 @@ Rules:
 
 Return JSON: { "latex": "...", "is_chemical": false }`
 
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
+
 export async function runFormulaAgent(
   description: string,
   model: string,
@@ -30,6 +33,7 @@ export async function runFormulaAgent(
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "FormulaAgent",
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate LaTeX for: ${description}` },
     schema: responseSchema,

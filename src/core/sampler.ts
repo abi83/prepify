@@ -27,6 +27,8 @@ export const agentSampleSchema = z.object({
   executionId: z.uuid(),
   agent: z.string().min(1),
   systemPrompt: z.string().min(1),
+  /** Semver, bumped by hand when the prompt text changes. */
+  promptVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
   /** sha-256 hex of `systemPrompt`. */
   promptHash: z.string().regex(/^[0-9a-f]{64}$/),
   input: z.object({

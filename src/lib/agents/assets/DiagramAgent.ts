@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 
 const diagramTypeSchema = z.enum([ "flowchart", "graph" ])
 
@@ -33,6 +34,8 @@ flowchart TD
 
 Return JSON: { "type": "flowchart", "dsl": "flowchart TD\\n  ..." }`
 
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
+
 const beautifulMermaidEsm = "https://esm.sh/beautiful-mermaid@1.1.3"
 
 export async function runDiagramAgent(
@@ -44,6 +47,7 @@ export async function runDiagramAgent(
 ): Promise<AgentResult<string>> {
   const result = await runAgent({
     name: "DiagramAgent",
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Generate a Mermaid diagram for: ${description}` },
     schema: responseSchema,

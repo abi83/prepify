@@ -1,0 +1,62 @@
+{
+  "concept-extractor": {
+    "version": "1.0.0",
+    "hash": "a367f05f5499fbe72a8986fc218d0964cfadd68758d798bdc93960d5c74f31da"
+  },
+  "concept-merger": {
+    "version": "1.0.0",
+    "hash": "7ff5f46cff62a53dc7ea9f5fe0a7fbfcd5ea9a4dbffb5cb2e6d5e113d7c99f9b"
+  },
+  "diagram": {
+    "version": "1.0.0",
+    "hash": "2f74b564ebaa1558aae2ae0fa2c7a37b1e859eaf204ac720c068a31ac0beb7da"
+  },
+  "fill-the-gap": {
+    "version": "1.0.0",
+    "hash": "33aa79b00e809d3961140b6d8327ccf7e6300a83dc9708b96516bafb938c9fab"
+  },
+  "flashcard": {
+    "version": "1.0.0",
+    "hash": "14db71739867ce558292df1dc47dc435fdd4fa17dc734dd69b273ccc7b647012"
+  },
+  "formula": {
+    "version": "1.0.0",
+    "hash": "7e006ef2c7c2f24c5808b5fd24cf89fcc2c3dd4bc0fa136bf36407deb8f657b9"
+  },
+  "judge/ocr": {
+    "version": "1.0.0",
+    "hash": "d9c661d220057479cb49f091d4fbf17760fa6b542f81770153d0a95bdd3676e7"
+  },
+  "molecule": {
+    "version": "1.0.0",
+    "hash": "7d19b188eca5dfa2a664c1ae7c3c434b16087d9e1782552acd1155db946ec20a"
+  },
+  "multiple-choice": {
+    "version": "1.0.0",
+    "hash": "9f56614bc5531ab55f6478118a5232ebb839dc8c415c21a68ecc93b43b7e14f4"
+  },
+  "ocr": {
+    "version": "1.0.0",
+    "hash": "00c5d3d9df8b031655e33e207df14c1216f40937cb452afe9bd2565ae65a6753"
+  },
+  "prep-labeler": {
+    "version": "1.0.0",
+    "hash": "0fc709396de9bd708fe7ae6ccfe148406b8a9fcc8b98f5ed1322d9fce0732278"
+  },
+  "prep-namer": {
+    "version": "1.0.0",
+    "hash": "abe0bda8930dbf064570c140d16d9e9dc6b0e17bca63a1d2772bbc951a79dae2"
+  },
+  "question-reviewer": {
+    "version": "1.0.0",
+    "hash": "9da2081b4302034c39292e3361d833e221990176841a624119436ee61b44a74a"
+  },
+  "single-choice": {
+    "version": "1.0.0",
+    "hash": "02cf72b3f1a7a1d806aa70f3cb41294e5e06bfe6f4aed6882bb01f15d71d3d3c"
+  },
+  "sorting": {
+    "version": "1.0.0",
+    "hash": "bc93a1b05a5d39dc364461b5b8e509a74c127fd540698aadaba78993dedfdf7d"
+  }
+}

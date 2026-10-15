@@ -1,3 +1,4 @@
+import type { Prompt } from "@/lib/prompt"
 import type { Evaluator } from "@evals/evaluator"
 
 const SYSTEM_PROMPT = `You are a strict judge of OCR quality. You are shown textbook page image(s), the instructions an OCR model was given, and the OCR model's JSON output (extracted text, confidence, language, visual elements). Judge the output against the images, not against the OCR model's own confidence.
@@ -12,9 +13,11 @@ Score from 0.0 to 1.0:
 
 Penalize invented text or visual elements as heavily as omissions. Use intermediate values between the anchors. In "reasoning", name the specific errors you found in two to four sentences.`
 
+export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
+
 export const ocrEvaluator: Evaluator = {
   agent: "ocr",
-  systemPrompt: SYSTEM_PROMPT,
+  prompt,
   buildJudgeInput: ({ input, output }) => ({
     textContent: `OCR model instructions:\n${input.textContent}\n\nOCR model output (JSON):\n${JSON.stringify(output, null, 2)}`,
     images: input.images,
