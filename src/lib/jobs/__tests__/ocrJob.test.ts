@@ -20,6 +20,7 @@ import { noopSampler } from "@/lib/sampler/noopSampler"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
+import { testCatalog } from "@/test/modelCatalog"
 
 const OWNER = "user-owner"
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -49,7 +50,7 @@ describe("ocr job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
 
-    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

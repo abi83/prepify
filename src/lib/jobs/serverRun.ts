@@ -1,6 +1,5 @@
 import { z } from "zod"
 
-import { AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
 import { DEFAULT_GEN_CONFIG } from "@/lib/generationConfig"
 import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
@@ -15,8 +14,8 @@ import { serverPrepData } from "./serverPrepData"
 export const serverRunRequestSchema = z.object({
   apiKey: z.string().min(1),
   prepId: z.string().min(1),
-  model: z.string().refine(id => AVAILABLE_MODELS.some(m => m.id === id)).default("gpt-5-nano"),
-  tier: z.string().refine(id => AVAILABLE_TIERS.some(t => t.id === id)).default("flex"),
+  model: z.string().min(1).default("gpt-5-nano"),
+  tier: z.string().min(1).default("flex"),
   target: z.object({
     questionCount: z.number().int().min(5).max(20),
     enabledTypes: z.array(questionTypeSchema).min(1),
@@ -51,7 +50,7 @@ export async function acquirePrepRun(prepId: string): Promise<void> {
 /** Runs the prep's job graph with the caller's key, then frees its run slot. The key lives only in this call's closure. */
 export async function runServerGeneration(userId: string, { apiKey, prepId, model, tier, target }: ServerRunRequest): Promise<void> {
   try {
-    await runGeneration(serverPorts(apiKey, serverPrepData(userId)), {
+    await runGeneration(await serverPorts(apiKey, serverPrepData(userId)), {
       actorId: userId,
       prepId,
       apiKey,

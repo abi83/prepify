@@ -2,6 +2,7 @@ import type { ZodType } from "zod"
 
 import type { AgentImage } from "@/lib/agent"
 import type { SupportedLanguage } from "@/lib/config"
+import type { ModelCatalog } from "@/lib/modelCatalog"
 import type { PrepState } from "@/lib/planner"
 
 import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
@@ -121,12 +122,13 @@ export interface Ports {
   llm: Llm
   logger: Logger
   sampler: Sampler
+  catalog: ModelCatalog
   progress: ProgressSink
   data: PrepData
 }
 
 /** What job definitions depend on. */
-export type JobDeps = Pick<Ports, "llm" | "logger" | "sampler">
+export type JobDeps = Pick<Ports, "llm" | "logger" | "sampler" | "catalog">
 
 /** What agents depend on: the job's deps plus its per-request timeout. */
 export type AgentDeps = JobDeps & { timeoutMs: number }

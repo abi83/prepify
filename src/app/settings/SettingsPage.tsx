@@ -10,8 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getApiKey, setApiKey, clearApiKey, AVAILABLE_MODELS, AVAILABLE_TIERS } from "@/lib/apiKey"
-import type { ModelId, ServiceTier } from "@/lib/apiKey"
+import { getApiKey, setApiKey, clearApiKey, DEFAULT_MODEL, DEFAULT_TIER } from "@/lib/apiKey"
 import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import {
@@ -19,20 +18,21 @@ import {
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from "@/lib/generationConfig"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
+import { providerModels, type ModelCatalog } from "@/lib/modelCatalog"
 import { formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
 import type { QuestionType } from "@/types/questions"
 
 type TestState = "idle" | "testing" | "ok" | "invalid_key" | "error"
 
-export default function SettingsPage() {
+export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnTo = searchParams.get("returnTo") ?? "/preps"
 
   const [ keyValue, setKeyValue ] = useState(() => getApiKey()?.key ?? "")
-  const [ model, setModel ] = useState<ModelId>(() => getApiKey()?.model ?? "gpt-5-nano")
-  const [ tier, setTier ] = useState<ServiceTier>(() => getApiKey()?.tier ?? "flex")
+  const [ model, setModel ] = useState(() => getApiKey()?.model ?? DEFAULT_MODEL)
+  const [ tier, setTier ] = useState(() => getApiKey()?.tier ?? DEFAULT_TIER)
   const [ saved, setSaved ] = useState(false)
   const [ testState, setTestState ] = useState<TestState>("idle")
   const [ totalTokens, setTotalTokens ] = useState(0)
@@ -85,8 +85,8 @@ export default function SettingsPage() {
   function handleClear() {
     clearApiKey()
     setKeyValue("")
-    setModel("gpt-5-nano")
-    setTier("flex")
+    setModel(DEFAULT_MODEL)
+    setTier(DEFAULT_TIER)
     setSaved(false)
     setTestState("idle")
   }
@@ -103,6 +103,23 @@ export default function SettingsPage() {
   }
 
   const hasKey = !!getApiKey()
+  const models = providerModels(catalog, "openai")
+  const selected = models.find(m => m.id === model)
+  const selectionError = !selected
+    ? `Saved model "${model}" is no longer available.`
+    : !(tier in selected.tiers) ? `Saved tier "${tier}" is not available for ${selected.label}.` : null
+  const tiers = selected ? Object.entries(selected.tiers) : []
+
+  function handleModelChange(next: string) {
+    setModel(next)
+    setSaved(false)
+  }
+
+  function handleResetSelection() {
+    setModel(DEFAULT_MODEL)
+    setTier(DEFAULT_TIER)
+    setSaved(false)
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-[520px] flex-1 flex-col gap-10 px-6 py-10">
@@ -137,36 +154,43 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        {selectionError && (
+          <div role="alert" className="flex flex-col items-start gap-2.5">
+            <p className="text-sm text-error">{selectionError} Reset to the defaults to continue.</p>
+            <Button variant="outline" onClick={handleResetSelection}>Reset model and tier</Button>
+          </div>
+        )}
+
+        {!selectionError && <div className="flex flex-col gap-1.5">
           <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Model</Label>
-          <Select value={model} onValueChange={v => { setModel(v as ModelId); setSaved(false) }}>
+          <Select value={model} onValueChange={handleModelChange}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AVAILABLE_MODELS.map(m => (
+              {models.map(m => (
                 <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
 
-        <div className="flex flex-col gap-1.5">
+        {!selectionError && <div className="flex flex-col gap-1.5">
           <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Service tier</Label>
-          <Select value={tier} onValueChange={v => { setTier(v as ServiceTier); setSaved(false) }}>
+          <Select value={tier} onValueChange={v => { setTier(v); setSaved(false) }}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AVAILABLE_TIERS.map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+              {tiers.map(([ id, t ]) => (
+                <SelectItem key={id} value={id}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div>}
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button onClick={handleSave} disabled={!keyValue.trim()}>
+          <Button onClick={handleSave} disabled={!keyValue.trim() || !!selectionError}>
             {saved ? "✓ Saved" : "Save"}
           </Button>
           <Button

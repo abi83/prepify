@@ -1,6 +1,7 @@
 import type { PrepVisibility } from "@prisma/client"
 import { useState, useEffect, useRef } from "react"
 
+import { getModelCatalog } from "@/actions/modelCatalog"
 import { updatePrep } from "@/actions/preps"
 import { runPrepLabeler, DISCIPLINES, type Discipline } from "@/lib/agents/PrepLabeler"
 import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
@@ -71,7 +72,9 @@ export default function ShareModal({
     const ac = new AbortController()
     abortRef.current = ac
 
-    runPrepLabeler(concepts, model, tier, ac.signal, { llm: new OpenAiLlm({ apiKey }), logger: consoleLogger, sampler: clientSampler, timeoutMs: DEFAULT_TIMEOUT_MS }).then(result => {
+    getModelCatalog().then(catalog =>
+      runPrepLabeler(concepts, model, tier, ac.signal, { llm: new OpenAiLlm({ apiKey }), logger: consoleLogger, sampler: clientSampler, catalog, timeoutMs: DEFAULT_TIMEOUT_MS })
+    ).then(result => {
       if (ac.signal.aborted) return
       setGrade(prev => prev ?? result.output.grade)
       setDiscipline(prev => prev ?? result.output.discipline)

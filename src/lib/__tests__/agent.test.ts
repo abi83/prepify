@@ -7,6 +7,7 @@ import type { Sampler } from "@/core/sampler"
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
+import { testCatalog } from "@/test/modelCatalog"
 
 describe("sanitizeLLMText", () => {
   it("passes through clean text unchanged", () => {
@@ -65,7 +66,7 @@ describe("runAgent", () => {
       userContent,
       schema,
       signal: new AbortController().signal,
-      deps: { llm, logger, sampler, timeoutMs: TIMEOUT_MS },
+      deps: { llm, logger, sampler, catalog: testCatalog, timeoutMs: TIMEOUT_MS },
     })
   }
 
@@ -88,7 +89,7 @@ describe("runAgent", () => {
     await run("ocr")
     expect(lastRequest().maxTokens).toBe(DEFAULT_MAX_TOKENS)
 
-    await runAgent({ name: "ocr", promptVersion: "1.0.0", systemPrompt: "system", userContent: { textContent: "hello" }, schema, maxTokens: 4096, signal: new AbortController().signal, deps: { llm, logger, sampler: noopSampler, timeoutMs: TIMEOUT_MS } })
+    await runAgent({ name: "ocr", promptVersion: "1.0.0", systemPrompt: "system", userContent: { textContent: "hello" }, schema, maxTokens: 4096, signal: new AbortController().signal, deps: { llm, logger, sampler: noopSampler, catalog: testCatalog, timeoutMs: TIMEOUT_MS } })
     expect(lastRequest().maxTokens).toBe(4096)
   })
 

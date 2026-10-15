@@ -21,6 +21,7 @@ import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
+import { testCatalog } from "@/test/modelCatalog"
 import type { StoredConcept } from "@/types/pipeline"
 
 const OWNER = "user-owner"
@@ -29,7 +30,7 @@ const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 
 
 const NOOP_LLM: Llm = { complete: () => { throw new Error("not used") } }
 const NOOP_PROGRESS: ProgressSink = { report: () => {} }
-const DEPS = { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }
+const DEPS = { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }
 
 const META = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 1000, promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
 

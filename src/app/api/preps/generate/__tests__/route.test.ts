@@ -141,6 +141,20 @@ describe("POST /api/preps/generate", () => {
     expect(await prisma.job.count({ where: { prepId: prep.id, status: { not: "executed" } } })).toBe(0)
   })
 
+  it.each([
+    [ "an unlisted model", { model: "not-a-model" }, /not in the model catalog/ ],
+    [ "a local model", { model: "google/gemma-4-26b-a4b" }, /belongs to "lmstudio"/ ],
+    [ "an unknown tier", { tier: "not-a-tier" }, /not available/ ],
+  ])("rejects %s with 400 before starting a run", async (_name, override, message) => {
+    const { prep } = await makePrep()
+
+    const response = await post({ apiKey: API_KEY, prepId: prep.id, ...override })
+
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toMatch(message)
+    expect(h.afterCallbacks).toHaveLength(0)
+  })
+
   it("rejects unauthenticated, malformed, unknown-prep and foreign-prep requests", async () => {
     const { prep } = await makePrep("someone-else")
 

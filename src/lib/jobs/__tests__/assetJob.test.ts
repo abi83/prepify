@@ -8,9 +8,10 @@ import type { JobRunContext } from "@/core/runJob"
 import { createAssetJobDefinition } from "@/lib/jobs/assetJob"
 import { consoleLogger } from "@/lib/logger"
 import { noopSampler } from "@/lib/sampler/noopSampler"
+import { testCatalog } from "@/test/modelCatalog"
 
 const META = { model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
-const DEPS: JobDeps = { llm: { complete: () => { throw new Error("not used") } }, logger: consoleLogger, sampler: noopSampler }
+const DEPS: JobDeps = { llm: { complete: () => { throw new Error("not used") } }, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }
 const CTX = {
   job: { id: "job-1", type: "asset", inputIds: [ "q1" ], config: { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }, question: null },
   signal: new AbortController().signal,

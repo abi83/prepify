@@ -6,6 +6,7 @@ import { createNextJobs, runCreatedJobs, runGeneration, untracked, type Generati
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { createLogger } from "@/lib/logger/core"
 import { createFileTransport } from "@/lib/logger/fileTransport"
+import { loadModelCatalog } from "@/lib/modelCatalogFile"
 import { createDiskSampler } from "@/lib/sampler/diskSampler"
 
 import type { CliConfig } from "./config"
@@ -40,7 +41,7 @@ export async function createCliJobs({ prepDir, config }: Pick<CliOptions, "prepD
 }
 
 /** CLI composition root: files for jobs and logs, a shared root for samples; any OpenAI-compatible endpoint for the model. */
-function createCliRoot(options: CliOptions) {
+async function createCliRoot(options: CliOptions) {
   const { prepDir, samplesRoot, apiKey, config } = options
   const prep = createFilePrep(prepDir)
   const ports: RunnerPorts = {
@@ -48,6 +49,7 @@ function createCliRoot(options: CliOptions) {
     llm: options.llm ?? new OpenAiLlm({ apiKey, baseUrl: config.llm.baseUrl, temperature: config.llm.temperature, maxTokens: config.llm.maxTokens }),
     logger: createLogger({ transport: createFileTransport(path.join(prepDir, "logs", "run.log")), minLevel: config.log.level }),
     sampler: createDiskSampler(samplesRoot, SAMPLE_RATE, SAMPLE_MAX_PER_CELL),
+    catalog: await loadModelCatalog(),
     data: prep.data,
     listUnfinishedJobs: prep.listUnfinishedJobs,
     trackRun: untracked,
@@ -65,13 +67,13 @@ function createCliRoot(options: CliOptions) {
 
 /** Executes the given `created`/`failed` jobs, or every unfinished job when `jobIds` is empty. */
 export async function runCliJobs(options: CliOptions & { jobIds: string[] }): Promise<Job[]> {
-  const { ports, params } = createCliRoot(options)
+  const { ports, params } = await createCliRoot(options)
   return runCreatedJobs(ports, { ...params, jobIds: options.jobIds })
 }
 
 /** Runs the whole pipeline: OCR, then everything else the target needs. */
 export async function runCli(options: CliOptions): Promise<void> {
   const { config } = options
-  const { ports, params } = createCliRoot(options)
+  const { ports, params } = await createCliRoot(options)
   await runGeneration(ports, { ...params, config: executionConfig(config), target: config.target })
 }

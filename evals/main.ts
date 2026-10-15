@@ -3,6 +3,7 @@ import { parseArgs } from "util"
 
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { createLogger } from "@/lib/logger/core"
+import { loadModelCatalog } from "@/lib/modelCatalogFile"
 
 import { createDiskResultSink, createDiskSampleSource } from "./diskAdapters"
 import { loadExperiment, type Location } from "./experiment"
@@ -53,6 +54,7 @@ const summary = await runExperiment(experiment, {
   sink,
   llm: new OpenAiLlm({ apiKey, baseUrl: experiment.judge.llm.baseUrl }),
   logger: createLogger({ transport: line => process.stderr.write(line + "\n"), minLevel: "info" }),
+  catalog: await loadModelCatalog(),
   gitSha,
 })
 console.log(formatSummary(summary))

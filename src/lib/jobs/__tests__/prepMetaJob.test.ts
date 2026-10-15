@@ -23,6 +23,7 @@ import { noopSampler } from "@/lib/sampler/noopSampler"
 import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepRepository from "@/repositories/prepRepository"
+import { testCatalog } from "@/test/modelCatalog"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"
@@ -60,7 +61,7 @@ beforeEach(async () => {
 })
 
 it("throws when the input concepts span languages", () => {
-  expect(() => createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }))
+  expect(() => createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }))
     .toThrow("more than one language")
 })
 
@@ -77,7 +78,7 @@ describe("prep.meta job", () => {
     const store = createPrismaStore()
     const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
 
-    const definition = createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+    const definition = createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },

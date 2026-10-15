@@ -1,55 +1,56 @@
-import { describe, expect, it } from "vitest"
+import path from "path"
 
+import { beforeAll, describe, expect, it } from "vitest"
+
+import type { ModelCatalog } from "@/lib/modelCatalog"
+import { readModelCatalog } from "@/lib/modelCatalogFile"
 import { computeCost } from "@/lib/pricing"
+
+let catalog: ModelCatalog
+
+beforeAll(async () => {
+  catalog = await readModelCatalog(path.join(process.cwd(), "config", "models.yml"))
+})
+
+const usage = (promptTokens: number, completionTokens: number, cachedTokens = 0) => ({ promptTokens, cachedTokens, completionTokens })
 
 describe("computeCost", () => {
   it("prices prompt tokens at the input rate, completion tokens at the output rate", () => {
-    const cost = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 0 }, "gpt-5-nano", "flex")
-    expect(cost).toBeCloseTo(0.025)
+    expect(computeCost(catalog, usage(1_000_000, 0), "gpt-5-nano", "flex")).toBeCloseTo(0.025)
   })
 
   it("bills cached tokens at the cached rate, the rest of promptTokens at the input rate", () => {
-    const cost = computeCost({ promptTokens: 1_000_000, cachedTokens: 400_000, completionTokens: 0 }, "gpt-5-nano", "default")
-    expect(cost).toBeCloseTo(0.6 * 0.05 + 0.4 * 0.005)
+    expect(computeCost(catalog, usage(1_000_000, 0, 400_000), "gpt-5-nano", "default")).toBeCloseTo(0.6 * 0.05 + 0.4 * 0.005)
   })
 
-  it("falls back to gpt-5-nano pricing for an unknown model", () => {
-    const known = computeCost({ promptTokens: 1000, cachedTokens: 0, completionTokens: 1000 }, "gpt-5-nano", "flex")
-    const unknown = computeCost({ promptTokens: 1000, cachedTokens: 0, completionTokens: 1000 }, "not-a-real-model", "flex")
-    expect(unknown).toBe(known)
+  it("throws for a model that is not in the catalog", () => {
+    expect(() => computeCost(catalog, usage(1000, 1000), "not-a-real-model", "flex")).toThrow(/not-a-real-model.*not in the model catalog/)
   })
 
-  it("falls back to flex pricing for an unknown tier", () => {
-    const known = computeCost({ promptTokens: 1000, cachedTokens: 0, completionTokens: 1000 }, "gpt-5-nano", "flex")
-    const unknown = computeCost({ promptTokens: 1000, cachedTokens: 0, completionTokens: 1000 }, "gpt-5-nano", "not-a-real-tier")
-    expect(unknown).toBe(known)
+  it("throws for a tier the model's provider does not have", () => {
+    expect(() => computeCost(catalog, usage(1000, 1000), "gpt-5-nano", "not-a-real-tier")).toThrow(/not-a-real-tier.*not available/)
   })
 
-  it("prices the default tier higher than flex for the same model and usage", () => {
-    const flex = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-5-nano", "flex")
-    const standard = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-5-nano", "default")
+  it("costs 0 for a local model priced at 0", () => {
+    expect(computeCost(catalog, usage(1_000_000, 1_000_000, 500_000), "google/gemma-4-26b-a4b", "default")).toBe(0)
+  })
+
+  it("prices the default tier higher than flex, and priority higher than default", () => {
+    const [ flex, standard, priority ] = [ "flex", "default", "priority" ].map(tier => computeCost(catalog, usage(1_000_000, 1_000_000), "gpt-5-nano", tier))
     expect(standard).toBeGreaterThan(flex)
-  })
-
-  it("prices the priority tier higher than the default tier for the same model and usage", () => {
-    const standard = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-5-nano", "default")
-    const priority = computeCost({ promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-5-nano", "priority")
     expect(priority).toBeGreaterThan(standard)
   })
 
   it("prices gpt-6-luna at $0.10/$0.50 per 1M tokens on the default tier", () => {
-    const cost = computeCost({ promptTokens: 2_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-6-luna", "default")
-    expect(cost).toBeCloseTo(0.70)
+    expect(computeCost(catalog, usage(2_000_000, 1_000_000), "gpt-6-luna", "default")).toBeCloseTo(0.70)
   })
 
   it("prices gpt-6-luna at $0.05/$0.25 per 1M tokens on the flex tier", () => {
-    const cost = computeCost({ promptTokens: 2_000_000, cachedTokens: 0, completionTokens: 1_000_000 }, "gpt-6-luna", "flex")
-    expect(cost).toBeCloseTo(0.35)
+    expect(computeCost(catalog, usage(2_000_000, 1_000_000), "gpt-6-luna", "flex")).toBeCloseTo(0.35)
   })
 
   it("prices gpt-5-mini default-tier usage at $0.0343", () => {
-    const cost = computeCost({ promptTokens: 24174, cachedTokens: 0, completionTokens: 14112 }, "gpt-5-mini", "default")
-    expect(cost).toBeCloseTo(34267.5 / 1e6, 10)
+    expect(computeCost(catalog, usage(24174, 14112), "gpt-5-mini", "default")).toBeCloseTo(34267.5 / 1e6, 10)
   })
 
   it.each([
@@ -57,16 +58,12 @@ describe("computeCost", () => {
     [ "gpt-5-mini", 0.25, 2.00 ],
     [ "gpt-6-luna", 0.10, 0.50 ],
     [ "gpt-6.1-sol", 2.00, 10.00 ],
-    [ "gpt-6-astra", 10.00, 50.00 ],
+    [ "gpt-5.4-nano", 0.20, 1.25 ],
+    [ "gpt-5.4-mini", 0.75, 4.50 ],
   ])("prices %s at standard $%d/$%d per 1M on default, half on flex, double on priority", (model, input, output) => {
-    const usage = { promptTokens: 1_000_000, cachedTokens: 0, completionTokens: 1_000_000 }
-    expect(computeCost(usage, model, "default")).toBeCloseTo(input + output, 10)
-    expect(computeCost(usage, model, "flex")).toBeCloseTo((input + output) / 2, 10)
-    expect(computeCost(usage, model, "priority")).toBeCloseTo((input + output) * 2, 10)
-  })
-
-  it("keeps gpt-5 default-tier pricing at $30/$120 per 1M", () => {
-    const cost = computeCost({ promptTokens: 1_000_000, cachedTokens: 500_000, completionTokens: 1_000_000 }, "gpt-5", "default")
-    expect(cost).toBeCloseTo(150)
+    const tokens = usage(1_000_000, 1_000_000)
+    expect(computeCost(catalog, tokens, model, "default")).toBeCloseTo(input + output, 10)
+    expect(computeCost(catalog, tokens, model, "flex")).toBeCloseTo((input + output) / 2, 10)
+    expect(computeCost(catalog, tokens, model, "priority")).toBeCloseTo((input + output) * 2, 10)
   })
 })

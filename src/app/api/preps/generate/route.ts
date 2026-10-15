@@ -2,6 +2,8 @@ import { after, NextResponse } from "next/server"
 
 import { auth } from "@/lib/auth"
 import { acquirePrepRun, releasePrepRun, RunInProgressError, runServerGeneration, serverRunRequestSchema } from "@/lib/jobs/serverRun"
+import { assertModelAndTier } from "@/lib/modelCatalog"
+import { loadModelCatalog } from "@/lib/modelCatalogFile"
 import { withHandler } from "@/lib/withHandler"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
@@ -18,7 +20,12 @@ export const POST = withHandler(async req => {
 
   const body = serverRunRequestSchema.safeParse(await req.json().catch(() => null))
   if (!body.success) return error("Invalid request", 400)
-  const { prepId } = body.data
+  const { prepId, model, tier } = body.data
+  try {
+    assertModelAndTier(await loadModelCatalog(), "openai", model, tier)
+  } catch (e) {
+    return error(e instanceof Error ? e.message : "Invalid model or tier", 400)
+  }
 
   try {
     const prep = await prepRepository.getPrep(userId, prepId)

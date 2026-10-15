@@ -1,4 +1,5 @@
 import * as jobActions from "@/actions/jobs"
+import { getModelCatalog } from "@/actions/modelCatalog"
 import type { ExecutionConfig, Job, QuestionSpec } from "@/core/job"
 import type { Logger } from "@/core/logger"
 import type { Store } from "@/core/ports"
@@ -31,22 +32,23 @@ function runnerOptions<T extends Pick<GenerationParams, "model" | "tier">>(optio
 }
 
 /** Browser composition root: server-action persistence and data, the BYOK key for the model. */
-function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKey" | "logger" | "sampler">): generation.RunnerPorts {
+async function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKey" | "logger" | "sampler">): Promise<generation.RunnerPorts> {
   return {
     store: actionStore,
     llm: new OpenAiLlm({ apiKey }),
     logger,
     sampler,
+    catalog: await getModelCatalog(),
     data: browserPrepData,
     listUnfinishedJobs: (_actorId, prepId) => jobActions.listUnfinishedJobs(prepId),
     trackRun: generation.untracked,
   }
 }
 
-export function runOcr(options: GenerationParams): Promise<void> {
-  return generation.runOcr(browserPorts(options), runnerOptions(options))
+export async function runOcr(options: GenerationParams): Promise<void> {
+  return generation.runOcr(await browserPorts(options), runnerOptions(options))
 }
 
-export function runGeneration(options: GenerationParams): Promise<void> {
-  return generation.runGeneration(browserPorts(options), runnerOptions(options))
+export async function runGeneration(options: GenerationParams): Promise<void> {
+  return generation.runGeneration(await browserPorts(options), runnerOptions(options))
 }

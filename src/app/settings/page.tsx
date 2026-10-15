@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { Suspense } from "react"
 
 import { auth } from "@/lib/auth"
+import { loadModelCatalog } from "@/lib/modelCatalogFile"
 
 import SettingsPage from "./SettingsPage"
 
@@ -13,7 +14,7 @@ export default async function Page() {
 
   return (
     <Suspense fallback={null}>
-      <SettingsPage />
+      <SettingsPage catalog={await loadModelCatalog()} />
     </Suspense>
   )
 }

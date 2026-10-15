@@ -26,6 +26,7 @@ import { noopSampler } from "@/lib/sampler/noopSampler"
 import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
 import * as prepRepository from "@/repositories/prepRepository"
+import { testCatalog } from "@/test/modelCatalog"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"
@@ -64,7 +65,7 @@ async function makeConcept(userId: string) {
 }
 
 async function execute(jobId: string) {
-  const definition = createQuestionJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler })
+  const definition = createQuestionJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
   return runJob(
     definition,
     { store: createPrismaStore(), llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -84,7 +85,7 @@ beforeEach(async () => {
 })
 
 it("throws when the input concepts span languages", () => {
-  expect(() => createQuestionJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler }))
+  expect(() => createQuestionJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }))
     .toThrow("more than one language")
 })
 
