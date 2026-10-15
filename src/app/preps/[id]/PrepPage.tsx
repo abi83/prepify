@@ -17,7 +17,7 @@ import { formatDate } from "@/lib/format"
 import { estimateCost, formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { Concept } from "@/types/pipeline"
+import type { StoredConcept } from "@/types/pipeline"
 import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
@@ -33,7 +33,7 @@ interface Props {
   assets: Asset[]
   progress: PrepProgress | null
   tokensUsed: number
-  concepts: Concept[]
+  concepts: StoredConcept[]
   images: PrepImage[]
 }
 
@@ -183,6 +183,18 @@ export default function PrepPage({
         {pages.map(page => (
           <PageSection key={page.page} prepId={prep.id} page={page} />
         ))}
+
+        <ul aria-label="Concepts">
+          {concepts.map(c => (
+            <li key={c.name}>
+              <strong>{c.name}</strong>
+              <p>{c.description}</p>
+              <p>Importance: {c.importance}</p>
+              <p>Misconceptions: {c.misconceptions.join("; ")}</p>
+              <p>Language: {c.language}</p>
+            </li>
+          ))}
+        </ul>
 
         <GenerationPanel
           prepId={prep.id}
