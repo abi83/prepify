@@ -42,12 +42,6 @@ function rateFor(model: string, tier: string): ModelRate {
   return tierPricing[model] ?? tierPricing["gpt-5-nano"]
 }
 
-/** Returns estimated USD cost for the given token counts, model, and service tier. */
-export function estimateCost(inputTokens: number, outputTokens: number, model: string, tier: string): number {
-  const pricing = rateFor(model, tier)
-  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000
-}
-
 /** Formats a USD cost value for display, e.g. "$0.0023" or "< $0.01". */
 export function formatCost(usd: number): string {
   if (usd === 0) return "$0.00"

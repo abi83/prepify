@@ -98,12 +98,12 @@ describe("listPublicCatalog", () => {
   })
 })
 
-async function addJobCall(prepId: string, promptTokens: number, completionTokens: number, wasted = false): Promise<void> {
+async function addJobCall(prepId: string, promptTokens: number, completionTokens: number, wasted = false, costUsd = 0): Promise<void> {
   const job = await prisma.job.create({
     data: { prepId, type: "question", model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0, createdBy: OWNER },
   })
   await prisma.generationMeta.create({
-    data: { jobId: job.id, model: "gpt-5-nano", tier: "flex", promptTokens, cachedTokens: 0, completionTokens, costUsd: 0, toolCalls: 0, executionMs: 1, wasted },
+    data: { jobId: job.id, model: "gpt-5-nano", tier: "flex", promptTokens, cachedTokens: 0, completionTokens, costUsd, toolCalls: 0, executionMs: 1, wasted },
   })
 }
 
@@ -138,5 +138,39 @@ describe("token totals", () => {
     await addJobCall(theirs.id, 500, 500)
 
     expect(await prepRepository.getOwnedTokens(OWNER)).toBe(150)
+  })
+})
+
+describe("cost totals", () => {
+  it("sums stored cost over a prep's jobs, wasted calls included", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
+    const other = await prepRepository.createPrep(OWNER, { title: "Other", language: "en" })
+    await addJobCall(prep.id, 100, 50, false, 0.5)
+    await addJobCall(prep.id, 10, 5, true, 0.25)
+    await addJobCall(other.id, 1000, 1000, false, 10)
+
+    expect(await prepRepository.getPrepCost(OWNER, prep.id)).toBe(0.75)
+  })
+
+  it("is zero for a prep with no jobs", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
+    expect(await prepRepository.getPrepCost(OWNER, prep.id)).toBe(0)
+  })
+
+  it("rejects a non-owner reading a private prep's cost", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "My Prep", language: "en" })
+    await expect(prepRepository.getPrepCost(OTHER, prep.id)).rejects.toThrow(ForbiddenError)
+  })
+
+  it("totals only the owner's active preps", async () => {
+    const active = await prepRepository.createPrep(OWNER, { title: "Active", language: "en" })
+    const draft = await prepRepository.createPrep(OWNER, { title: "Draft", language: "en" })
+    const theirs = await prepRepository.createPrep(OTHER, { title: "Theirs", language: "en" })
+    await prisma.prep.updateMany({ where: { id: { in: [ active.id, theirs.id ] } }, data: { isActive: true } })
+    await addJobCall(active.id, 100, 50, false, 0.5)
+    await addJobCall(draft.id, 7, 7, false, 3)
+    await addJobCall(theirs.id, 500, 500, false, 9)
+
+    expect(await prepRepository.getOwnedCost(OWNER)).toBe(0.5)
   })
 })

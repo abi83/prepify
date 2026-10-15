@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getApiKey } from "@/lib/apiKey"
 import { disciplineFromEnum, disciplineToEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
-import { estimateCost, formatCost } from "@/lib/pricing"
+import { formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
 import type { PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
@@ -38,6 +38,7 @@ interface Props {
   assets: Asset[]
   progress: PrepProgress | null
   tokensUsed: number
+  costUsd: number
   concepts: StatedConcept[]
   images: PrepImage[]
 }
@@ -49,6 +50,7 @@ export default function PrepPage({
   assets,
   progress,
   tokensUsed,
+  costUsd,
   concepts,
   images,
 }: Props) {
@@ -177,10 +179,7 @@ export default function PrepPage({
           <span className="text-sm text-muted-foreground">{formatDate(prep.createdAt)}</span>
           {tokensUsed > 0 && (
             <span className="text-xs text-muted-foreground">
-              {tokensUsed.toLocaleString()} tokens
-              {getApiKey() && (
-                <> · ~{formatCost(estimateCost(tokensUsed * 0.8, tokensUsed * 0.2, getApiKey()!.model, getApiKey()!.tier))}</>
-              )}
+              {tokensUsed.toLocaleString()} tokens · {formatCost(costUsd)}
             </span>
           )}
         </div>
