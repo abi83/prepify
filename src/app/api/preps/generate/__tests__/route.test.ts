@@ -61,7 +61,8 @@ function fakeDefinition(type: string, output: (key: string) => unknown) {
       if (type === "concepts" && h.failConcepts) throw new Error("concepts boom")
       h.ran.push(type)
       h.keysSeenByRun.push(ctx.apiKey)
-      return { output: output(ctx.apiKey), metas: [], wastedMetas: [] }
+      const meta = { model: "m", tier: "flex", temperature: 0, maxTokens: 1, promptTokens: 1, cachedTokens: 0, completionTokens: 1, totalTokens: 2, costUsd: 0, toolCalls: 0, executionMs: 1 }
+      return { output: output(ctx.apiKey), metas: [ meta ], wastedMetas: [] }
     },
   })
 }

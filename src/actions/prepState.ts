@@ -1,11 +1,10 @@
 "use server"
 
 import { requireUserId } from "@/lib/currentUser"
-import type { PrepState } from "@/lib/planner"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 import * as prepStateRepository from "@/repositories/prepStateRepository"
-import type { PrepProgress } from "@/repositories/prepStateRepository"
+import type { GeneratedPrepState, PrepProgress } from "@/repositories/prepStateRepository"
 
 async function assertOwnsPrep(prepId: string): Promise<void> {
   const userId = await requireUserId()
@@ -13,7 +12,7 @@ async function assertOwnsPrep(prepId: string): Promise<void> {
   if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${userId}`)
 }
 
-export async function loadMyPrepState(prepId: string): Promise<PrepState> {
+export async function loadMyPrepState(prepId: string): Promise<GeneratedPrepState> {
   await assertOwnsPrep(prepId)
   return prepStateRepository.loadPrepState(prepId)
 }

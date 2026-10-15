@@ -15,7 +15,12 @@ const OWNER = "user-owner"
 const OTHER = "user-other"
 const TARGET: PlanTarget = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 
+const addMeta = (jobId: string, wasted = false) => prisma.generationMeta.create({
+  data: { jobId, model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, costUsd: 0.001, toolCalls: 0, executionMs: 100, wasted },
+})
+
 beforeEach(async () => {
+  await prisma.generationMeta.deleteMany()
   await prisma.asset.deleteMany()
   await prisma.jobInput.deleteMany()
   await prisma.question.deleteMany()
@@ -38,6 +43,7 @@ describe("prepStateRepository", () => {
     })
     const conceptsJob = await job("concepts")
     await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+    await addMeta(conceptsJob.id)
     await job("prep.meta")
     await job("question")
     await prisma.question.create({ data: { prepId: finished.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
@@ -67,6 +73,32 @@ describe("prepStateRepository", () => {
 
     expect(state.assetQuestionIds).toEqual([ pending.id ])
     expect(state.assetQuestionIds).not.toContain(plain.id)
+  })
+
+  it("loads each concept with its job's generation calls, wasted ones included", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Concepts", language: "en" })
+    const conceptsJob = await prisma.job.create({
+      data: { prepId: prep.id, type: "concepts", status: "executed", model: "gpt-5-nano", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
+    })
+    await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+    await addMeta(conceptsJob.id)
+    await addMeta(conceptsJob.id, true)
+
+    const { concepts } = await loadPrepState(prep.id)
+
+    expect(concepts).toHaveLength(1)
+    expect(concepts[0].generation).toMatchObject({ jobId: conceptsJob.id, model: "gpt-5-nano", tier: "flex" })
+    expect(concepts[0].generation.calls.map(call => call.wasted).sort()).toEqual([ false, true ])
+  })
+
+  it("throws for a concept whose job has no GenerationMeta", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "No meta", language: "en" })
+    const conceptsJob = await prisma.job.create({
+      data: { prepId: prep.id, type: "concepts", status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
+    })
+    await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
+
+    await expect(loadPrepState(prep.id)).rejects.toThrow("no GenerationMeta")
   })
 
   describe("getPrepProgress", () => {
