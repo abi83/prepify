@@ -1,5 +1,6 @@
 import type { PrepVisibility } from "@prisma/client"
 import { useState, useEffect, useRef } from "react"
+import { toast } from "sonner"
 
 import { getModelCatalog } from "@/actions/modelCatalog"
 import { updatePrep } from "@/actions/preps"
@@ -95,6 +96,10 @@ export default function ShareModal({
       await updatePrep(prepId, { visibility, grade, discipline: disciplineToEnum(discipline) })
       onSave(visibility, grade, discipline)
       setSaved(true)
+      toast.success("Prep published")
+    } catch (error) {
+      toast.error("Could not publish prep")
+      throw error
     } finally {
       setSaving(false)
     }

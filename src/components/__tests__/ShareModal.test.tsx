@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
+const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }))
 vi.mock("@/actions/samples", () => ({ getSampleRate: vi.fn(), recordSample: vi.fn() }))
 vi.mock("@/actions/preps", () => ({
   updatePrep: vi.fn().mockResolvedValue({}),
@@ -21,6 +23,7 @@ vi.mock("@/lib/agents/PrepLabeler", async () => {
   }
 })
 
+import { updatePrep } from "@/actions/preps"
 import ShareModal from "@/components/ShareModal"
 
 const baseProps = {
@@ -137,5 +140,26 @@ describe("ShareModal — accessibility", () => {
     unmount()
     await waitFor(() => expect(document.activeElement).toBe(trigger))
     trigger.remove()
+  })
+})
+
+describe("ShareModal — save toasts", () => {
+  it("shows a success toast after publishing", async () => {
+    render(<ShareModal {...baseProps} />)
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Prep published"))
+  })
+
+  it("shows an error toast and rethrows when publishing fails", async () => {
+    const failure = new Error("boom")
+    vi.mocked(updatePrep).mockRejectedValueOnce(failure)
+    const unhandled = vi.fn()
+    process.on("unhandledRejection", unhandled)
+    render(<ShareModal {...baseProps} />)
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }))
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Could not publish prep"))
+    await waitFor(() => expect(unhandled).toHaveBeenCalledWith(failure, expect.anything()))
+    process.off("unhandledRejection", unhandled)
+    expect(toastSuccess).not.toHaveBeenCalled()
   })
 })

@@ -10,6 +10,7 @@ vi.mock("next/navigation", async () => {
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "u1" } } }) }))
 vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: vi.fn() }))
 vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn(), deletePrep: vi.fn() }))
+vi.mock("@/actions/jobs", () => ({ retryTerminalJobs: vi.fn() }))
 vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
 vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: vi.fn() }))
 vi.mock("@/actions/attempts", () => ({ insertAttempt: vi.fn() }))

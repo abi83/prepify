@@ -4,7 +4,9 @@ import type { Prep, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useCallback, useState, useRef } from "react"
+import { toast } from "sonner"
 
+import { retryTerminalJobs } from "@/actions/jobs"
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
 import { AdditionalSettings } from "@/components/AdditionalSettings"
@@ -107,7 +109,9 @@ export default function GenerationPanel({
           // The `prep.meta` job has committed by the time questions start.
           if (event.stage === "questions" && !titleNotified) {
             titleNotified = true
-            void getMyPrep(prepId).then(fresh => onTitleReady(fresh.title))
+            void getMyPrep(prepId)
+              .then(fresh => onTitleReady(fresh.title))
+              .catch(() => toast.error("Could not load the generated title"))
           }
         },
       })
@@ -147,6 +151,16 @@ export default function GenerationPanel({
     await runOnServer()
   }
 
+  async function handleRetryTerminal() {
+    setGenError(null)
+    try {
+      await retryTerminalJobs(prepId)
+      await refreshProgress()
+    } catch (e: unknown) {
+      setGenError((e as Error).message)
+    }
+  }
+
   const isRunning = genPhase === "running"
   const hasPartialRun = prepProgress !== null
   const isServerRunning = prepProgress?.runState === "running"
@@ -183,6 +197,14 @@ export default function GenerationPanel({
                   </Button>
                 )}
               </div>
+              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions > 0 && (
+                <div className="flex items-center gap-2.5">
+                  <Button variant="outline" onClick={handleRetryTerminal}>Retry</Button>
+                  <p className="text-sm text-error">
+                    {prepProgress.terminalQuestions} question{prepProgress.terminalQuestions === 1 ? "" : "s"} failed repeatedly and won&apos;t be resumed automatically.
+                  </p>
+                </div>
+              )}
               {!isRunning && !isServerRunning && !isInterrupted && <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />}
             </>
           ) : (

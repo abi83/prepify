@@ -6,7 +6,7 @@ import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 
-import { interruptStaleJobs } from "./jobRepository"
+import { interruptStaleJobs, TERMINAL } from "./jobRepository"
 
 /** One LLM call of the job that produced a concept. A `wasted` call was billed but discarded. */
 export interface GenerationCall {
@@ -75,19 +75,21 @@ export interface PrepProgress {
   hasConcepts: boolean
   totalQuestions: number // question jobs created so far, any status
   completedQuestions: number // executed
-  failedQuestions: number // failed, until resume re-executes them
+  failedQuestions: number // failed with attempts left, until resume re-executes them
+  terminalQuestions: number // failed past the attempt cap; only an explicit retry re-runs them
 }
 
 /** What generation has done so far, for the UI. Null until the first job past OCR exists or a run is live — uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
 export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
   await interruptStaleJobs({ prepId })
-  const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs ] = await Promise.all([
+  const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs, terminalQuestions ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true } }),
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
     prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
     prisma.job.count({ where: { prepId, type: { notIn: [ OCR_JOB_TYPE, QUESTION_JOB_TYPE ] } } }),
     prisma.job.count({ where: { prepId, status: "running" } }),
     prisma.job.count({ where: { prepId, status: "interrupted" } }),
+    prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE, ...TERMINAL } }),
   ])
   const runState: RunState = runningJobs > 0 ? "running" : interruptedJobs > 0 ? "interrupted" : "idle"
   if (otherJobs === 0 && questionJobs.length === 0 && runState === "idle") return null
@@ -100,7 +102,8 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
     hasConcepts: conceptCount > 0,
     totalQuestions: questionJobs.reduce((sum, group) => sum + group._count, 0),
     completedQuestions: countOf("executed"),
-    failedQuestions: countOf("failed"),
+    failedQuestions: countOf("failed") - terminalQuestions,
+    terminalQuestions,
   }
 }
 
