@@ -31,10 +31,10 @@ permissions:
 
 jobs:
   interns:
-    uses: abi83/interns/.github/workflows/issue-pipeline.yml@v0
+    uses: abi83/interns/.github/workflows/issue-pipeline.yml@next
     secrets: inherit
     with:
-      pipeline_ref: v0
+      pipeline_ref: next
       issue_number: ${{ inputs.issue_number || github.event.issue.number }}
       phase: ${{ inputs.phase }}
       debug: ${{ inputs.debug || false }}
