@@ -20,7 +20,19 @@ export const STALE_HEARTBEAT_MS = 5 * 60 * 1000
 
 const staleCutoff = () => new Date(Date.now() - STALE_HEARTBEAT_MS)
 
-const RESUMABLE: JobStatus[] = [ "created", "failed", "interrupted" ]
+/** Claims a job may take before a `failed` one stops being resumed. */
+export const MAX_JOB_ATTEMPTS = 3
+
+/** Re-executable jobs: not yet run, or failed with attempts left. */
+const RESUMABLE: Prisma.JobWhereInput = {
+  OR: [
+    { status: { in: [ "created", "interrupted" ] } },
+    { status: "failed", attempts: { lt: MAX_JOB_ATTEMPTS } },
+  ],
+}
+
+/** A `failed` job that used up its attempts — only an explicit user retry re-runs it. */
+export const TERMINAL: Prisma.JobWhereInput = { status: "failed", attempts: { gte: MAX_JOB_ATTEMPTS } }
 
 /** Persists `interrupted` on `running` jobs with a dead heartbeat — the lazy fallback for a runner that died
  *  without a SIGTERM (OOM/SIGKILL). Conditional on the stale heartbeat, so a live runner's beat wins the race. */
@@ -110,7 +122,7 @@ function toJob<TOutput>(row: JobRow & { inputs: { entityId: string }[] }): Job<T
   }
   if (row.status === "failed") {
     if (row.failureReason === null) throw new Error(`Job ${row.id} is failed but has no failureReason`)
-    return { ...base, status: "failed", output: null, failureReason: row.failureReason }
+    return { ...base, status: "failed", output: null, failureReason: row.failureReason, terminal: row.attempts >= MAX_JOB_ATTEMPTS }
   }
   if (row.output !== null || row.failureReason !== null) {
     throw new Error(`Job ${row.id} is ${row.status} but already has output or a failureReason`)
@@ -191,15 +203,19 @@ export function createPrismaStore(): Store {
   }
 }
 
-/** A prep's re-executable jobs (`created`/`failed`/`interrupted`, stale `running` ones are marked `interrupted` first), oldest first — what "resume" re-executes. */
-export async function listUnfinishedJobs(actorId: string, prepId: string): Promise<Job[]> {
+async function assertOwnsPrep(actorId: string, prepId: string): Promise<void> {
   const prep = await prisma.prep.findUnique({ where: { id: prepId } })
   if (!prep) throw new NotFoundError(`Prep ${prepId} not found`)
   if (prep.userId !== actorId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${actorId}`)
+}
+
+/** A prep's re-executable jobs (`created`/`interrupted`/`failed` with attempts left, stale `running` ones are marked `interrupted` first), oldest first — what "resume" re-executes. */
+export async function listUnfinishedJobs(actorId: string, prepId: string): Promise<Job[]> {
+  await assertOwnsPrep(actorId, prepId)
 
   await interruptStaleJobs({ prepId })
   const rows = await prisma.job.findMany({
-    where: { prepId, status: { in: RESUMABLE } },
+    where: { prepId, ...RESUMABLE },
     include: { inputs: true },
     orderBy: { createdAt: "asc" },
   })
@@ -211,10 +227,23 @@ export async function hasActiveRun(prepId: string): Promise<boolean> {
   return await prisma.job.count({ where: { prepId, status: "running", heartbeatAt: { gte: staleCutoff() } } }) > 0
 }
 
-/** Moves a re-executable job to `running` with a fresh heartbeat; false if another runner holds it. */
+/** Moves a re-executable job to `running` with a fresh heartbeat and counts the attempt; false if another runner holds it or it is terminal. */
 export async function claimJob(jobId: string): Promise<boolean> {
-  const result = await prisma.job.updateMany({ where: { id: jobId, status: { in: RESUMABLE } }, data: { status: "running", heartbeatAt: new Date() } })
+  const result = await prisma.job.updateMany({
+    where: { id: jobId, ...RESUMABLE },
+    data: { status: "running", heartbeatAt: new Date(), attempts: { increment: 1 } },
+  })
   return result.count === 1
+}
+
+/** Explicit user retry: hands the prep's terminal jobs back to resume with a fresh attempt budget. Returns how many were reset. */
+export async function retryTerminalJobs(actorId: string, prepId: string): Promise<number> {
+  await assertOwnsPrep(actorId, prepId)
+  const result = await prisma.job.updateMany({
+    where: { prepId, ...TERMINAL },
+    data: { status: "interrupted", attempts: 0, failureReason: null },
+  })
+  return result.count
 }
 
 export async function touchHeartbeat(jobId: string): Promise<void> {

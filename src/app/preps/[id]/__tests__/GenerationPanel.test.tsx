@@ -2,7 +2,8 @@ import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { mockPush, mockRefresh, mockGetProgress, mockRunInBrowser } = vi.hoisted(() => ({
+const { mockPush, mockRefresh, mockGetProgress, mockRunInBrowser, mockRetryTerminal } = vi.hoisted(() => ({
+  mockRetryTerminal: vi.fn(),
   mockPush: vi.fn(),
   mockRefresh: vi.fn(),
   mockGetProgress: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush, refresh:
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "u1" } } }) }))
 vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: mockGetProgress }))
 vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn() }))
+vi.mock("@/actions/jobs", () => ({ retryTerminalJobs: mockRetryTerminal }))
 vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
 vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: mockRunInBrowser }))
@@ -25,7 +27,7 @@ import type { PrepProgress } from "@/repositories/prepStateRepository"
 const fetchMock = vi.fn()
 
 const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
-  runState: "idle", totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, ...overrides,
+  runState: "idle", totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, ...overrides,
 })
 
 async function overrideToServer() {
@@ -172,5 +174,14 @@ describe("GenerationPanel progress from the DB", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ apiKey: "sk-secret", prepId: "prep-1" })
+  })
+
+  it("shows terminally failed questions apart from retryable ones and retries them on click", async () => {
+    renderPanel(progress({ hasConcepts: true, totalQuestions: 3, completedQuestions: 1, failedQuestions: 1, terminalQuestions: 1 }))
+
+    expect(screen.getByText(/1 failed, 1 gave up/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+
+    expect(mockRetryTerminal).toHaveBeenCalledWith("prep-1")
   })
 })

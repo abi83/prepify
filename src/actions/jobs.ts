@@ -24,6 +24,10 @@ export async function commitJob(jobId: string, fromStatus: JobStatus, outcome: J
   return store.commitJob(await requireUserId(), jobId, fromStatus, outcome)
 }
 
+export async function retryTerminalJobs(prepId: string): Promise<number> {
+  return jobRepository.retryTerminalJobs(await requireUserId(), prepId)
+}
+
 export async function listUnfinishedJobs(prepId: string): Promise<Job[]> {
   return jobRepository.listUnfinishedJobs(await requireUserId(), prepId)
 }

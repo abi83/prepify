@@ -13,6 +13,8 @@ export interface ChecklistRowData {
   detail?: string
   /** A failed-slot count, rendered after `detail` in the error color. Doesn't affect `status`. */
   failed?: number
+  /** Jobs that gave up past the attempt cap, rendered after `failed`. Only a user retry re-runs them. */
+  terminal?: number
 }
 
 const DEFAULT_TITLE_RE = /^Prep #\d+$/
@@ -61,6 +63,7 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
       status: s.totalQuestions > 0 && s.completedQuestions === s.totalQuestions ? "done" : "pending",
       detail: s.totalQuestions > 0 ? `${s.completedQuestions}/${s.totalQuestions}` : undefined,
       failed: s.failedQuestions,
+      terminal: s.terminalQuestions,
     },
   ]
   if (s.runState !== "running") return rows
@@ -70,7 +73,8 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
 }
 
 export function ChecklistRow({ row }: { row: ChecklistRowData }) {
-  const parts = [ row.detail, row.failed ? `${row.failed} failed` : null ].filter(Boolean)
+  const errors = [ row.failed ? `${row.failed} failed` : null, row.terminal ? `${row.terminal} gave up` : null ].filter(Boolean)
+  const parts = [ row.detail, ...errors ].filter(Boolean)
   return (
     <div className="flex items-center gap-2.5 text-sm">
       <span className={cn("flex size-5 shrink-0 items-center justify-center text-sm font-bold",
@@ -84,7 +88,7 @@ export function ChecklistRow({ row }: { row: ChecklistRowData }) {
         {row.label}
         {parts.length > 0 && (
           <span className="text-sm text-muted-foreground">
-            {" "}({row.detail}{row.detail && row.failed ? ", " : ""}{row.failed ? <span className="text-error">{row.failed} failed</span> : null})
+            {" "}({row.detail}{row.detail && errors.length > 0 ? ", " : ""}<span className="text-error">{errors.join(", ")}</span>)
           </span>
         )}
       </span>
