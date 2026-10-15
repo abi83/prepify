@@ -8,11 +8,34 @@ import { prisma } from "@/lib/prisma"
 
 import { interruptStaleJobs } from "./jobRepository"
 
+/** One LLM call of the job that produced a concept. A `wasted` call was billed but discarded. */
+export interface GenerationCall {
+  promptTokens: number
+  cachedTokens: number
+  completionTokens: number
+  costUsd: number
+  executionMs: number
+  wasted: boolean
+}
+
+/** The job that produced a concept, with all its LLM calls. */
+export interface ConceptGeneration {
+  jobId: string
+  model: string
+  tier: string
+  calls: GenerationCall[]
+}
+
+export type StatedConcept = PrepState["concepts"][number] & { createdAt: Date; generation: ConceptGeneration }
+
+/** `PrepState` with each concept's generation meta, for the prep page. */
+export type GeneratedPrepState = PrepState & { concepts: StatedConcept[] }
+
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
-export async function loadPrepState(prepId: string): Promise<PrepState> {
+export async function loadPrepState(prepId: string): Promise<GeneratedPrepState> {
   const [ images, concepts, extractJobs, prepMetaJobs, questions, questionJobCount, assets, assetJobInputs ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
-    prisma.concept.findMany({ where: { producedByJob: { prepId } }, orderBy: { createdAt: "asc" } }),
+    prisma.concept.findMany({ where: { producedByJob: { prepId } }, include: { producedByJob: { include: { generationMetas: true } } }, orderBy: { createdAt: "asc" } }),
     prisma.job.findMany({
       where: { prepId, type: CONCEPTS_EXTRACT_JOB_TYPE, status: "executed" },
       select: { output: true, inputs: { select: { entityId: true } } },
@@ -31,7 +54,11 @@ export async function loadPrepState(prepId: string): Promise<PrepState> {
   const pageConcepts = indexPageConcepts(extractJobs.map(job => ({ inputIds: job.inputs.map(input => input.entityId), output: job.output })))
   return {
     images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" } })),
-    concepts: concepts.map(({ id, name, description, importance, misconceptions, language }) => ({ id, name, description, importance, misconceptions, language })),
+    concepts: concepts.map(({ id, name, description, importance, misconceptions, language, createdAt, producedByJob: job }) => {
+      if (job.generationMetas.length === 0) throw new Error(`Concept ${id} has no GenerationMeta on its job ${job.id}`)
+      const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
+      return { id, name, description, importance, misconceptions, language, createdAt, generation: { jobId: job.id, model: job.model, tier: job.tier, calls } }
+    }),
     prepMetaDone: prepMetaJobs > 0,
     questionCount: questions.length,
     questionJobCount,

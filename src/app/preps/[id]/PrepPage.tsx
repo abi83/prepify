@@ -7,6 +7,8 @@ import { useState } from "react"
 
 import { deletePrep } from "@/actions/preps"
 import AttemptFlow from "@/components/attempt/AttemptFlow"
+import ConceptCard from "@/components/ConceptCard"
+import ConceptGenerationSummary from "@/components/ConceptGenerationSummary"
 import ShareModal from "@/components/ShareModal"
 import StudyTabs from "@/components/StudyTabs"
 import { Button } from "@/components/ui/button"
@@ -16,13 +18,16 @@ import { disciplineFromEnum, disciplineToEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
 import { estimateCost, formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
-import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { StoredConcept } from "@/types/pipeline"
+import type { PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
 import GenerationPanel from "./GenerationPanel"
 import PageSection from "./PageSection"
+
+function uniqueGenerations(concepts: StatedConcept[]) {
+  return [ ...new Map(concepts.map(c => [ c.generation.jobId, c.generation ])).values() ]
+}
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -33,7 +38,7 @@ interface Props {
   assets: Asset[]
   progress: PrepProgress | null
   tokensUsed: number
-  concepts: StoredConcept[]
+  concepts: StatedConcept[]
   images: PrepImage[]
 }
 
@@ -184,17 +189,16 @@ export default function PrepPage({
           <PageSection key={page.page} prepId={prep.id} page={page} />
         ))}
 
-        <ul aria-label="Concepts">
-          {concepts.map(c => (
-            <li key={c.name}>
-              <strong>{c.name}</strong>
-              <p>{c.description}</p>
-              <p>Importance: {c.importance}</p>
-              <p>Misconceptions: {c.misconceptions.join("; ")}</p>
-              <p>Language: {c.language}</p>
-            </li>
-          ))}
-        </ul>
+        {concepts.length > 0 && (
+          <>
+            <ul aria-label="Concepts" className="flex flex-col gap-3">
+              {concepts.map(c => (
+                <li key={c.id}><ConceptCard concept={c} /></li>
+              ))}
+            </ul>
+            <ConceptGenerationSummary generations={uniqueGenerations(concepts)} />
+          </>
+        )}
 
         <GenerationPanel
           prepId={prep.id}

@@ -20,6 +20,11 @@ export function Card({ href, className, children }: CardProps) {
   )
 }
 
+/** A card that isn't a link: same surface, no hover lift. */
+export function CardStatic({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <div className={cn("flex h-full flex-col gap-2.5 rounded-lg border border-border bg-background p-5", className)}>{children}</div>
+}
+
 export function CardBadges({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-[22px] flex-wrap gap-1.5">{children}</div>
 }
