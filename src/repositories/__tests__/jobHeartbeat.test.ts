@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
-import { claimJob, createPrismaStore, hasActiveRun, listUnfinishedJobs, markInterrupted, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
+import { claimJob, createPrismaStore, hasActiveRun, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { getPrepProgress } from "@/repositories/prepStateRepository"
@@ -25,12 +25,12 @@ beforeEach(async () => {
   await prisma.prep.deleteMany()
 })
 
-async function makeJob(status: "created" | "running" | "interrupted" | "failed", heartbeatAt: Date | null) {
+async function makeJob(status: "created" | "running" | "interrupted" | "failed", heartbeatAt: Date | null, attempts = 0) {
   const prep = await prepRepository.createPrep(USER, { title: "Prep", language: "en" })
   const image = await prepImageRepository.createImage(USER, prep.id, "key")
   const job = await prisma.job.create({
     data: {
-      prepId: prep.id, type: "ocr", status, heartbeatAt, ...CONFIG, createdBy: USER,
+      prepId: prep.id, type: "ocr", status, heartbeatAt, attempts, ...CONFIG, createdBy: USER,
       failureReason: status === "failed" ? "boom" : null,
       inputs: { create: [ { entityType: "prepImage", entityId: image.id } ] },
     },
@@ -82,6 +82,43 @@ describe("running and interrupted jobs", () => {
     expect(await claimJob(job.id)).toBe(true)
     expect(await statusOf(job.id)).toBe("running")
     expect(await claimJob(job.id)).toBe(false)
+  })
+
+  it("claimJob counts the attempt", async () => {
+    const { job } = await makeJob("created", null)
+
+    await claimJob(job.id)
+
+    expect((await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).attempts).toBe(1)
+  })
+
+  it("a `failed` job below the cap resumes; at the cap it is terminal for listUnfinishedJobs and claimJob", async () => {
+    const retryable = await makeJob("failed", null, MAX_JOB_ATTEMPTS - 1)
+    const terminal = await makeJob("failed", null, MAX_JOB_ATTEMPTS)
+
+    expect((await listUnfinishedJobs(USER, retryable.prep.id)).map(j => j.id)).toEqual([ retryable.job.id ])
+    expect(await listUnfinishedJobs(USER, terminal.prep.id)).toEqual([])
+    expect(await claimJob(terminal.job.id)).toBe(false)
+    expect(await statusOf(terminal.job.id)).toBe("failed")
+    expect(await store.getJob(USER, terminal.job.id)).toMatchObject({ status: "failed", terminal: true })
+    expect(await store.getJob(USER, retryable.job.id)).toMatchObject({ status: "failed", terminal: false })
+  })
+
+  it("getPrepProgress separates terminal questions from retryable failed ones", async () => {
+    const { prep } = await makeJob("failed", null)
+    await prisma.job.updateMany({ where: { prepId: prep.id }, data: { type: "question", attempts: MAX_JOB_ATTEMPTS } })
+
+    expect(await getPrepProgress(prep.id)).toMatchObject({ failedQuestions: 0, terminalQuestions: 1 })
+  })
+
+  it("retryTerminalJobs resets terminal jobs for resume and refuses a non-owner", async () => {
+    const { prep, job } = await makeJob("failed", null, MAX_JOB_ATTEMPTS)
+
+    await expect(retryTerminalJobs("someone-else", prep.id)).rejects.toThrow()
+    expect(await retryTerminalJobs(USER, prep.id)).toBe(1)
+
+    expect(await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "interrupted", attempts: 0, failureReason: null })
+    expect((await listUnfinishedJobs(USER, prep.id)).map(j => j.id)).toEqual([ job.id ])
   })
 
   it("commits from `running` over the status the caller read", async () => {

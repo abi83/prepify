@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useCallback, useState, useRef } from "react"
 
+import { retryTerminalJobs } from "@/actions/jobs"
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
 import { AdditionalSettings } from "@/components/AdditionalSettings"
@@ -147,6 +148,16 @@ export default function GenerationPanel({
     await runOnServer()
   }
 
+  async function handleRetryTerminal() {
+    setGenError(null)
+    try {
+      await retryTerminalJobs(prepId)
+      await refreshProgress()
+    } catch (e: unknown) {
+      setGenError((e as Error).message)
+    }
+  }
+
   const isRunning = genPhase === "running"
   const hasPartialRun = prepProgress !== null
   const isServerRunning = prepProgress?.runState === "running"
@@ -183,6 +194,14 @@ export default function GenerationPanel({
                   </Button>
                 )}
               </div>
+              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions > 0 && (
+                <div className="flex items-center gap-2.5">
+                  <Button variant="outline" onClick={handleRetryTerminal}>Retry</Button>
+                  <p className="text-sm text-error">
+                    {prepProgress.terminalQuestions} question{prepProgress.terminalQuestions === 1 ? "" : "s"} failed repeatedly and won&apos;t be resumed automatically.
+                  </p>
+                </div>
+              )}
               {!isRunning && !isServerRunning && !isInterrupted && <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />}
             </>
           ) : (

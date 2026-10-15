@@ -51,7 +51,7 @@ function job(id: string, type: string, status: "created" | "failed"): Job {
   const base = { id, type, inputIds: type === "ocr" || type === "concepts.extract" ? [ "i1" ] : [ "c1" ], config: CONFIG, question: null }
   return status === "created"
     ? { ...base, status, output: null, failureReason: null }
-    : { ...base, status, output: null, failureReason: "boom" }
+    : { ...base, status, output: null, failureReason: "boom", terminal: false }
 }
 
 function params(events: GenerationProgress[] = []): GenerationParams {

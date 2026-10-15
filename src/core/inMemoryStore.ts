@@ -4,7 +4,7 @@ import type { Store } from "./ports"
 export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
   return outcome.status === "executed"
     ? { ...job, status: "executed", output: outcome.output, failureReason: null }
-    : { ...job, status: "failed", output: null, failureReason: outcome.failureReason }
+    : { ...job, status: "failed", output: null, failureReason: outcome.failureReason, terminal: false }
 }
 
 /**

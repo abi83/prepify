@@ -146,7 +146,7 @@ describe("prepStateRepository", () => {
       await addJob(prep.id, "question", "failed")
       await addJob(prep.id, "question", "created")
 
-      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1 })
+      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0 })
     })
   })
 })

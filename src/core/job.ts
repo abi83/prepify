@@ -33,7 +33,7 @@ export interface QuestionSpec {
 export type Job<TOutput = unknown> =
   | { id: string; type: string; status: PendingJobStatus; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: null }
   | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: TOutput; failureReason: null }
-  | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string }
+  | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string; terminal: boolean }
 
 /** What a job's `run` returns: its output plus the LLM calls behind it. `wastedMetas` are
  *  calls whose result was discarded (rejected attempts). */
