@@ -23,6 +23,7 @@ locals {
     "roles/storage.admin",
     "roles/run.admin",
     "roles/secretmanager.admin",
+    "roles/iam.roleAdmin",
   ]
 }
 
@@ -48,11 +49,25 @@ resource "google_storage_bucket_iam_member" "runtime_uploads_admin" {
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
-# Write-only: the runtime SA writes samples for later offline analysis but
-# never reads/lists/deletes them back, unlike the uploads bucket above.
+# The runtime SA writes samples for later offline analysis and lists them for
+# the per-cell cap, but never reads/deletes them, unlike the uploads bucket above.
 resource "google_storage_bucket_iam_member" "runtime_samples_writer" {
   bucket = google_storage_bucket.samples.name
   role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.run_runtime.email}"
+}
+
+resource "google_project_iam_custom_role" "samples_lister" {
+  project     = google_project.this.project_id
+  role_id     = "samplesLister"
+  title       = "Samples Lister"
+  description = "storage.objects.list only, for the sampler per-cell cap check"
+  permissions = ["storage.objects.list"]
+}
+
+resource "google_storage_bucket_iam_member" "runtime_samples_lister" {
+  bucket = google_storage_bucket.samples.name
+  role   = google_project_iam_custom_role.samples_lister.id
   member = "serviceAccount:${google_service_account.run_runtime.email}"
 }
 
