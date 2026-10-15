@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 import type { Concept } from "@/types/pipeline"
 
 const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
@@ -20,6 +21,8 @@ RULES:
 
 Return a JSON object: { "groups": [["Mitose", "cell division"], ["DNA replication"], ...] }
 Every input name must appear in exactly one group.`
+
+export const prompt: Prompt = { id: "concept-merger", version: "1.0.0", text: SYSTEM_PROMPT }
 
 const mergerResponseSchema = z.object({
   groups: z.array(z.array(z.string())),
@@ -41,6 +44,8 @@ export async function runConceptMerger(
 
   const result = await runAgent({
     name: "ConceptMerger",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: JSON.stringify(payload) },
     schema: mergerResponseSchema,

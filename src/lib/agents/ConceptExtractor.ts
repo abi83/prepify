@@ -1,6 +1,7 @@
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, type AgentResult } from "@/lib/agent"
 import { MAX_PAGE_CHARS, type SupportedLanguage } from "@/lib/config"
+import type { Prompt } from "@/lib/prompt"
 import { conceptsResponseSchema, type PageConcepts } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 
@@ -51,6 +52,8 @@ NOT ASSESSABLE (skip):
 Return a JSON object: { "concepts": [ { "name": "...", "description": "...", "importance": 0.0–1.0, "misconceptions": ["..."] } ], "emptyReason": null }
 The list will be capped at 20 entries — prioritise by importance if you have more.`
 
+export const prompt: Prompt = { id: "concept-extractor", version: "1.0.0", text: SYSTEM_PROMPT }
+
 function serializePage(page: Page): string {
   const parts = [ `=== Page ${page.page} ===\n${page.text}` ]
   if (page.visual_elements.length > 0) {
@@ -83,6 +86,8 @@ export async function runConceptExtractor(
 
   const { output, meta } = await runAgent({
     name: "ConceptExtractor",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Source text:\n\n${serialized}` },
     schema: conceptsResponseSchema,

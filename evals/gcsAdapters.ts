@@ -22,17 +22,17 @@ export function createGcsSampleSource(bucket: string, storage = new Storage()): 
   }
 }
 
-/** Writes `gs://{bucket}/{keyPrefix}results/{agent}/{promptHash}/{model}/{evaluatorId}/{executionId|summary}.json`. */
+/** Writes `gs://{bucket}/{keyPrefix}results/{agent}/{promptHash}/{model}/{judge promptHash}/{executionId|summary}.json`. */
 export function createGcsResultSink(bucket: string, storage = new Storage(), keyPrefix = ""): ResultSink {
-  const resultKey = (cell: Cell, evaluatorId: string, name: string) =>
-    `${keyPrefix}${cellPrefix(cell).replace(/^samples/, "results")}/${evaluatorId}/${name}.json`
+  const resultKey = (cell: Cell, judgeHash: string, name: string) =>
+    `${keyPrefix}${cellPrefix(cell).replace(/^samples/, "results")}/${judgeHash}/${name}.json`
 
   const write = (key: string, content: unknown) =>
     storage.bucket(bucket).file(key).save(JSON.stringify(content, null, 2), { contentType: "application/json" })
 
   return {
-    writeSampleResult: (cell, result) => write(resultKey(cell, result.evaluatorId, result.executionId), result),
-    writeSummary: (cell, evaluatorId, summary) => write(resultKey(cell, evaluatorId, "summary"), summary),
+    writeSampleResult: (cell, result) => write(resultKey(cell, result.promptHash, result.executionId), result),
+    writeSummary: (cell, promptHash, summary) => write(resultKey(cell, promptHash, "summary"), summary),
   }
 }
 
@@ -46,6 +46,6 @@ export async function uploadSamples(bucket: string, samples: StoredSample[], sto
 export function teeResultSinks(...sinks: ResultSink[]): ResultSink {
   return {
     writeSampleResult: async (cell, result) => { await Promise.all(sinks.map(sink => sink.writeSampleResult(cell, result))) },
-    writeSummary: async (cell, evaluatorId, summary) => { await Promise.all(sinks.map(sink => sink.writeSummary(cell, evaluatorId, summary))) },
+    writeSummary: async (cell, promptHash, summary) => { await Promise.all(sinks.map(sink => sink.writeSummary(cell, promptHash, summary))) },
   }
 }

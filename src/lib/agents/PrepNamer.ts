@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 import type { Concept } from "@/types/pipeline"
 
 const prepNameSchema = z.object({
@@ -24,6 +25,8 @@ Description requirements:
 
 Return JSON: { "title": "...", "description": "..." }`
 
+export const prompt: Prompt = { id: "prep-namer", version: "1.0.0", text: SYSTEM_PROMPT }
+
 export async function runPrepNamer(
   concepts: Concept[],
   model: string,
@@ -42,6 +45,8 @@ export async function runPrepNamer(
 
   return runAgent({
     name: "PrepNamer",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepNameSchema,

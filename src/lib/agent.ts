@@ -40,6 +40,9 @@ export interface AgentInput {
 
 interface RunAgentConfig<T> {
   name: string
+  promptId: string
+  /** Semver, bumped by hand when the prompt text changes. */
+  promptVersion: string
   systemPrompt: string
   userContent: AgentInput
   schema: ZodSchema<T>
@@ -86,12 +89,14 @@ function describeFailure(err: unknown, timeoutMs: number): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, output: T, meta: AgentMeta): Promise<void> {
+async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, promptHash: string, output: T, meta: AgentMeta): Promise<void> {
   await sampler.record({
     executionId: crypto.randomUUID(),
     agent: config.name,
     systemPrompt: config.systemPrompt,
-    promptHash: await hashPrompt(config.systemPrompt),
+    promptId: config.promptId,
+    promptVersion: config.promptVersion,
+    promptHash,
     input: { textContent: config.userContent.textContent, images: config.userContent.images ?? [] },
     output: z.json().parse(output),
     meta,
@@ -100,14 +105,16 @@ async function recordSample<T>(sampler: Sampler, config: RunAgentConfig<T>, outp
 }
 
 export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResult<T>> {
-  const { name, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
+  const { name, promptId, promptVersion, systemPrompt, userContent, schema, model = "gpt-5-nano", tier = "flex", maxTokens = DEFAULT_MAX_TOKENS, signal, deps } = config
   const { llm, logger, sampler, timeoutMs } = deps
 
+  const promptHash = await hashPrompt(systemPrompt)
+  const promptIdentity = { promptId, promptVersion, promptHash }
   let lastError: unknown
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const t0 = performance.now()
-    logger.debug(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} started`, { model, tier, attempt, timeoutMs })
+    logger.debug(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} started`, { model, tier, attempt, timeoutMs, ...promptIdentity })
 
     try {
       const response = await llm.complete(
@@ -150,10 +157,10 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
         executionMs,
       }
 
-      logger.debug(`agent:${name}`, meta as Record<string, unknown>)
+      logger.debug(`agent:${name}`, { ...meta, ...promptIdentity })
 
       // A failed sample write must not fail the run.
-      void recordSample(sampler, config, validated, meta).catch(e =>
+      void recordSample(sampler, config, promptHash, validated, meta).catch(e =>
         logger.warn(`agent:${name}: failed to record sample`, { error: serializeError(e) }))
 
       return { output: validated, meta }
@@ -161,7 +168,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const elapsedMs = Math.round(performance.now() - t0)
       const retryable = !(err instanceof NonRetryableLlmError || (err instanceof Error && err.name === "AbortError"))
       logger.warn(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} failed${retryable ? "" : " (not retryable)"}`, {
-        model, tier, attempt, timeoutMs, elapsedMs, error: serializeError(err),
+        model, tier, attempt, timeoutMs, elapsedMs, ...promptIdentity, error: serializeError(err),
       })
       lastError = err
       if (!retryable) throw err

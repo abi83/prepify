@@ -53,7 +53,7 @@ describe("GCS ResultSink", () => {
   it("mirrors the cell path under results/ plus the evaluator id", async () => {
     const { storage, objects } = fakeStorage()
     const sink = createGcsResultSink("b", storage)
-    const result = { executionId: "e1", evaluatorId: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
+    const result = { executionId: "e1", promptId: "judge/ocr", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
     await sink.writeSampleResult(CELL, result)
     await sink.writeSummary(CELL, "ev", { n: 1 })
 

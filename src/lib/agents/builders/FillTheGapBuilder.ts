@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 import type { QuestionTask } from "@/types/pipeline"
 import { fillTheGapContentSchema } from "@/types/questions"
 import type { FillTheGapContent } from "@/types/questions"
@@ -39,6 +40,8 @@ ASSET HINT: Decide if a visual asset would significantly improve this question.
 
 Return JSON: { "content": { "question": "...", "gaps": [...], "answers": [...], "rationale": "...", "asset_hint": { "needed": false, "type": null, "description": null } } }`
 
+export const prompt: Prompt = { id: "fill-the-gap", version: "1.0.0", text: SYSTEM_PROMPT }
+
 function formatConcepts(concepts: QuestionTask["concepts"]): string {
   if (concepts.length === 1) {
     const c = concepts[0]
@@ -64,6 +67,8 @@ export async function runFillTheGapBuilder(
   const langInstruction = language !== "en" ? `\nRespond in ${language}.` : ""
   const result = await runAgent({
     name: "FillTheGapBuilder",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT + langInstruction,
     userContent: { textContent: `${formatConcepts(task.concepts)}\n\n${difficultyInstructions(task, "with-distractors")}${rewriteInstructions(rewrite)}` },
     schema: responseSchema,

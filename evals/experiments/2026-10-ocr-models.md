@@ -3,9 +3,9 @@
 Part of #313. Proof of concept: the decision is not final.
 
 ## Evaluated
-- Agent `ocr`, prompt hash `00c5d3d9df8b031655e33e207df14c1216f40937cb452afe9bd2565ae65a6753`.
+- Agent `ocr`, prompt `ocr` v1.0.0, hash `00c5d3d9df8b031655e33e207df14c1216f40937cb452afe9bd2565ae65a6753`.
 - Input: 6 textbook photos. French: `20260805_151639`, `151650`, `151654`, `151702 (2)`. Physics: `20260913_131759`, `131803`.
-- Judge: `gpt-5.4-mini` on flex, score 0–1 per sample (evaluator `d9c661d2…`).
+- Judge: `gpt-5.4-mini` on flex, score 0–1 per sample (judge prompt `judge/ocr` v1.0.0, hash `d9c661d220057479cb49f091d4fbf17760fa6b542f81770153d0a95bdd3676e7`).
 - Local models via LM Studio. Gemma: temperature 0.2, max tokens 4096, repeat penalty 1.2, reasoning off. Qwen: reasoning off.
 - Code: samples recorded at `6ea5ff4` (luna, qwen), `7bf1c20` (gemma), `70619e8` (nano, mini); evals at the same SHAs.
 

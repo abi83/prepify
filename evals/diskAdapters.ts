@@ -22,10 +22,10 @@ export function createDiskSampleSource(dir: string): SampleSource {
   }
 }
 
-/** Writes `{dir}/results/{agent}/{promptHash}/{model}/{evaluatorId}/{executionId|summary}.json`. */
+/** Writes `{dir}/results/{agent}/{promptHash}/{model}/{judge promptHash}/{executionId|summary}.json`. */
 export function createDiskResultSink(dir: string): ResultSink {
-  const resultDir = (cell: Cell, evaluatorId: string) =>
-    path.join(dir, cellPrefix(cell).replace(/^samples/, "results"), evaluatorId)
+  const resultDir = (cell: Cell, judgeHash: string) =>
+    path.join(dir, cellPrefix(cell).replace(/^samples/, "results"), judgeHash)
 
   async function write(file: string, content: unknown): Promise<void> {
     await mkdir(path.dirname(file), { recursive: true })
@@ -33,7 +33,7 @@ export function createDiskResultSink(dir: string): ResultSink {
   }
 
   return {
-    writeSampleResult: (cell, result) => write(path.join(resultDir(cell, result.evaluatorId), `${result.executionId}.json`), result),
-    writeSummary: (cell, evaluatorId, summary) => write(path.join(resultDir(cell, evaluatorId), "summary.json"), summary),
+    writeSampleResult: (cell, result) => write(path.join(resultDir(cell, result.promptHash), `${result.executionId}.json`), result),
+    writeSummary: (cell, promptHash, summary) => write(path.join(resultDir(cell, promptHash), "summary.json"), summary),
   }
 }

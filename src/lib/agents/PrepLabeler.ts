@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, AgentResult } from "@/lib/agent"
+import type { Prompt } from "@/lib/prompt"
 import type { Concept } from "@/types/pipeline"
 
 export const DISCIPLINES = [
@@ -55,6 +56,8 @@ Rules:
 
 Return JSON: { "grade": <integer 1–13 or null>, "discipline": <discipline string or null>, "confidence": <float 0.0–1.0> }`
 
+export const prompt: Prompt = { id: "prep-labeler", version: "1.0.0", text: SYSTEM_PROMPT }
+
 export async function runPrepLabeler(
   concepts: Concept[],
   model: string,
@@ -70,6 +73,8 @@ export async function runPrepLabeler(
 
   return runAgent({
     name: "PrepLabeler",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: `Concepts:\n${conceptList}` },
     schema: prepLabelSchema,

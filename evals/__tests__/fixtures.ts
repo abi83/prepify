@@ -12,6 +12,8 @@ export function makeSample(n: number, overrides: Partial<StoredSample> = {}): St
     executionId: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
     agent: CELL.agent,
     systemPrompt: "ocr prompt",
+    promptId: "ocr",
+    promptVersion: "1.0.0",
     promptHash: PROMPT_HASH,
     input: { textContent: "Extract text", images: [ { base64: "AAAA", mimeType: "image/png" } ] },
     output: { text: `page ${n}`, confidence: 0.9, language: "en", visual_elements: [] },

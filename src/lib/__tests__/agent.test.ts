@@ -60,12 +60,20 @@ describe("runAgent", () => {
   async function run(name: string, sampler: Sampler = noopSampler, userContent: Parameters<typeof runAgent>[0]["userContent"] = { textContent: "hello" }) {
     return runAgent({
       name,
+      promptId: "test",
+      promptVersion: "1.0.0",
       systemPrompt: "system",
       userContent,
       schema,
       signal: new AbortController().signal,
       deps: { llm, logger, sampler, timeoutMs: TIMEOUT_MS },
     })
+  }
+
+  /** Hashing the prompt is real async work; wait for the first LLM call so the retry timers exist before they're flushed. */
+  async function drainTimers() {
+    await vi.waitFor(() => expect(complete).toHaveBeenCalled())
+    await vi.runAllTimersAsync()
   }
 
   function lastRequest(): LlmRequest {
@@ -81,7 +89,7 @@ describe("runAgent", () => {
     await run("ocr")
     expect(lastRequest().maxTokens).toBe(DEFAULT_MAX_TOKENS)
 
-    await runAgent({ name: "ocr", systemPrompt: "system", userContent: { textContent: "hello" }, schema, maxTokens: 4096, signal: new AbortController().signal, deps: { llm, logger, sampler: noopSampler, timeoutMs: TIMEOUT_MS } })
+    await runAgent({ name: "ocr", promptId: "test", promptVersion: "1.0.0", systemPrompt: "system", userContent: { textContent: "hello" }, schema, maxTokens: 4096, signal: new AbortController().signal, deps: { llm, logger, sampler: noopSampler, timeoutMs: TIMEOUT_MS } })
     expect(lastRequest().maxTokens).toBe(4096)
   })
 
@@ -96,10 +104,10 @@ describe("runAgent", () => {
     complete.mockRejectedValueOnce(new Error("503"))
 
     const result = run("ocr")
-    await vi.runAllTimersAsync()
+    await drainTimers()
     await result
 
-    const fields = { model: "gpt-5-nano", tier: "flex", timeoutMs: TIMEOUT_MS }
+    const fields = { model: "gpt-5-nano", tier: "flex", timeoutMs: TIMEOUT_MS, promptId: "test", promptVersion: "1.0.0", promptHash: await hashPrompt("system") }
     expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 1/3 started", { ...fields, attempt: 1 })
     expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 2/3 started", { ...fields, attempt: 2 })
   })
@@ -123,7 +131,7 @@ describe("runAgent", () => {
       complete.mockRejectedValueOnce(new Error("503"))
 
       const result = run("SomeAgent")
-      await vi.runAllTimersAsync()
+      await drainTimers()
 
       await expect(result).resolves.toMatchObject({ output: { answer: "ok" } })
       expect(complete).toHaveBeenCalledTimes(2)
@@ -135,7 +143,7 @@ describe("runAgent", () => {
 
       const result = run("SomeAgent")
       const assertion = expect(result).rejects.toThrow("503")
-      await vi.runAllTimersAsync()
+      await drainTimers()
 
       await assertion
       expect(complete).toHaveBeenCalledTimes(3)
@@ -155,7 +163,7 @@ describe("runAgent", () => {
 
       const result = run("ocr")
       const assertion = expect(result).rejects.toThrow("ocr: timed out after 7s (attempt 3/3)")
-      await vi.runAllTimersAsync()
+      await drainTimers()
 
       await assertion
       expect(warn).toHaveBeenCalledTimes(3)
@@ -173,6 +181,8 @@ describe("runAgent", () => {
       expect(record).toHaveBeenCalledWith(expect.objectContaining({
         agent: "SomeAgent",
         systemPrompt: "system",
+        promptId: "test",
+        promptVersion: "1.0.0",
         promptHash: await hashPrompt("system"),
         input: { textContent: "hello", images: [] },
         output: { answer: "ok" },

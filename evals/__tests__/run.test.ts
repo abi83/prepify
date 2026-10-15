@@ -58,15 +58,16 @@ describe("runExperiment (OCR)", () => {
 
     const summary = await runExperiment(experiment, deps(dir, llm))
 
-    const evaluatorId = await hashPrompt(ocrEvaluator.systemPrompt)
-    expect(summary).toMatchObject({ cell: CELL, evaluatorId, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
+    const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
+    const judgePrompt = { promptId: "judge/ocr", promptVersion: ocrEvaluator.prompt.version, promptHash }
+    expect(summary).toMatchObject({ cell: CELL, agentPromptId: "ocr", agentPromptVersion: "1.0.0", ...judgePrompt, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
     expect(summary.score).toEqual({ mean: 0.75, median: 0.75, p95: 1 })
     expect(summary.latencyMs.mean).toBe(1500)
 
-    const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", evaluatorId)
+    const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", promptHash)
     expect((await readdir(resultDir)).sort()).toEqual([ ...samples.map(s => `${s.executionId}.json`), "summary.json" ].sort())
     expect(JSON.parse(await readFile(path.join(resultDir, `${samples[0].executionId}.json`), "utf-8")))
-      .toEqual({ executionId: samples[0].executionId, evaluatorId, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
+      .toEqual({ executionId: samples[0].executionId, ...judgePrompt, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
     expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8"))).toMatchObject({ gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000 })
 
     expect(requests[0].model).toBe("big-judge")
@@ -108,8 +109,8 @@ describe("runExperiment (OCR)", () => {
       },
     }
     await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/sample\(s\) failed/)
-    const evaluatorId = await hashPrompt(ocrEvaluator.systemPrompt)
-    const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", evaluatorId)
+    const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
+    const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", promptHash)
     expect(await readdir(resultDir)).not.toContain("summary.json")
   })
 

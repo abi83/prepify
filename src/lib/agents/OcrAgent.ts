@@ -5,6 +5,7 @@ import { runAgent, AgentResult } from "@/lib/agent"
 import type { AgentImage } from "@/lib/agent"
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
 import type { SupportedLanguage } from "@/lib/config"
+import type { Prompt } from "@/lib/prompt"
 
 const visualElementSchema = z.object({
   type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
@@ -29,6 +30,8 @@ export type VisualElementOutput = z.infer<typeof visualElementSchema>
 const SUPPORTED_LANGUAGE_NAMES = SUPPORTED_LANGUAGES.map(l => LANGUAGE_LABELS[l]).join(", ")
 
 const SYSTEM_PROMPT = "You are an OCR agent. Extract all text and visual elements from the textbook page image provided."
+
+export const prompt: Prompt = { id: "ocr", version: "1.0.0", text: SYSTEM_PROMPT }
 
 const USER_PROMPT = `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
 
@@ -75,6 +78,8 @@ export async function runOcrAgent(
 ): Promise<AgentResult<OcrOutput>> {
   const result = await runAgent({
     name: "ocr",
+    promptId: prompt.id,
+    promptVersion: prompt.version,
     systemPrompt: SYSTEM_PROMPT,
     userContent: { textContent: USER_PROMPT, images },
     schema: ocrSchema,
