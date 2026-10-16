@@ -25,7 +25,7 @@ const CONCEPTS = [ concept("c1", 0.9), concept("c2", 0.7), concept("c3", 0.5) ]
 
 function state(overrides: Partial<PrepState> = {}): PrepState {
   return {
-    images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ],
+    images: [ { id: "i1", ocrDone: true, concepts: FOUND, merge: "merged" } ],
     concepts: CONCEPTS,
     prepMetaDone: true,
     questionCount: 0,
@@ -39,7 +39,7 @@ function state(overrides: Partial<PrepState> = {}): PrepState {
 
 describe("nextJobs", () => {
   it("plans one ocr job per image on an empty prep", () => {
-    const specs = nextJobs(state({ images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } }, { id: "i2", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false }), TARGET)
+    const specs = nextJobs(state({ images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" }, { id: "i2", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false }), TARGET)
     expect(specs).toEqual([
       { type: "ocr", inputIds: [ "i1" ], question: null },
       { type: "ocr", inputIds: [ "i2" ], question: null },
@@ -47,7 +47,7 @@ describe("nextJobs", () => {
   })
 
   it("only plans ocr for the images still missing it", () => {
-    const specs = nextJobs(state({ images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } }, { id: "i2", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false }), TARGET)
+    const specs = nextJobs(state({ images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" }, merge: "none" }, { id: "i2", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false }), TARGET)
     expect(specs).toEqual([ { type: "ocr", inputIds: [ "i2" ], question: null } ])
   })
 
@@ -56,7 +56,7 @@ describe("nextJobs", () => {
   })
 
   it("plans one concepts.extract job per image once OCR is done", () => {
-    const images = [ { id: "i1", ocrDone: true, concepts: PENDING }, { id: "i2", ocrDone: true, concepts: PENDING } ]
+    const images: PrepState["images"] = [ { id: "i1", ocrDone: true, concepts: PENDING, merge: "none" }, { id: "i2", ocrDone: true, concepts: PENDING, merge: "none" } ]
     const specs = nextJobs(state({ images, concepts: [] }), TARGET)
     expect(specs).toEqual([
       { type: "concepts.extract", inputIds: [ "i1" ], question: null },
@@ -65,32 +65,71 @@ describe("nextJobs", () => {
   })
 
   it("only plans extraction for the images not yet extracted, including empty ones", () => {
-    const images = [
-      { id: "i1", ocrDone: true, concepts: FOUND },
-      { id: "i2", ocrDone: true, concepts: EMPTY },
-      { id: "i3", ocrDone: true, concepts: PENDING },
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: FOUND, merge: "none" },
+      { id: "i2", ocrDone: true, concepts: EMPTY, merge: "none" },
+      { id: "i3", ocrDone: true, concepts: PENDING, merge: "none" },
     ]
     const specs = nextJobs(state({ images, concepts: [] }), TARGET)
     expect(specs).toEqual([ { type: "concepts.extract", inputIds: [ "i3" ], question: null } ])
   })
 
-  it("plans the concepts merge over the images that yielded concepts once all are extracted", () => {
-    const images = [
-      { id: "i1", ocrDone: true, concepts: FOUND },
-      { id: "i2", ocrDone: true, concepts: EMPTY },
-      { id: "i3", ocrDone: true, concepts: FOUND },
+  it("plans the first found page's merge once all pages are extracted, skipping empty ones", () => {
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: EMPTY, merge: "none" },
+      { id: "i2", ocrDone: true, concepts: FOUND, merge: "none" },
+      { id: "i3", ocrDone: true, concepts: FOUND, merge: "none" },
     ]
-    const specs = nextJobs(state({ images, concepts: [] }), TARGET)
-    expect(specs).toEqual([ { type: "concepts", inputIds: [ "i1", "i3" ], question: null } ])
+    expect(nextJobs(state({ images, concepts: [] }), TARGET)).toEqual([ { type: "concepts", inputIds: [ "i2" ], question: null } ])
+  })
+
+  it("plans the next page's merge only after the earlier pages are merged", () => {
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: FOUND, merge: "merged" },
+      { id: "i2", ocrDone: true, concepts: FOUND, merge: "none" },
+      { id: "i3", ocrDone: true, concepts: FOUND, merge: "none" },
+    ]
+    expect(nextJobs(state({ images }), TARGET)).toEqual([ { type: "concepts", inputIds: [ "i2" ], question: null } ])
+  })
+
+  it("plans nothing while the earlier page's merge job is unfinished", () => {
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: FOUND, merge: "planned" },
+      { id: "i2", ocrDone: true, concepts: FOUND, merge: "none" },
+    ]
+    expect(nextJobs(state({ images, concepts: [] }), TARGET)).toEqual([])
+    expect(nextJobs(state({ images }), TARGET)).toEqual([])
+  })
+
+  it("merges a page added to a prep that already has concepts and questions, before assets", () => {
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: FOUND, merge: "merged" },
+      { id: "i2", ocrDone: true, concepts: FOUND, merge: "none" },
+    ]
+    const specs = nextJobs(state({ images, questionCount: 5, questionJobCount: 5, assetQuestionIds: [ "q1" ] }), TARGET)
+    expect(specs).toEqual([ { type: "concepts", inputIds: [ "i2" ], question: null } ])
+  })
+
+  it("extracts a page added to a prep that already has concepts", () => {
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: FOUND, merge: "merged" },
+      { id: "i2", ocrDone: true, concepts: PENDING, merge: "none" },
+    ]
+    expect(nextJobs(state({ images }), TARGET)).toEqual([ { type: "concepts.extract", inputIds: [ "i2" ], question: null } ])
+  })
+
+  it("doesn't re-extract a page that was already merged", () => {
+    const images: PrepState["images"] = [ { id: "i1", ocrDone: true, concepts: PENDING, merge: "merged" } ]
+    expect(nextJobs(state({ images }), TARGET).every(spec => spec.type === "question")).toBe(true)
   })
 
   it("plans nothing when every page came up empty", () => {
-    const images = [ { id: "i1", ocrDone: true, concepts: EMPTY }, { id: "i2", ocrDone: true, concepts: EMPTY } ]
+    const images: PrepState["images"] = [ { id: "i1", ocrDone: true, concepts: EMPTY, merge: "none" }, { id: "i2", ocrDone: true, concepts: EMPTY, merge: "none" } ]
     expect(nextJobs(state({ images, concepts: [] }), TARGET)).toEqual([])
   })
 
   it("plans prep.meta over every page's OCR alongside concept extraction", () => {
-    const images = [ { id: "i1", ocrDone: true, concepts: PENDING }, { id: "i2", ocrDone: true, concepts: PENDING } ]
+    const images: PrepState["images"] = [ { id: "i1", ocrDone: true, concepts: PENDING, merge: "none" }, { id: "i2", ocrDone: true, concepts: PENDING, merge: "none" } ]
     const specs = nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)
     expect(specs).toEqual([
       { type: "concepts.extract", inputIds: [ "i1" ], question: null },
@@ -106,7 +145,7 @@ describe("nextJobs", () => {
   })
 
   it("plans prep.meta even when every page came up empty", () => {
-    const images = [ { id: "i1", ocrDone: true, concepts: EMPTY } ]
+    const images: PrepState["images"] = [ { id: "i1", ocrDone: true, concepts: EMPTY, merge: "none" } ]
     expect(nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)).toEqual([ { type: "prep.meta", inputIds: [ "i1" ], question: null } ])
   })
 
@@ -167,10 +206,10 @@ describe("nextJobs", () => {
 
 describe("assertConceptsFound", () => {
   it("throws, naming the distinct reasons, when every page is empty", () => {
-    const images = [
-      { id: "i1", ocrDone: true, concepts: EMPTY },
-      { id: "i2", ocrDone: true, concepts: { status: "empty", reason: "unreadable" } satisfies PageConceptsState },
-      { id: "i3", ocrDone: true, concepts: EMPTY },
+    const images: PrepState["images"] = [
+      { id: "i1", ocrDone: true, concepts: EMPTY, merge: "none" },
+      { id: "i2", ocrDone: true, concepts: { status: "empty", reason: "unreadable" }, merge: "none" },
+      { id: "i3", ocrDone: true, concepts: EMPTY, merge: "none" },
     ]
     expect(() => assertConceptsFound(state({ images, concepts: [] }))).toThrow("No concepts found in any page (not_educational, unreadable)")
   })

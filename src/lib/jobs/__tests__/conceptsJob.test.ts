@@ -54,55 +54,61 @@ async function createPrepWithImages(count: number) {
   return { prep, imageIds: images.map(image => image.id) }
 }
 
-function run(jobId: string, pages: StoredConcept[][]) {
+type StoredWithId = StoredConcept & { id: string }
+
+function run(jobId: string, incoming: StoredConcept[], stored: StoredWithId[] = []) {
   return runJob(
-    createConceptsJobDefinition(pages, DEPS),
+    createConceptsJobDefinition(incoming, stored, DEPS),
     { store: createPrismaStore(), llm: NOOP_LLM, progress: NOOP_PROGRESS },
     { actorId: OWNER, jobId, apiKey: "sk-test", signal: new AbortController().signal },
   )
 }
 
 describe("concepts job", () => {
-  it("merges the pages' concepts: Concept rows and a GenerationMeta row for the merger call are persisted", async () => {
-    const { prep, imageIds } = await createPrepWithImages(2)
-    runConceptMerger.mockResolvedValue({ output: [ concept("Mitosis", 0.9) ], meta: META })
+  it("inserts a page's concepts as they are when the prep has none yet, without an LLM call", async () => {
+    const { prep, imageIds } = await createPrepWithImages(1)
     const job = await createPrismaStore().createJob(OWNER, "concepts", imageIds, CONFIG)
 
-    const result = await run(job.id, [ [ concept("Mitosis", 0.9) ], [ concept("cell division", 0.8) ] ])
+    const result = await run(job.id, [ concept("Mitosis", 0.9), concept("Meiosis", 0.8) ])
 
     expect(result).toMatchObject({ committed: true, status: "executed" })
-    const concepts = await prisma.concept.findMany({ where: { producedByJobId: job.id } })
-    expect(concepts).toHaveLength(1)
-    expect(concepts[0]).toMatchObject({ name: "Mitosis", importance: 0.9, language: "de" })
-    expect((await prisma.prep.findUniqueOrThrow({ where: { id: prep.id } })).language).toBe("de")
-    expect(await prisma.generationMeta.findMany({ where: { jobId: job.id } })).toHaveLength(1)
-  })
-
-  it("skips the merger when a single page has concepts", async () => {
-    const { imageIds } = await createPrepWithImages(1)
-    const job = await createPrismaStore().createJob(OWNER, "concepts", imageIds, CONFIG)
-
-    await run(job.id, [ [ concept("Mitosis", 0.9), concept("mitosis", 0.7) ] ])
-
     expect(runConceptMerger).not.toHaveBeenCalled()
-    expect(await prisma.concept.findMany({ where: { producedByJobId: job.id } })).toHaveLength(1)
+    expect(await prisma.concept.findMany({ where: { producedByJobId: job.id }, orderBy: { name: "asc" } })).toMatchObject([ { name: "Meiosis" }, { name: "Mitosis" } ])
+    expect((await prisma.prep.findUniqueOrThrow({ where: { id: prep.id } })).language).toBe("de")
     expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(0)
   })
 
-  it("fails the job when the merge produces no concepts", async () => {
+  it("inserts only the incoming concepts the merger marks new and records its GenerationMeta", async () => {
     const { imageIds } = await createPrepWithImages(2)
-    runConceptMerger.mockResolvedValue({ output: [], meta: META })
-    const job = await createPrismaStore().createJob(OWNER, "concepts", imageIds, CONFIG)
+    const stored = { ...concept("Mitosis", 0.9), id: "stored-1" }
+    runConceptMerger.mockResolvedValue({
+      output: [ { concept: concept("cell division", 0.8), duplicateOfId: "stored-1" }, { concept: concept("Meiosis", 0.7), duplicateOfId: null } ],
+      meta: META,
+    })
+    const job = await createPrismaStore().createJob(OWNER, "concepts", [ imageIds[1] ], CONFIG)
 
-    const result = await run(job.id, [ [ concept("Mitosis", 0.9) ], [ concept("Meiosis", 0.8) ] ])
+    const result = await run(job.id, [ concept("cell division", 0.8), concept("Meiosis", 0.7) ], [ stored ])
 
-    expect(result).toMatchObject({ committed: true, status: "failed", failureReason: "Concept merge produced no concepts" })
-    expect(await prisma.concept.count()).toBe(0)
-    expect(await prisma.generationMeta.findMany({ where: { jobId: job.id } })).toMatchObject([ { wasted: true } ])
+    expect(result).toMatchObject({ committed: true, status: "executed" })
+    expect(runConceptMerger).toHaveBeenCalledWith([ concept("cell division", 0.8), concept("Meiosis", 0.7) ], [ stored ], "gpt-5-nano", "flex", expect.anything(), expect.anything())
+    expect(await prisma.concept.findMany({ where: { producedByJobId: job.id } })).toMatchObject([ { name: "Meiosis", language: "de" } ])
+    expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(1)
   })
 
-  it("throws when the input pages span languages", () => {
-    expect(() => createConceptsJobDefinition([ [ concept("Mitosis", 0.9) ], [ { ...concept("Mitose", 0.9), language: "fr" } ] ], DEPS))
+  it("executes with no new concepts when every incoming one is a duplicate", async () => {
+    const { imageIds } = await createPrepWithImages(2)
+    const stored = { ...concept("Mitosis", 0.9), id: "stored-1" }
+    runConceptMerger.mockResolvedValue({ output: [ { concept: concept("cell division", 0.8), duplicateOfId: "stored-1" } ], meta: META })
+    const job = await createPrismaStore().createJob(OWNER, "concepts", [ imageIds[1] ], CONFIG)
+
+    const result = await run(job.id, [ concept("cell division", 0.8) ], [ stored ])
+
+    expect(result).toMatchObject({ committed: true, status: "executed" })
+    expect(await prisma.concept.count()).toBe(0)
+  })
+
+  it("throws when the incoming and stored concepts span languages", () => {
+    expect(() => createConceptsJobDefinition([ { ...concept("Mitose", 0.9), language: "fr" } ], [ { ...concept("Mitosis", 0.9), id: "stored-1" } ], DEPS))
       .toThrow("more than one language")
   })
 

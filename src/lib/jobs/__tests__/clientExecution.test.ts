@@ -8,7 +8,7 @@ const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, max
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 
-const DONE_STATE: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
+const DONE_STATE: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
 
 const h = vi.hoisted(() => ({
   jobs: new Map<string, unknown>(),
@@ -121,7 +121,7 @@ describe("runOcr", () => {
   })
 
   it("OCRs pending images", async () => {
-    h.state = { ...DONE_STATE, images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ] }
+    h.state = { ...DONE_STATE, images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ] }
 
     await runOcr(params())
     expect(h.ran).toEqual([ "ocr" ])

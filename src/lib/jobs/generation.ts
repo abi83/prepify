@@ -73,13 +73,10 @@ function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: D
       return createConceptsExtractJobDefinition(page, deps)
     }
     case CONCEPTS_JOB_TYPE: {
-      const { images } = await data.loadState(prepId)
-      const pages = job.inputIds.map(id => {
-        const concepts = images.find(image => image.id === id)?.concepts
-        if (concepts?.status !== "found") throw new Error(`PrepImage ${id} has no extracted concepts for job ${job.id}`)
-        return concepts.concepts
-      })
-      return createConceptsJobDefinition(pages, deps)
+      const { images, concepts } = await data.loadState(prepId)
+      const extraction = images.find(image => image.id === job.inputIds[0])?.concepts
+      if (extraction?.status !== "found") throw new Error(`PrepImage ${job.inputIds[0]} has no extracted concepts for job ${job.id}`)
+      return createConceptsJobDefinition(extraction.concepts, concepts, deps)
     }
     case PREP_META_JOB_TYPE: {
       const images = await data.listImages(prepId)
@@ -173,7 +170,10 @@ async function runStaged(runner: Runner, jobs: Job[]): Promise<void> {
     const stageJobs = jobs.filter(job => stageOf(job.type) === stage)
     if (stageJobs.length === 0) continue
     runner.startStage(stage, stageJobs.length)
-    await runJobs(runner.deps, runner.params, stageJobs)
+    const merges = stageJobs.filter(job => job.type === CONCEPTS_JOB_TYPE)
+    await runJobs(runner.deps, runner.params, stageJobs.filter(job => !merges.includes(job)))
+    // Each merge reads the concepts the previous one stored, so they never overlap or skip ahead after a failure.
+    for (const merge of merges) await runJobs(runner.deps, runner.params, [ merge ])
   }
 }
 
