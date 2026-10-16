@@ -51,7 +51,8 @@ If no visual elements are present, return an empty array for visual_elements.`
 const MIN_PAGE_CONFIDENCE = 0.5
 const MIN_ELEMENT_CONFIDENCE = 0.6
 const MIN_TEXT_LENGTH = 20
-const MIN_LETTER_RATIO = 0.7
+const MIN_READABLE_RATIO = 0.7
+const MIN_LETTER_RATIO = 0.3
 
 export function assertReadableText(text: string): void {
   const trimmed = text.trim()
@@ -59,10 +60,12 @@ export function assertReadableText(text: string): void {
     throw new Error(`ocr_text_too_short:${trimmed.length}`)
   }
   const nonWhitespace = trimmed.replace(/\s/g, "")
-  const letters = nonWhitespace.match(/\p{L}/gu)?.length ?? 0
-  const ratio = letters / nonWhitespace.length
-  if (ratio < MIN_LETTER_RATIO) {
-    throw new Error(`ocr_text_not_letters:${ratio.toFixed(2)}`)
+  const count = (pattern: RegExp) => nonWhitespace.match(pattern)?.length ?? 0
+  const letterRatio = count(/\p{L}/gu) / nonWhitespace.length
+  // Math pages are mostly digits and symbols; the letter floor still rejects digit-only and "|~=" noise.
+  const readableRatio = count(/[\p{L}\p{N}\p{Sm}]/gu) / nonWhitespace.length
+  if (letterRatio < MIN_LETTER_RATIO || readableRatio < MIN_READABLE_RATIO) {
+    throw new Error(`ocr_text_not_letters:${letterRatio.toFixed(2)}/${readableRatio.toFixed(2)}`)
   }
 }
 
