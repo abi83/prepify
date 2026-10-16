@@ -3,7 +3,7 @@ import { z } from "zod"
 import type { Logger } from "@/core/logger"
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, truncateForLog, AgentResult } from "@/lib/agent"
-import type { AgentImage } from "@/lib/agent"
+import type { AgentImage, AgentMeta } from "@/lib/agent"
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
 import type { SupportedLanguage } from "@/lib/config"
 import { serializeError } from "@/lib/logger"
@@ -86,6 +86,23 @@ function assertSupportedLanguage(code: string): asserts code is SupportedLanguag
   }
 }
 
+/** Thrown when the LLM call succeeded but its output was rejected; `meta` is the wasted call. */
+export class OcrRejectedError extends Error {
+  constructor(public readonly meta: AgentMeta, public readonly cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.name = "OcrRejectedError"
+  }
+}
+
+function assertAcceptable(output: z.infer<typeof ocrSchema>, logger: Logger): asserts output is OcrOutput {
+  if (output.confidence < MIN_PAGE_CONFIDENCE) {
+    throw new Error(`low_confidence:${output.confidence}`)
+  }
+
+  assertReadableTextLogged(output.text, logger)
+  assertSupportedLanguage(output.language)
+}
+
 export async function runOcrAgent(
   images: AgentImage[],
   model: string,
@@ -105,12 +122,11 @@ export async function runOcrAgent(
     deps,
   })
 
-  if (result.output.confidence < MIN_PAGE_CONFIDENCE) {
-    throw new Error(`low_confidence:${result.output.confidence}`)
+  try {
+    assertAcceptable(result.output, deps.logger)
+  } catch (error) {
+    throw new OcrRejectedError(result.meta, error)
   }
-
-  assertReadableTextLogged(result.output.text, deps.logger)
-  assertSupportedLanguage(result.output.language)
 
   return {
     ...result,
