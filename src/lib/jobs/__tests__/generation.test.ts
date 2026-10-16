@@ -109,7 +109,7 @@ describe("resuming merges", () => {
         { id: "i1", ocrDone: true, concepts: found("first"), merge: "planned" },
         { id: "i2", ocrDone: true, concepts: found("second"), merge: "planned" },
       ],
-      concepts: [], prepMetaDone: true, questionCount: 0, questionJobCount: 0, assetQuestionIds: [],
+      concepts: [], prepMetaDone: true, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [],
     }
     const ports = root({ complete: () => { throw new Error("unused") } }, state)
     const first = await ports.store.createJob("u1", "concepts", [ "i1" ], CONFIG)
