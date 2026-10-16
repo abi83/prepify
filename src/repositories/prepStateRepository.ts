@@ -3,10 +3,10 @@ import type { JobStatus, Prep } from "@prisma/client"
 import { activeAssetHint } from "@/lib/assetHint"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
-import { nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
+import { countConceptUsage, nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 
-import { interruptStaleJobs, TERMINAL } from "./jobRepository"
+import { interruptStaleJobs, RESUMABLE, TERMINAL } from "./jobRepository"
 
 /** One LLM call of the job that produced a concept. A `wasted` call was billed but discarded. */
 export interface GenerationCall {
@@ -33,7 +33,7 @@ export type GeneratedPrepState = PrepState & { concepts: StatedConcept[] }
 
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<GeneratedPrepState> {
-  const [ images, concepts, extractJobs, prepMetaJobs, questions, questionJobCount, assets, assetJobInputs ] = await Promise.all([
+  const [ images, concepts, extractJobs, prepMetaJobs, questions, questionJobCount, unfinishedJobCount, questionConceptInputs, assets, assetJobInputs ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
     prisma.concept.findMany({ where: { producedByJob: { prepId } }, include: { producedByJob: { include: { generationMetas: true } } }, orderBy: { createdAt: "asc" } }),
     prisma.job.findMany({
@@ -44,6 +44,8 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
     prisma.job.count({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" } }),
     prisma.question.findMany({ where: { prepId }, select: { id: true, content: true }, orderBy: { createdAt: "asc" } }),
     prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE } }),
+    prisma.job.count({ where: { prepId, ...RESUMABLE } }),
+    prisma.jobInput.findMany({ where: { entityType: "concept", job: { prepId, type: QUESTION_JOB_TYPE, status: "executed" } }, select: { entityId: true } }),
     prisma.asset.findMany({ where: { question: { prepId } }, select: { questionId: true } }),
     prisma.jobInput.findMany({ where: { entityType: "question", job: { prepId, type: ASSET_JOB_TYPE } }, select: { entityId: true } }),
   ])
@@ -62,6 +64,8 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
     prepMetaDone: prepMetaJobs > 0,
     questionCount: questions.length,
     questionJobCount,
+    unfinishedJobCount,
+    conceptUsage: countConceptUsage(questionConceptInputs.map(input => input.entityId)),
     assetQuestionIds,
   }
 }

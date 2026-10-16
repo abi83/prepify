@@ -8,7 +8,7 @@ import { activeAssetHint } from "@/lib/assetHint"
 import type { SupportedLanguage } from "@/lib/config"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
-import type { PrepState } from "@/lib/planner"
+import { countConceptUsage, type PrepState } from "@/lib/planner"
 import type { StoredConcept } from "@/types/pipeline"
 import type { GeneratedQuestion } from "@/types/questions"
 
@@ -89,6 +89,8 @@ export function createFilePrep(dir: string): FilePrep {
         prepMetaDone: meta.length > 0,
         questionCount: allQuestions.length,
         questionJobCount: jobs.filter(job => job.type === QUESTION_JOB_TYPE).length,
+        unfinishedJobCount: jobs.filter(job => job.status !== "executed").length,
+        conceptUsage: countConceptUsage(jobs.filter(job => job.type === QUESTION_JOB_TYPE && job.status === "executed").flatMap(job => job.inputIds)),
         assetQuestionIds: allQuestions.filter(({ job, output }) => activeAssetHint(output.content) && !assetJobQuestionIds.has(job.id)).map(({ job }) => job.id),
       }
     },
