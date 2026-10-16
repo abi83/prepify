@@ -1,13 +1,39 @@
 import { beforeEach, describe, it, expect, vi } from "vitest"
 
 const runAgent = vi.fn()
-vi.mock("@/lib/agent", () => ({ runAgent: (...args: unknown[]) => runAgent(...args) }))
+vi.mock("@/lib/agent", async importActual => ({ ...await importActual<typeof import("@/lib/agent")>(), runAgent: (...args: unknown[]) => runAgent(...args) }))
 
 import { assertReadableText, runOcrAgent } from "@/lib/agents/OcrAgent"
 
 const DEPS = {} as Parameters<typeof runOcrAgent>[4]
 
 beforeEach(() => runAgent.mockReset())
+
+describe("runOcrAgent readability gate", () => {
+  const rejectedOutput = { title: "t", text: "1 + 2 = 3 | 4 - 5 = 6 | 7 * 8 = 9 | ~ ~ ~ ~ ~ ~ ~ ~ ~", confidence: 0.9, language: "de", visual_elements: [] }
+
+  it("warns with the code and the text, then rethrows the same error", async () => {
+    const warn = vi.fn()
+    runAgent.mockResolvedValue({ output: rejectedOutput, meta: {} })
+
+    const run = runOcrAgent([], "m", "flex", new AbortController().signal, { logger: { warn } } as unknown as Parameters<typeof runOcrAgent>[4])
+
+    await expect(run).rejects.toThrow(/^ocr_text_not_letters:/)
+    expect(warn).toHaveBeenCalledWith("agent:ocr: page text rejected", expect.objectContaining({
+      text: rejectedOutput.text,
+      error: expect.objectContaining({ message: expect.stringMatching(/^ocr_text_not_letters:/) }),
+    }))
+  })
+
+  it("truncates a long rejected text in the warn", async () => {
+    const warn = vi.fn()
+    runAgent.mockResolvedValue({ output: { ...rejectedOutput, text: "~".repeat(5000) }, meta: {} })
+
+    await expect(runOcrAgent([], "m", "flex", new AbortController().signal, { logger: { warn } } as unknown as Parameters<typeof runOcrAgent>[4])).rejects.toThrow()
+
+    expect(warn.mock.calls[0][1].text).toHaveLength(2000 + "… [truncated, 5000 chars]".length)
+  })
+})
 
 describe("runOcrAgent", () => {
   it("returns the page title with the OCR output", async () => {

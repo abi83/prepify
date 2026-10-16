@@ -1,10 +1,12 @@
 import { z } from "zod"
 
+import type { Logger } from "@/core/logger"
 import type { AgentDeps } from "@/core/ports"
-import { runAgent, AgentResult } from "@/lib/agent"
+import { runAgent, truncateForLog, AgentResult } from "@/lib/agent"
 import type { AgentImage } from "@/lib/agent"
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
 import type { SupportedLanguage } from "@/lib/config"
+import { serializeError } from "@/lib/logger"
 import type { Prompt } from "@/lib/prompt"
 
 const visualElementSchema = z.object({
@@ -69,6 +71,15 @@ export function assertReadableText(text: string): void {
   }
 }
 
+function assertReadableTextLogged(text: string, logger: Logger): void {
+  try {
+    assertReadableText(text)
+  } catch (error) {
+    logger.warn("agent:ocr: page text rejected", { error: serializeError(error), text: truncateForLog(text) })
+    throw error
+  }
+}
+
 function assertSupportedLanguage(code: string): asserts code is SupportedLanguage {
   if (!(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
     throw new Error(`unsupported_language:${code}. Supported languages: ${SUPPORTED_LANGUAGE_NAMES}`)
@@ -98,7 +109,7 @@ export async function runOcrAgent(
     throw new Error(`low_confidence:${result.output.confidence}`)
   }
 
-  assertReadableText(result.output.text)
+  assertReadableTextLogged(result.output.text, deps.logger)
   assertSupportedLanguage(result.output.language)
 
   return {
