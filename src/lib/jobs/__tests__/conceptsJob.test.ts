@@ -98,6 +98,7 @@ describe("concepts job", () => {
 
     expect(result).toMatchObject({ committed: true, status: "failed", failureReason: "Concept merge produced no concepts" })
     expect(await prisma.concept.count()).toBe(0)
+    expect(await prisma.generationMeta.findMany({ where: { jobId: job.id } })).toMatchObject([ { wasted: true } ])
   })
 
   it("throws when the input pages span languages", () => {

@@ -1,6 +1,6 @@
 import type { JobRunResult } from "@/core/job"
 import type { JobDeps } from "@/core/ports"
-import type { JobDefinition, JobRunContext } from "@/core/runJob"
+import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
 import type { AgentMeta } from "@/lib/agent"
 import { runConceptMerger } from "@/lib/agents/ConceptMerger"
 import { resolveLanguage } from "@/lib/language"
@@ -29,7 +29,7 @@ export function createConceptsJobDefinition(pages: StoredConcept[][], deps: JobD
         metas.push(merged.meta)
         concepts = merged.output
       }
-      if (concepts.length === 0) throw new Error("Concept merge produced no concepts")
+      if (concepts.length === 0) throw new JobRunError(metas, new Error("Concept merge produced no concepts"))
 
       return { output: concepts.map(concept => ({ ...concept, language })), metas, wastedMetas: [] }
     },
