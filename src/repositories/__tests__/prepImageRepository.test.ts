@@ -109,3 +109,31 @@ describe("cascade delete", () => {
     expect(await prisma.prepImage.findMany({ where: { prepId: prep.id } })).toHaveLength(0)
   })
 })
+
+describe("deleteImage", () => {
+  it("deletes a draft's image row and returns it", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const image = await prepImageRepository.createImage(OWNER, prep.id, "prep-pages/p/page-0.jpg")
+
+    const deleted = await prepImageRepository.deleteImage(OWNER, image.id)
+
+    expect(deleted.gcsKey).toBe("prep-pages/p/page-0.jpg")
+    expect(await prepImageRepository.listImages(OWNER, prep.id)).toEqual([])
+  })
+
+  it("rejects a non-owner and leaves the row", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+
+    await expect(prepImageRepository.deleteImage(OTHER, image.id)).rejects.toThrow(ForbiddenError)
+    expect(await prepImageRepository.listImages(OWNER, prep.id)).toHaveLength(1)
+  })
+
+  it("rejects removing an image from an active prep", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    await prepRepository.updatePrep(OWNER, prep.id, { isActive: true })
+
+    await expect(prepImageRepository.deleteImage(OWNER, image.id)).rejects.toThrow(/active prep/)
+  })
+})

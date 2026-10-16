@@ -2,7 +2,6 @@
 
 import type { Prep, PrepVisibility } from "@prisma/client"
 import { BookOpenIcon } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -40,12 +39,6 @@ interface Props {
 
 export default function MyPreps({ preps }: Props) {
   const [ showUpload, setShowUpload ] = useState(false)
-  const router = useRouter()
-
-  function handleDone(prepId: string) {
-    setShowUpload(false)
-    router.push(`/preps/${prepId}`)
-  }
 
   return (
     <>
@@ -76,7 +69,7 @@ export default function MyPreps({ preps }: Props) {
       </main>
 
       {showUpload && (
-        <UploadModal onClose={() => setShowUpload(false)} onDone={handleDone} />
+        <UploadModal onClose={() => setShowUpload(false)} />
       )}
     </>
   )

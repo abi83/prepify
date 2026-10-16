@@ -7,6 +7,7 @@ import { vi } from "vitest"
  */
 export function createNavigationMock() {
   const mockPush = vi.fn()
+  const mockRefresh = vi.fn()
   let searchParams = new URLSearchParams()
   const listeners = new Set<() => void>()
 
@@ -16,7 +17,7 @@ export function createNavigationMock() {
   }
 
   function useRouter() {
-    return { push: mockPush, replace }
+    return { push: mockPush, refresh: mockRefresh, replace }
   }
 
   function useSearchParams() {
@@ -29,5 +30,5 @@ export function createNavigationMock() {
     )
   }
 
-  return { mockPush, useRouter, useSearchParams }
+  return { mockPush, mockRefresh, useRouter, useSearchParams }
 }

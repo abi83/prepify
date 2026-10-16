@@ -1,86 +1,83 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { useRouter } from "next/navigation"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const h = vi.hoisted(() => ({
-  runOcr: vi.fn(),
-  requestServerRun: vi.fn(),
-  awaitRunStart: vi.fn(),
-  updatePrep: vi.fn(),
+  createPrep: vi.fn(),
+  listMyPreps: vi.fn(),
+  uploadPrepImage: vi.fn(),
 }))
 
-vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "u1" } } }) }))
-vi.mock("@/actions/prepImages", () => ({ listMyPrepImages: vi.fn().mockResolvedValue([]) }))
-vi.mock("@/actions/preps", () => ({ updatePrep: h.updatePrep }))
-vi.mock("@/lib/jobs/clientExecution", () => ({ runOcr: h.runOcr }))
-vi.mock("@/lib/jobs/serverRunClient", () => ({ requestServerRun: h.requestServerRun, awaitRunStart: h.awaitRunStart }))
-vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
-vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }) }))
-vi.mock("@/components/FilePicker", () => ({
-  FilePicker: ({ onRecognise }: { onRecognise: (args: unknown) => void }) => (
-    <button onClick={() => onRecognise({ prepId: "prep-1", files: [ new File([ "x" ], "a.png") ], images: [] })}>Prep me</button>
-  ),
-}))
+vi.mock("next/navigation", async () => {
+  const { createNavigationMock } = await import("@/testUtils/navigationMock")
+  return createNavigationMock()
+})
+vi.mock("@/actions/prepImages", () => ({ createPrepImage: vi.fn() }))
+vi.mock("@/actions/uploads", () => ({ getUploadSignedUrl: vi.fn() }))
+vi.mock("@/actions/preps", () => ({ createPrep: h.createPrep, listMyPreps: h.listMyPreps }))
+vi.mock("@/lib/prepImageUpload", async importActual => ({ ...await importActual<typeof import("@/lib/prepImageUpload")>(), uploadPrepImage: h.uploadPrepImage }))
 
 import UploadModal from "@/components/UploadModal"
 
-const onDone = vi.fn()
+const png = (name = "a.png", size = 1) => new File([ new Uint8Array(size) ], name, { type: "image/png" })
 
-function renderModal() {
-  return render(<UploadModal onClose={vi.fn()} onDone={onDone} />)
+async function pick(...files: File[]) {
+  const input = document.querySelector<HTMLInputElement>("input[type=file]:not([capture])")!
+  await userEvent.upload(input, files)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  localStorage.clear()
-  h.runOcr.mockResolvedValue(undefined)
-  h.requestServerRun.mockResolvedValue("triggered")
-  h.awaitRunStart.mockResolvedValue(undefined)
-  h.updatePrep.mockResolvedValue(undefined)
+  h.listMyPreps.mockResolvedValue([])
+  h.createPrep.mockResolvedValue({ id: "prep-1" })
+  h.uploadPrepImage.mockResolvedValue({ id: "img-1" })
 })
 
-describe("UploadModal execution mode", () => {
-  it("when mode not set, shows mode dialog; selecting client then runs OCR", async () => {
-    renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
+describe("UploadModal", () => {
+  it("creates the draft and redirects to its page once the first image is persisted", async () => {
+    render(<UploadModal onClose={vi.fn()} />)
+    await pick(png("a.png"), png("b.png"))
 
-    expect(await screen.findByRole("heading", { name: /where should your prep run/i })).toBeInTheDocument()
-    expect(screen.getByRole("radio", { name: /client/i })).toBeChecked()
-
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }))
-
-    expect(h.runOcr).toHaveBeenCalledOnce()
-    expect(h.requestServerRun).not.toHaveBeenCalled()
+    await waitFor(() => expect(useRouter().push).toHaveBeenCalledWith("/preps/prep-1"))
+    expect(h.createPrep).toHaveBeenCalledWith({ title: "Prep #1", language: null })
+    expect(h.uploadPrepImage).toHaveBeenCalledTimes(2)
   })
 
-  it("uses saved client preference without dialog", async () => {
-    localStorage.setItem("prepify_execution_mode", "client")
-    renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
+  it("does not redirect while the first upload is still running", async () => {
+    h.uploadPrepImage.mockReturnValue(new Promise(() => {}))
+    render(<UploadModal onClose={vi.fn()} />)
+    await pick(png())
 
-    expect(h.runOcr).toHaveBeenCalledOnce()
-    expect(h.requestServerRun).not.toHaveBeenCalled()
+    expect(await screen.findByText("Uploading your pages…")).toBeInTheDocument()
+    expect(useRouter().push).not.toHaveBeenCalled()
   })
 
-  it("runs on the server with the saved preference, then redirects to the prep", async () => {
-    localStorage.setItem("prepify_execution_mode", "server")
-    renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
+  it("shows the error and stays open when every upload fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    h.uploadPrepImage.mockRejectedValue(new Error("boom"))
+    render(<UploadModal onClose={vi.fn()} />)
+    await pick(png())
 
-    expect(h.updatePrep).toHaveBeenCalledWith("prep-1", { isActive: true })
-    expect(h.requestServerRun).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-secret", prepId: "prep-1", model: "gpt-5-mini", tier: "flex" }))
-    expect(h.awaitRunStart).toHaveBeenCalledWith("prep-1")
-    expect(h.runOcr).not.toHaveBeenCalled()
-    expect(onDone).toHaveBeenCalledWith("prep-1")
+    expect(await screen.findByText("Upload failed. Please try again.")).toBeInTheDocument()
+    expect(useRouter().push).not.toHaveBeenCalled()
+    expect(screen.getByText("Upload photos of textbook pages")).toBeInTheDocument()
   })
 
-  it("shows the error and stays open when the server rejects the run", async () => {
-    localStorage.setItem("prepify_execution_mode", "server")
-    h.requestServerRun.mockRejectedValue(new Error("You are signed out. Sign in again."))
-    renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
+  it("rejects oversized files without creating a draft", async () => {
+    render(<UploadModal onClose={vi.fn()} />)
+    await pick(png("big.png", 5 * 1024 * 1024 + 1))
 
-    expect(await screen.findByText(/signed out/i)).toBeInTheDocument()
-    expect(onDone).not.toHaveBeenCalled()
+    expect(await screen.findByText(/big\.png exceeds the 5 MB limit/)).toBeInTheDocument()
+    expect(h.createPrep).not.toHaveBeenCalled()
+  })
+
+  it("shows the error and stays open when the draft cannot be created", async () => {
+    h.createPrep.mockRejectedValue(new Error("db down"))
+    render(<UploadModal onClose={vi.fn()} />)
+    await pick(png())
+
+    expect(await screen.findByText("db down")).toBeInTheDocument()
+    expect(useRouter().push).not.toHaveBeenCalled()
   })
 })

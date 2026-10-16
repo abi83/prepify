@@ -14,9 +14,11 @@ import { parsePrepTab, ocrResultSchema, type PrepTab } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
 import DeletePrepDialog from "./DeletePrepDialog"
+import DraftPrep from "./DraftPrep"
 import PrepHeader from "./PrepHeader"
 import PrepTabs from "./PrepTabs"
 import SharePrepDialog from "./SharePrepDialog"
+import { usePrepMe } from "./usePrepMe"
 
 /** The generation of the job that produced an entity; null when that job is gone. */
 function generationOf(jobId: string | null, generations: Record<string, JobGeneration>): JobGeneration | null {
@@ -69,9 +71,12 @@ export default function PrepPage({
   const [ activeAttempt, setActiveAttempt ] = useState(false)
   const [ shareOpen, setShareOpen ] = useState(false)
   const [ deleteOpen, setDeleteOpen ] = useState(false)
+  const prepMe = usePrepMe(prep.id, images.length)
 
   const studyQuestions = questions.filter(q => q.type !== "flashcard")
   const isOwner = prep.userId === userId
+  // A run in flight keeps the draft view up: activating the prep mid-run would otherwise unmount it.
+  const showDraft = (!prep.isActive && progress === null) || prepMe.phase !== null
 
   function handleExitAttempt() {
     setActiveAttempt(false)
@@ -85,6 +90,24 @@ export default function PrepPage({
           ← Back to Prep
         </Button>
         <AttemptFlow questions={studyQuestions} assets={assets} prepId={prep.id} userId={userId} onExit={handleExitAttempt} />
+      </main>
+    )
+  }
+
+  if (showDraft) {
+    return (
+      <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-5 px-4 py-6 sm:px-6 sm:py-10">
+        <PrepHeader
+          prep={prep}
+          isOwner={isOwner}
+          canShare={false}
+          tokensUsed={0}
+          costUsd={0}
+          onShare={() => setShareOpen(true)}
+          onDelete={() => setDeleteOpen(true)}
+        />
+        <DraftPrep prepId={prep.id} images={images} prepMe={prepMe} />
+        <DeletePrepDialog prep={prep} open={deleteOpen} onOpenChange={setDeleteOpen} />
       </main>
     )
   }
