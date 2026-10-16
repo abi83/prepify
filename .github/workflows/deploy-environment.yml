@@ -100,4 +100,4 @@ jobs:
           region: ${{ env.REGION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
           image: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}
-          revision_suffix: ${{ steps.revision.outputs.suffix }}
+          suffix: ${{ steps.revision.outputs.suffix }}
