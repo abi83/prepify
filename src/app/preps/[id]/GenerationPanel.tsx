@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { getApiKey } from "@/lib/apiKey"
 import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
@@ -233,25 +234,27 @@ export default function GenerationPanel({
             <>
               <p className="text-sm text-muted-foreground">Generate study questions from this material.</p>
 
-              <div className="min-w-[280px] self-start overflow-hidden rounded-sm border border-border">
-                <button
-                  className="flex w-full items-center justify-between gap-3 bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  onClick={() => setGenConfigOpen(v => !v)}
-                >
-                  <span className="flex-1">
-                    {localConfig.questionCount} questions
-                    {" · "}
-                    {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
-                      ? "All types"
-                      : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(", ")}
-                  </span>
-                  <span className="text-xs opacity-60">{genConfigOpen ? "▲" : "▼"}</span>
-                </button>
-
-                {genConfigOpen && (
-                  <div className="flex flex-col gap-3 border-t border-border bg-background p-3.5">
-                    <div className="flex items-start gap-2.5">
-                      <Label className="min-w-[68px] pt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Questions</Label>
+              <Sheet open={genConfigOpen} onOpenChange={setGenConfigOpen}>
+                <SheetTrigger asChild>
+                  <button className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border border-border bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground sm:max-w-sm">
+                    <span className="flex-1">
+                      {localConfig.questionCount} questions
+                      {" · "}
+                      {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
+                        ? "All types"
+                        : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(", ")}
+                    </span>
+                    <span className="text-xs opacity-60">Edit</span>
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-lg p-5">
+                  <SheetHeader className="p-0">
+                    <SheetTitle>Generation settings</SheetTitle>
+                    <SheetDescription className="sr-only">Choose how many questions to generate and which types.</SheetDescription>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-2.5">
+                      <Label className="min-w-[68px] text-xs font-semibold tracking-wide text-muted-foreground uppercase">Questions</Label>
                       <Input
                         type="number"
                         min={5}
@@ -261,19 +264,19 @@ export default function GenerationPanel({
                           ...prev,
                           questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
                         }))}
-                        className="w-[68px]"
+                        className="h-11 w-[84px]"
                       />
-                      <span className="pt-1.5 text-xs text-muted-foreground">5–20</span>
+                      <span className="text-xs text-muted-foreground">5–20</span>
                     </div>
 
-                    <div className="flex items-start gap-2.5">
-                      <Label className="min-w-[68px] pt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Types</Label>
-                      <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Types</Label>
+                      <div className="flex flex-col gap-1">
                         {ALL_QUESTION_TYPES.map(type => {
                           const checked = localConfig.enabledTypes.includes(type)
                           const isOnly = checked && localConfig.enabledTypes.length === 1
                           return (
-                            <Label key={type} className={cn("gap-1.5 text-sm font-normal", isOnly && "cursor-not-allowed opacity-50")}>
+                            <Label key={type} className={cn("min-h-11 gap-2 text-sm font-normal", isOnly && "cursor-not-allowed opacity-50")}>
                               <Checkbox checked={checked} disabled={isOnly} onCheckedChange={() => toggleLocalType(type)} />
                               {TYPE_LABELS[type]}
                             </Label>
@@ -281,11 +284,12 @@ export default function GenerationPanel({
                         })}
                       </div>
                     </div>
+                    <Button className="h-11" onClick={() => setGenConfigOpen(false)}>Done</Button>
                   </div>
-                )}
-              </div>
+                </SheetContent>
+              </Sheet>
 
-              <Button className="self-start" onClick={handleGenerate}>Generate questions</Button>
+              <Button className="h-11 self-start" onClick={handleGenerate}>Generate questions</Button>
             </>
           )}
         </div>
