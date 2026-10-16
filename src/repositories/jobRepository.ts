@@ -284,7 +284,7 @@ async function writeDomainRows(tx: Prisma.TransactionClient, job: JobWithInputs,
 
 /** Writes the OCR text/visual elements and detected language straight onto the target `PrepImage` row (ADR point 6, no staging). */
 function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrOutput) {
-  const result: OcrResult = { text: output.text, visual_elements: output.visual_elements }
+  const result: OcrResult = { title: output.title, text: output.text, visual_elements: output.visual_elements }
   return tx.prepImage.update({
     where: { id: job.inputs[0].entityId },
     data: { ocrResult: result as unknown as Prisma.InputJsonValue, language: output.language, producedByJobId: job.id, status: "done", error: null },

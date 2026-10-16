@@ -9,7 +9,7 @@ import { conceptsResponseSchema } from "@/types/pipeline"
 
 const META = { model: "m", tier: "flex", temperature: 1, maxTokens: 1, promptTokens: 1, cachedTokens: 0, completionTokens: 1, totalTokens: 2, costUsd: 0, toolCalls: 0, executionMs: 1 }
 const DEPS = {} as Parameters<typeof runConceptExtractor>[5]
-const PAGE = { page: 1, text: "Mitosis divides a cell.", gcsKey: "k", visual_elements: [] }
+const PAGE = { page: 1, title: "Cells", language: "de" as const, text: "Mitosis divides a cell.", gcsKey: "k", visual_elements: [] }
 
 const concept = (name: string, importance: number) => ({ name, description: "Cell division process in eukaryotes that yields two identical cells", importance, misconceptions: [] })
 

@@ -34,7 +34,7 @@ vi.mock("@/actions/jobs", () => ({
   listUnfinishedJobs: async () => h.unfinished,
 }))
 vi.mock("@/actions/prepImages", () => ({
-  listMyPrepImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: { text: "t", visual_elements: [] }, language: "en" } ],
+  listMyPrepImages: async () => [ { id: "i1", gcsKey: "k", ocrResult: { title: "T", text: "t", visual_elements: [] }, language: "en" } ],
 }))
 vi.mock("@/actions/prepState", () => ({ loadMyPrepState: async () => h.state }))
 vi.mock("@/actions/questions", () => ({ loadMyQuestion: async () => { throw new Error("not used") } }))

@@ -37,7 +37,7 @@ describe("prepStateRepository", () => {
 
     const finished = await prepRepository.createPrep(OWNER, { title: "Finished", language: "en" })
     const image = await prepImageRepository.createImage(OWNER, finished.id, "key")
-    await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { text: "t", visual_elements: [] } } })
+    await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
     const job = (type: string) => prisma.job.create({
       data: { prepId: finished.id, type, status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
     })
@@ -130,7 +130,7 @@ describe("prepStateRepository", () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
       const first = await prepImageRepository.createImage(OWNER, prep.id, "k1")
       await prepImageRepository.createImage(OWNER, prep.id, "k2")
-      await prisma.prepImage.update({ where: { id: first.id }, data: { ocrResult: { text: "t", visual_elements: [] } } })
+      await prisma.prepImage.update({ where: { id: first.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
       const job = await addJob(prep.id, "ocr", "running")
       await prisma.job.update({ where: { id: job.id }, data: { heartbeatAt: new Date() } })
 

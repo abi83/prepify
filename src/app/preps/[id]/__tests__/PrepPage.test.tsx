@@ -1,4 +1,4 @@
-import type { Prep } from "@prisma/client"
+import type { Prep, PrepImage, Question } from "@prisma/client"
 import { render, screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
@@ -20,7 +20,7 @@ vi.mock("@/lib/apiKey", () => ({ getApiKey: () => null }))
 
 import PrepPage from "@/app/preps/[id]/PrepPage"
 import { formatDate } from "@/lib/format"
-import type { StatedConcept } from "@/repositories/prepStateRepository"
+import type { JobGeneration, StatedConcept } from "@/repositories/prepStateRepository"
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "private",
@@ -44,9 +44,17 @@ function concept(overrides: Partial<StatedConcept> = {}): StatedConcept {
   }
 }
 
-function renderPage(concepts: StatedConcept[]) {
+const call = (promptTokens: number, completionTokens: number, costUsd: number) =>
+  ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false })
+
+const question = (id: string, producedByJobId: string): Question =>
+  ({ id, prepId: "p1", type: "flashcard", difficulty: null, language: "en", content: { front: "f", back: "b", back_explanation: "", asset_hint: { needed: false, type: null, description: null } }, producedByJobId, createdAt: CREATED_AT })
+
+interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; generations?: Record<string, JobGeneration> }
+
+function renderPage(concepts: StatedConcept[], { images = [], questions = [], generations = {} }: RenderOverrides = {}) {
   return render(
-    <PrepPage prep={prep} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={concepts} images={[]} />,
+    <PrepPage prep={prep} questions={questions} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={concepts} images={images} generations={generations} />,
   )
 }
 
@@ -65,15 +73,39 @@ describe("PrepPage concepts", () => {
     expect(cards[1]).not.toHaveTextContent("Misconceptions")
   })
 
-  it("lists each job's cost once, with wasted calls apart", () => {
-    const secondJob = { jobId: "j2", model: "gpt-5-nano", tier: "flex", calls: [ { promptTokens: 10, cachedTokens: 0, completionTokens: 5, costUsd: 0.5, executionMs: 2000, wasted: false } ] }
+  it("summarises concept generation over unique jobs, wasted calls included, with a per-job detail", () => {
+    const secondJob = { jobId: "j2", model: "gpt-5-nano", tier: "flex", calls: [ call(10, 5, 0.5) ] }
     renderPage([ concept(), concept({ id: "c2", name: "Osmosis" }), concept({ id: "c3", name: "Meiosis", generation: secondJob }) ])
-    const jobs = within(screen.getByRole("list", { name: "Concept jobs" })).getAllByRole("listitem")
-    expect(jobs).toHaveLength(2)
-    expect(jobs[0]).toHaveTextContent("Job 1 · gpt-5-nano · flex: 1,000 prompt / 200 cached / 300 completion tokens · $0.0020 · 1.5s")
-    expect(jobs[0]).toHaveTextContent("wasted: 400 prompt / 0 cached / 100 completion tokens · < $0.001 · 0.5s")
-    expect(jobs[1]).toHaveTextContent("Job 2 · gpt-5-nano · flex: 10 prompt / 0 cached / 5 completion tokens · $0.500 · 2.0s")
-    expect(jobs[1]).not.toHaveTextContent("wasted")
+    const section = screen.getByRole("heading", { name: "Concept generation" }).closest("section")!
+    expect(section).toHaveTextContent("1,815 tokens · $0.502")
+    expect(section).toHaveTextContent("gpt-5-nano · flex · 1,400 in / 400 out · $0.0025")
+    expect(section).toHaveTextContent("gpt-5-nano · flex · 10 in / 5 out · $0.500")
+    expect(section).not.toHaveTextContent("cached")
+  })
+
+  it("shows each page's OCR title, language and cost", () => {
+    const image: PrepImage = {
+      id: "i1", prepId: "p1", gcsKey: "k", status: "done", error: null, language: "de", producedByJobId: "ocr1",
+      ocrResult: { title: "Zellteilung", text: "t", visual_elements: [] }, createdAt: CREATED_AT, updatedAt: CREATED_AT,
+    }
+    renderPage([], { images: [ image ], generations: { ocr1: { jobId: "ocr1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 20, 0.01) ] } } })
+    expect(screen.getByText("Zellteilung")).toBeInTheDocument()
+    expect(screen.getByText("de")).toBeInTheDocument()
+    expect(screen.queryByText(/^Page 1$/)).not.toBeInTheDocument()
+    expect(screen.getByText("120 tokens · $0.010")).toBeInTheDocument()
+  })
+
+  it("accumulates question cost as the per-question costs, wasted calls included", () => {
+    const generations = {
+      q1: { jobId: "q1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 10, 0.01), { ...call(50, 5, 0.005), wasted: true } ] },
+      q2: { jobId: "q2", model: "gpt-5-nano", tier: "flex", calls: [ call(200, 20, 0.02) ] },
+    }
+    const questions = [ question("a", "q1"), question("b", "q2") ]
+    renderPage([], { questions, generations })
+    const items = [ ...screen.getByRole("list", { name: "Questions" }).querySelectorAll(":scope > li") ]
+    expect(items[0]).toHaveTextContent("165 tokens · $0.015")
+    expect(items[1]).toHaveTextContent("220 tokens · $0.020")
+    expect(screen.getByRole("group", { name: "Questions total" })).toHaveTextContent("385 tokens · $0.035")
   })
 
   it("renders no concepts section when the prep has none", () => {
