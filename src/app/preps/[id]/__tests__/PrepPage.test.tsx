@@ -1,6 +1,8 @@
-import type { Prep, PrepImage, Question } from "@prisma/client"
+import type { Attempt, Prep, PrepImage, Question } from "@prisma/client"
 import { render, screen, within } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import userEvent from "@testing-library/user-event"
+import { useRouter } from "next/navigation"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
 vi.mock("next/navigation", async () => {
@@ -47,20 +49,35 @@ function concept(overrides: Partial<StatedConcept> = {}): StatedConcept {
 const call = (promptTokens: number, completionTokens: number, costUsd: number) =>
   ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false })
 
+const flashcard = (id: string): Question =>
+  ({ id, prepId: "p1", type: "flashcard", difficulty: null, language: "en", content: { front: "f", back: "b", back_explanation: "", asset_hint: { needed: false, type: null, description: null } }, producedByJobId: null, createdAt: CREATED_AT })
+
 const question = (id: string, producedByJobId: string): Question =>
-  ({ id, prepId: "p1", type: "flashcard", difficulty: null, language: "en", content: { front: "f", back: "b", back_explanation: "", asset_hint: { needed: false, type: null, description: null } }, producedByJobId, createdAt: CREATED_AT })
+  ({
+    id, prepId: "p1", type: "single_choice", difficulty: null, language: "en", producedByJobId, createdAt: CREATED_AT,
+    content: {
+      question: `Question ${id}?`, rationale: "", asset_hint: { needed: false, type: null, description: null },
+      answers: [ { id: "a", text: "right", is_correct: true, explanation: "" }, { id: "b", text: "wrong", is_correct: false, explanation: "" } ],
+    },
+  })
 
-interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; generations?: Record<string, JobGeneration> }
+interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attempts?: Attempt[]; generations?: Record<string, JobGeneration>; tokensUsed?: number; costUsd?: number }
 
-function renderPage(concepts: StatedConcept[], { images = [], questions = [], generations = {} }: RenderOverrides = {}) {
+function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], generations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
   return render(
-    <PrepPage prep={prep} questions={questions} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={concepts} images={images} generations={generations} />,
+    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={null} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} />,
   )
 }
 
+// The navigation mock keeps the URL across tests.
+beforeEach(() => useRouter().replace("?"))
+
+const openTab = (name: RegExp) => userEvent.click(screen.getByRole("tab", { name }))
+
 describe("PrepPage concepts", () => {
-  it("renders each concept as a card with its fields", () => {
+  it("renders each concept as a card with its fields", async () => {
     renderPage([ concept(), concept({ id: "c2", name: "Osmosis", importance: 0.5, misconceptions: [], language: "de" }) ])
+    await openTab(/^Concepts/)
     const headings = within(screen.getByRole("list", { name: "Concepts" })).getAllByRole("heading", { level: 3 })
     const cards = headings.map(heading => heading.closest("li")!)
     expect(cards).toHaveLength(2)
@@ -73,9 +90,10 @@ describe("PrepPage concepts", () => {
     expect(cards[1]).not.toHaveTextContent("Misconceptions")
   })
 
-  it("summarises concept generation over unique jobs, wasted calls included, with a per-job detail", () => {
+  it("summarises concept generation over unique jobs, wasted calls included, with a per-job detail", async () => {
     const secondJob = { jobId: "j2", model: "gpt-5-nano", tier: "flex", calls: [ call(10, 5, 0.5) ] }
     renderPage([ concept(), concept({ id: "c2", name: "Osmosis" }), concept({ id: "c3", name: "Meiosis", generation: secondJob }) ])
+    await openTab(/^Concepts/)
     const section = screen.getByRole("heading", { name: "Concept generation" }).closest("section")!
     expect(section).toHaveTextContent("1,815 tokens · $0.502")
     expect(section).toHaveTextContent("gpt-5-nano · flex · 1,400 in / 400 out · $0.0025")
@@ -83,33 +101,89 @@ describe("PrepPage concepts", () => {
     expect(section).not.toHaveTextContent("cached")
   })
 
-  it("shows each page's OCR title, language and cost", () => {
+  it("shows each page's OCR title, language and cost", async () => {
     const image: PrepImage = {
       id: "i1", prepId: "p1", gcsKey: "k", status: "done", error: null, language: "de", producedByJobId: "ocr1",
       ocrResult: { title: "Zellteilung", text: "t", visual_elements: [] }, createdAt: CREATED_AT, updatedAt: CREATED_AT,
     }
     renderPage([], { images: [ image ], generations: { ocr1: { jobId: "ocr1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 20, 0.01) ] } } })
+    await openTab(/^Pages/)
     expect(screen.getByText("Zellteilung")).toBeInTheDocument()
     expect(screen.getByText("de")).toBeInTheDocument()
     expect(screen.queryByText(/^Page 1$/)).not.toBeInTheDocument()
-    expect(screen.getByText("120 tokens · $0.010")).toBeInTheDocument()
+    expect(within(screen.getByRole("tabpanel")).getByText("120 tokens · $0.010")).toBeInTheDocument()
   })
 
-  it("accumulates question cost as the per-question costs, wasted calls included", () => {
+  it("shows a question's generation cost on the question itself, wasted calls included", async () => {
     const generations = {
       q1: { jobId: "q1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 10, 0.01), { ...call(50, 5, 0.005), wasted: true } ] },
-      q2: { jobId: "q2", model: "gpt-5-nano", tier: "flex", calls: [ call(200, 20, 0.02) ] },
     }
-    const questions = [ question("a", "q1"), question("b", "q2") ]
-    renderPage([], { questions, generations })
-    const items = [ ...screen.getByRole("list", { name: "Questions" }).querySelectorAll(":scope > li") ]
-    expect(items[0]).toHaveTextContent("165 tokens · $0.015")
-    expect(items[1]).toHaveTextContent("220 tokens · $0.020")
-    expect(screen.getByRole("group", { name: "Questions total" })).toHaveTextContent("385 tokens · $0.035")
+    renderPage([], { questions: [ question("a", "q1") ], generations })
+    await openTab(/^Questions/)
+    expect(within(screen.getByRole("tabpanel")).getByText("165 tokens · $0.015")).toBeInTheDocument()
   })
 
-  it("renders no concepts section when the prep has none", () => {
+  it("shows an empty state when the prep has no concepts", async () => {
     renderPage([])
-    expect(screen.queryByRole("list", { name: "Concepts" })).not.toBeInTheDocument()
+    await openTab(/^Concepts/)
+    expect(screen.getByText("No concepts extracted yet.")).toBeInTheDocument()
+  })
+})
+
+describe("PrepPage shell", () => {
+  it("lists the tabs in order with Main selected by default", () => {
+    renderPage([], { questions: [ flashcard("f1"), question("a", "q1") ] })
+    const tabs = screen.getAllByRole("tab")
+    expect(tabs.map(t => t.textContent?.replace(/\d+$/, ""))).toEqual([ "Main", "Flashcards", "Questions", "Concepts", "Pages", "Audio", "Video", "Generation" ])
+    expect(screen.getByRole("tab", { name: "Main" })).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("shows the prep total in the header", () => {
+    renderPage([], { tokensUsed: 1300, costUsd: 0.002 })
+    expect(screen.getByRole("banner")).toHaveTextContent("1,300 tokens · $0.002")
+  })
+
+  it("Main previews questions and lists the attempt history", () => {
+    const attempt: Attempt = { id: "at1", prepId: "p1", userId: "u1", score: 3, total: 4, createdAt: CREATED_AT }
+    renderPage([], { questions: [ flashcard("f1"), question("a", "q1") ], attempts: [ attempt ] })
+    const main = screen.getByRole("tabpanel")
+    expect(within(main).getByText("Question a?")).toBeInTheDocument()
+    expect(within(main).getByRole("button", { name: "Start attempt" })).toBeEnabled()
+    expect(within(main).getByRole("list", { name: "Attempt history" })).toHaveTextContent("3/4 (75%)")
+  })
+
+  it("with no questions, Main points to the Generation tab", async () => {
+    renderPage([])
+    await userEvent.click(screen.getByRole("button", { name: "Go to Generation" }))
+    expect(screen.getByRole("tab", { name: "Generation" })).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("button", { name: "Generate questions" })).toBeVisible()
+  })
+
+  it.each([ "Audio", "Video" ])("%s is a placeholder tab", async name => {
+    renderPage([])
+    await openTab(new RegExp(`^${name}`))
+    expect(screen.getByText(`${name} is coming soon`)).toBeInTheDocument()
+  })
+
+  it("collapses Share and Delete into the actions menu for the owner", async () => {
+    renderPage([], { questions: [ question("a", "q1") ] })
+    await userEvent.click(screen.getByRole("button", { name: "Prep actions" }))
+    expect(screen.getByRole("menuitem", { name: "Share" })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }))
+    expect(screen.getByRole("dialog", { name: "Delete prep?" })).toBeInTheDocument()
+  })
+})
+
+describe("PrepPage generation log", () => {
+  it("lists every generation job on the Generation tab", async () => {
+    const generations = {
+      j1: { jobId: "j1", model: "gpt-5-nano", tier: "flex", calls: [ call(10, 5, 0.5) ] },
+      j2: { jobId: "j2", model: "gpt-5-mini", tier: "flex", calls: [ call(20, 5, 0.1) ] },
+    }
+    renderPage([], { generations })
+    await openTab(/^Generation/)
+    const log = screen.getByRole("heading", { name: "Generation log" }).closest("section")!
+    expect(log).toHaveTextContent("gpt-5-nano · flex · 10 in / 5 out · $0.500")
+    expect(log).toHaveTextContent("gpt-5-mini · flex · 20 in / 5 out · $0.100")
   })
 })

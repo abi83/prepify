@@ -1,5 +1,5 @@
 import type { Question, Asset } from "@prisma/client"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import { emptyAnswer, type AnswerState } from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,12 @@ import QuestionView from "./QuestionView"
 interface Props {
   questions: Question[]
   assets: Asset[]
+  /** Rendered under the current question, e.g. its generation cost. */
+  questionFooter?: (question: Question) => ReactNode
 }
 
 /** Stateless practice: instant feedback after each submit, nothing persisted. */
-export default function PracticeFlow({ questions, assets }: Props) {
+export default function PracticeFlow({ questions, assets, questionFooter }: Props) {
   const assetByQuestion = new Map(assets.map(a => [ a.questionId, a ]))
   const [ shuffled, setShuffled ] = useState(() => prepareQuestions(questions))
   const total = shuffled.length
@@ -50,6 +52,7 @@ export default function PracticeFlow({ questions, assets }: Props) {
         asset={assetByQuestion.get(current.id)}
         onChange={next => setAnswers(prev => prev.map((a, i) => i === index ? next : a))}
       />
+      {questionFooter?.(current)}
 
       {isSubmitted && (
         <div

@@ -20,6 +20,18 @@ export function parseStudyTab(value: string | null): StudyTab {
   return value !== null && isStudyTab(value) ? value : "flashcards"
 }
 
+export const PREP_TABS = [ "main", "flashcards", "questions", "concepts", "pages", "audio", "video", "generation" ] as const
+export type PrepTab = (typeof PREP_TABS)[number]
+
+export function isPrepTab(value: string): value is PrepTab {
+  return PREP_TABS.some(tab => tab === value)
+}
+
+/** Reads the prep page's `tab` query param, falling back to Main for anything absent or invalid. */
+export function parsePrepTab(value: string | null): PrepTab {
+  return value !== null && isPrepTab(value) ? value : "main"
+}
+
 export type VisualElementType = "diagram" | "formula" | "table" | "chart" | "molecule" | "image"
 
 export type VisualElement = {
