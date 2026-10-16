@@ -9,12 +9,16 @@ import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
 import { FilePicker } from "@/components/FilePicker"
 import { Button } from "@/components/ui/button"
 import { MAX_IMAGES } from "@/lib/config"
+import { describeOcrError } from "@/lib/ocrRejection"
 import { validateNewFiles } from "@/lib/prepImageUpload"
 import { enqueueUploads, pruneUploaded, removeUpload, useUploads, type UploadEntry } from "@/lib/uploadQueue"
 
 import type { usePrepMe } from "./usePrepMe"
 
-type Thumb = { src: string | null; status: "uploading" | "done" | "error"; remove: () => Promise<void> }
+type Thumb = { src: string | null; remove: () => Promise<void> } & (
+  | { status: "uploading" | "done" | "error" }
+  | { status: "rejected"; reason: string }
+)
 
 function ThumbCard({ thumb, page }: { thumb: Thumb; page: number }) {
   const [ removing, setRemoving ] = useState(false)
@@ -46,6 +50,9 @@ function ThumbCard({ thumb, page }: { thumb: Thumb; page: number }) {
       {thumb.status === "uploading" && (
         <span role="status" aria-label={`Uploading page ${page}`} className="absolute right-1 bottom-1 block size-3 animate-spin rounded-full border border-white/50 border-t-white" />
       )}
+      {thumb.status === "rejected" && (
+        <span role="alert" aria-label={`Page ${page} rejected`} className="absolute inset-x-0 top-6 bottom-5 overflow-hidden bg-black/70 px-1 text-[0.6rem] leading-tight text-white">{thumb.reason}</span>
+      )}
       {thumb.status === "error" && (
         <span role="img" aria-label={`Page ${page} failed to upload`} className="absolute right-1 bottom-1 flex size-3.5 items-center justify-center rounded-full bg-error text-[0.5rem] font-bold text-white">!</span>
       )}
@@ -67,7 +74,10 @@ function usePersistedUrl(prepId: string, gcsKey: string): string | null {
 
 function PersistedThumb({ prepId, image, page }: { prepId: string; image: PrepImage; page: number }) {
   const src = usePersistedUrl(prepId, image.gcsKey)
-  return <ThumbCard page={page} thumb={{ src, status: "done", remove: () => deleteMyPrepImage(image.id) }} />
+  const remove = () => deleteMyPrepImage(image.id)
+  if (image.status !== "failed") return <ThumbCard page={page} thumb={{ src, status: "done", remove }} />
+  if (!image.error) throw new Error(`PrepImage ${image.id} failed without an error`)
+  return <ThumbCard page={page} thumb={{ src, status: "rejected", reason: describeOcrError(image.error), remove }} />
 }
 
 function PendingThumb({ prepId, entry, page }: { prepId: string; entry: UploadEntry; page: number }) {

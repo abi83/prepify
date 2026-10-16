@@ -182,7 +182,7 @@ describe("PrepPage shell", () => {
 
   it("with no questions, Main disables Start attempt and shows generation status", () => {
     const progress: PrepProgress = {
-      runState: "idle", totalPages: 3, ocrPages: 3, hasConcepts: false,
+      runState: "idle", totalPages: 3, ocrPages: 3, rejectedPages: 0, hasConcepts: false,
       totalQuestions: 10, completedQuestions: 0, failedQuestions: 1, terminalQuestions: 0,
     }
     renderPage([], { progress })
@@ -222,6 +222,48 @@ describe("PrepPage generation log", () => {
   })
 })
 
+describe("PrepPage OCR verdicts", () => {
+  const accepted: PrepImage = {
+    id: "i1", prepId: "p1", gcsKey: "k1", status: "done", error: null, language: "de", producedByJobId: null,
+    ocrResult: { title: "Zellteilung", text: "t", visual_elements: [] }, createdAt: CREATED_AT, updatedAt: CREATED_AT,
+  }
+  const rejected = (id: string, error: string): PrepImage =>
+    ({ ...accepted, id, gcsKey: `k-${id}`, status: "failed", error, language: null, ocrResult: null })
+
+  const REASONS = [
+    [ "ocr_text_too_short:5", /too little text/i ],
+    [ "ocr_text_not_letters:0.69", /isn't readable/i ],
+    [ "low_confidence:0.3", /too blurry or dark/i ],
+    [ "unsupported_language:ja. Supported languages: English", /language Prepify doesn't support/i ],
+  ] as const
+
+  it("shows an accepted and a rejected page together", async () => {
+    renderPage([], { images: [ accepted, rejected("i2", REASONS[0][0]) ] })
+    await openTab(/^Pages/)
+    expect(screen.getByText("Zellteilung")).toBeInTheDocument()
+    expect(within(screen.getByRole("alert")).getByText("Page 2")).toBeInTheDocument()
+  })
+
+  it.each(REASONS)("explains %s in plain words", async (error, message) => {
+    renderPage([], { images: [ accepted, rejected("i2", error) ] })
+    await openTab(/^Pages/)
+    expect(screen.getByRole("alert")).toHaveTextContent(message)
+    expect(screen.getByRole("alert")).not.toHaveTextContent(error.split(":")[0])
+  })
+
+  it("falls back to a generic message with the raw code for an unknown error", async () => {
+    renderPage([], { images: [ accepted, rejected("i2", "weird_code:1") ] })
+    await openTab(/^Pages/)
+    expect(screen.getByRole("alert")).toHaveTextContent("This page couldn't be read (weird_code).")
+  })
+
+  it("shows the reason on the rejected thumbnail in the draft", async () => {
+    const draft: Prep = { ...prep, isActive: false }
+    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={[ accepted, rejected("i2", REASONS[2][0]) ]} generations={{}} />)
+    expect(await screen.findByRole("alert")).toHaveTextContent(REASONS[2][1])
+  })
+})
+
 describe("PrepPage draft", () => {
   const draft: Prep = { ...prep, isActive: false }
   const KEY = { provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }
@@ -257,7 +299,7 @@ describe("PrepPage draft", () => {
   })
 
   it("keeps rendering a prep with jobs as before", () => {
-    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
+    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
     render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
   })

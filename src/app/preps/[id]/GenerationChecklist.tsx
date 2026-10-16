@@ -13,6 +13,8 @@ export interface ChecklistRowData {
   detail?: string
   /** A failed-slot count, rendered after `detail` in the error color. Doesn't affect `status`. */
   failed?: number
+  /** Pages OCR rejected, rendered with the other errors. */
+  unreadable?: number
   /** Jobs that gave up past the attempt cap, rendered after `failed`. Only a user retry re-runs them. */
   terminal?: number
 }
@@ -55,6 +57,7 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
       label: "Recognise pages",
       status: s.totalPages > 0 && s.ocrPages === s.totalPages ? "done" : "pending",
       detail: s.totalPages > 0 ? `${s.ocrPages}/${s.totalPages}` : undefined,
+      unreadable: s.rejectedPages,
     },
     { label: "Extract educational concepts", status: s.hasConcepts ? "done" : "pending" },
     { label: "Name the prep", status: titled ? "done" : "pending" },
@@ -73,7 +76,7 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
 }
 
 export function ChecklistRow({ row }: { row: ChecklistRowData }) {
-  const errors = [ row.failed ? `${row.failed} failed` : null, row.terminal ? `${row.terminal} gave up` : null ].filter(Boolean)
+  const errors = [ row.unreadable ? `${row.unreadable} unreadable` : null, row.failed ? `${row.failed} failed` : null, row.terminal ? `${row.terminal} gave up` : null ].filter(Boolean)
   const parts = [ row.detail, ...errors ].filter(Boolean)
   return (
     <div className="flex items-center gap-2.5 text-sm">

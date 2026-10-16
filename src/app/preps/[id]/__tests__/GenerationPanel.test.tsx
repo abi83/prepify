@@ -51,7 +51,7 @@ import type { PrepProgress } from "@/repositories/prepStateRepository"
 const fetchMock = vi.fn()
 
 const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
-  runState: "idle", totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, ...overrides,
+  runState: "idle", totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, ...overrides,
 })
 
 function renderPanel(initialProgress: PrepProgress | null = null) {
@@ -170,6 +170,12 @@ describe("GenerationPanel progress from the DB", () => {
 
     expect(screen.getByText("Recognise pages")).toBeInTheDocument()
     expect(screen.getByText("(1/3)")).toBeInTheDocument()
+  })
+
+  it("reports rejected pages in the OCR row", () => {
+    renderPanel(progress({ runState: "running", totalPages: 4, ocrPages: 1, rejectedPages: 3 }))
+
+    expect(screen.getByText("3 unreadable")).toBeInTheDocument()
   })
 
   it("opens an SSE stream while a server run is live and refreshes the page when it ends", async () => {
