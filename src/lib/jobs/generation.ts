@@ -3,10 +3,10 @@ import type { ListUnfinishedJobs, Ports, ProgressSink } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
 import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
 import { nextJobs, type PlanTarget } from "@/lib/planner"
-import { ocrResultSchema } from "@/types/prep"
+import { ocrResultSchema, type Page } from "@/types/prep"
 
 import { createAssetJobDefinition } from "./assetJob"
-import { createConceptsExtractJobDefinition, type OcrPage } from "./conceptsExtractJob"
+import { createConceptsExtractJobDefinition } from "./conceptsExtractJob"
 import { createConceptsJobDefinition } from "./conceptsJob"
 import { createJobs, executePrep, runJobs, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobTypes"
@@ -69,7 +69,7 @@ function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: D
       const image = (await data.listImages(prepId)).find(i => i.id === job.inputIds[0])
       if (!image) throw new Error(`PrepImage ${job.inputIds[0]} not found for job ${job.id}`)
       if (!image.language) throw new Error(`PrepImage ${image.id} has no language for job ${job.id}`)
-      const page: OcrPage = { page: 1, gcsKey: image.gcsKey, language: image.language, ...ocrResultSchema.parse(image.ocrResult) }
+      const page: Page = { page: 1, gcsKey: image.gcsKey, language: image.language, ...ocrResultSchema.parse(image.ocrResult) }
       return createConceptsExtractJobDefinition(page, deps)
     }
     case CONCEPTS_JOB_TYPE: {

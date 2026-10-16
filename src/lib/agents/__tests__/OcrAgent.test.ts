@@ -1,6 +1,25 @@
-import { describe, it, expect } from "vitest"
+import { beforeEach, describe, it, expect, vi } from "vitest"
 
-import { assertReadableText } from "@/lib/agents/OcrAgent"
+const runAgent = vi.fn()
+vi.mock("@/lib/agent", () => ({ runAgent: (...args: unknown[]) => runAgent(...args) }))
+
+import { assertReadableText, runOcrAgent } from "@/lib/agents/OcrAgent"
+
+const DEPS = {} as Parameters<typeof runOcrAgent>[4]
+
+beforeEach(() => runAgent.mockReset())
+
+describe("runOcrAgent", () => {
+  it("returns the page title with the OCR output", async () => {
+    const output = { title: "Chapter 3: Cells", text: "Mitosis divides a cell into two identical daughter cells.", confidence: 0.9, language: "en", visual_elements: [] }
+    runAgent.mockResolvedValue({ output, meta: {} })
+
+    const result = await runOcrAgent([], "m", "flex", new AbortController().signal, DEPS)
+
+    expect(result.output.title).toBe("Chapter 3: Cells")
+    expect(runAgent.mock.calls[0][0].schema.shape).toHaveProperty("title")
+  })
+})
 
 describe("assertReadableText", () => {
   it("accepts a normal paragraph", () => {

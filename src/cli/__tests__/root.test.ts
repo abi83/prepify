@@ -14,7 +14,7 @@ const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8D
 
 const METRIC = { score: 1, comment: "ok" }
 const RESPONSES: Record<string, unknown> = {
-  ocr: { text: "Mitosis is the division of a cell nucleus into two identical nuclei.", confidence: 0.9, language: "en", visual_elements: [] },
+  ocr: { title: "Cells", text: "Mitosis is the division of a cell nucleus into two identical nuclei.", confidence: 0.9, language: "en", visual_elements: [] },
   ConceptExtractor: {
     concepts: [ { name: "Mitosis", description: "Division of a cell nucleus into two identical daughter nuclei.", importance: 0.9, misconceptions: [] } ],
     emptyReason: null,

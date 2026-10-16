@@ -66,7 +66,7 @@ function fakeDefinition(type: string, output: (key: string) => unknown) {
     },
   })
 }
-vi.mock("@/lib/jobs/ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", () => ({ language: "en", text: "t", visual_elements: [] })) }))
+vi.mock("@/lib/jobs/ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", () => ({ language: "en", title: "T", text: "t", visual_elements: [] })) }))
 vi.mock("@/lib/jobs/conceptsExtractJob", () => ({
   createConceptsExtractJobDefinition: fakeDefinition("concepts.extract", () => ({
     status: "found",
@@ -260,7 +260,7 @@ describe("POST /api/preps/generate", () => {
 
   it("resumes an interrupted job (stale heartbeat) without re-planning finished steps", async () => {
     const { prep, image } = await makePrep()
-    await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { text: "t", visual_elements: [] }, language: "en" } })
+    await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] }, language: "en" } })
     const extraction = await prisma.job.create({
       data: {
         prepId: prep.id, type: "concepts.extract", status: "running", heartbeatAt: new Date(Date.now() - STALE_HEARTBEAT_MS - 1000),

@@ -5,7 +5,7 @@ import { listMyAssets } from "@/actions/assets"
 import { listMyAttempts } from "@/actions/attempts"
 import { listMyPrepImages } from "@/actions/prepImages"
 import { getMyPrep, getPrepCost, getPrepTokens } from "@/actions/preps"
-import { getMyPrepProgress, loadMyPrepState } from "@/actions/prepState"
+import { getMyPrepProgress, loadMyJobGenerations, loadMyPrepState } from "@/actions/prepState"
 import { listMyQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
 import { Button } from "@/components/ui/button"
@@ -43,7 +43,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const [ questions, attempts, progress, tokensUsed, costUsd, state, images ] = await Promise.all([
+  const [ questions, attempts, progress, tokensUsed, costUsd, state, images, generations ] = await Promise.all([
     listMyQuestions(id),
     listMyAttempts(id),
     getMyPrepProgress(id),
@@ -51,6 +51,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     getPrepCost(id),
     loadMyPrepState(id),
     listMyPrepImages(id),
+    loadMyJobGenerations(id),
   ])
 
   const assets = questions.length > 0 ? await listMyAssets(questions.map(q => q.id)) : []
@@ -66,6 +67,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       costUsd={costUsd}
       concepts={state.concepts}
       images={images}
+      generations={generations}
     />
   )
 }

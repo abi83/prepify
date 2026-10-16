@@ -30,7 +30,7 @@ const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 
 const NOOP_LLM: Llm = { complete: () => { throw new Error("not used") } }
 const NOOP_PROGRESS: ProgressSink = { report: () => {} }
 const META = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 1000, promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
-const PAGE = { page: 1, text: "t", gcsKey: "k", visual_elements: [], language: "de" as const }
+const PAGE = { page: 1, title: "Cells", text: "t", gcsKey: "k", visual_elements: [], language: "de" as const }
 
 const FOUND: PageConcepts = {
   status: "found",

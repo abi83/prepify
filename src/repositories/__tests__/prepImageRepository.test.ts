@@ -46,7 +46,7 @@ describe("status transitions", () => {
     const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
 
     await prepImageRepository.startProcessing(OWNER, image.id)
-    const ocrResult = { text: "hello", visual_elements: [] }
+    const ocrResult = { title: "T", text: "hello", visual_elements: [] }
     await prepImageRepository.finishImage(OWNER, image.id, ocrResult)
 
     const [ reloaded ] = await prepImageRepository.listImages(OWNER, prep.id)
@@ -76,7 +76,7 @@ describe("status transitions", () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
     const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
 
-    await expect(prepImageRepository.finishImage(OWNER, image.id, { text: "x", visual_elements: [] })).rejects.toThrow()
+    await expect(prepImageRepository.finishImage(OWNER, image.id, { title: "T", text: "x", visual_elements: [] })).rejects.toThrow()
     await expect(prepImageRepository.failImage(OWNER, image.id, "err")).rejects.toThrow()
   })
 
@@ -87,7 +87,7 @@ describe("status transitions", () => {
 
     await expect(prepImageRepository.startProcessing(OWNER, image.id)).rejects.toThrow()
 
-    await prepImageRepository.finishImage(OWNER, image.id, { text: "x", visual_elements: [] })
+    await prepImageRepository.finishImage(OWNER, image.id, { title: "T", text: "x", visual_elements: [] })
     await expect(prepImageRepository.startProcessing(OWNER, image.id)).rejects.toThrow()
   })
 

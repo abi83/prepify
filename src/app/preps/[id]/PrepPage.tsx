@@ -9,6 +9,7 @@ import { deletePrep } from "@/actions/preps"
 import AttemptFlow from "@/components/attempt/AttemptFlow"
 import ConceptCard from "@/components/ConceptCard"
 import ConceptGenerationSummary from "@/components/ConceptGenerationSummary"
+import GenerationCost, { formatUsage } from "@/components/GenerationCost"
 import ShareModal from "@/components/ShareModal"
 import StudyTabs from "@/components/StudyTabs"
 import { Button } from "@/components/ui/button"
@@ -16,9 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getApiKey } from "@/lib/apiKey"
 import { disciplineFromEnum, disciplineToEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
-import { formatCost } from "@/lib/pricing"
 import { useUrlParams } from "@/lib/urlState"
-import type { PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
+import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 import { parseStudyTab, type StudyTab, type Page, ocrResultSchema } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
@@ -27,6 +27,12 @@ import PageSection from "./PageSection"
 
 function uniqueGenerations(concepts: StatedConcept[]) {
   return [ ...new Map(concepts.map(c => [ c.generation.jobId, c.generation ])).values() ]
+}
+
+/** The generation of the job that produced an entity; null when that job is gone. */
+function generationOf(jobId: string | null, generations: Record<string, JobGeneration>): JobGeneration | null {
+  if (jobId === null) return null
+  return generations[jobId] ?? null
 }
 
 // ── Main component ──────────────────────────────────────────────────────────
@@ -41,6 +47,7 @@ interface Props {
   costUsd: number
   concepts: StatedConcept[]
   images: PrepImage[]
+  generations: Record<string, JobGeneration>
 }
 
 export default function PrepPage({
@@ -53,6 +60,7 @@ export default function PrepPage({
   costUsd,
   concepts,
   images,
+  generations,
 }: Props) {
   const router = useRouter()
   const { searchParams, set: setUrlParams } = useUrlParams()
@@ -82,9 +90,13 @@ export default function PrepPage({
   const tab = parseStudyTab(searchParams.get("tab"))
   function setTab(next: StudyTab) { setUrlParams({ tab: next }) }
 
-  const pages: Page[] = images
-    .filter(img => img.ocrResult !== null)
-    .map((img, i) => ({ page: i + 1, gcsKey: img.gcsKey, ...ocrResultSchema.parse(img.ocrResult) }))
+  const ocrImages = images.filter(img => img.ocrResult !== null)
+  const pages: Page[] = ocrImages.map((img, i) => {
+    if (!img.language) throw new Error(`PrepImage ${img.id} has an OCR result but no language`)
+    return { page: i + 1, gcsKey: img.gcsKey, language: img.language, ...ocrResultSchema.parse(img.ocrResult) }
+  })
+  const questionGenerations = questions.map(q => generationOf(q.producedByJobId, generations))
+  const questionJobGenerations = [ ...new Map(questionGenerations.filter(g => g !== null).map(g => [ g.jobId, g ])).values() ]
   const hasQuestions = questions.length > 0
   const flashcards = questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
   const studyQuestions = questions.filter(q => q.type !== "flashcard")
@@ -179,13 +191,13 @@ export default function PrepPage({
           <span className="text-sm text-muted-foreground">{formatDate(prep.createdAt)}</span>
           {tokensUsed > 0 && (
             <span className="text-xs text-muted-foreground">
-              {tokensUsed.toLocaleString()} tokens · {formatCost(costUsd)}
+              {formatUsage(tokensUsed, costUsd)}
             </span>
           )}
         </div>
 
-        {pages.map(page => (
-          <PageSection key={page.page} prepId={prep.id} page={page} />
+        {pages.map((page, i) => (
+          <PageSection key={page.page} prepId={prep.id} page={page} generation={generationOf(ocrImages[i].producedByJobId, generations)} />
         ))}
 
         {concepts.length > 0 && (
@@ -220,6 +232,27 @@ export default function PrepPage({
               studyQuestions={studyQuestions}
               onStartAttempt={mode => setActiveAttempt(mode)}
             />
+
+            <section className="flex flex-col gap-1.5">
+              <h3 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">Question generation</h3>
+              <ul aria-label="Questions" className="flex flex-col gap-1">
+                {questions.map((q, i) => {
+                  const generation = questionGenerations[i]
+                  return (
+                    <li key={q.id} className="flex flex-col text-xs">
+                      <span className="font-semibold capitalize">{i + 1}. {q.type.replace(/_/g, " ")}</span>
+                      {generation && <GenerationCost generations={[ generation ]} />}
+                    </li>
+                  )
+                })}
+              </ul>
+              {questionJobGenerations.length > 0 && (
+                <div aria-label="Questions total" role="group" className="flex flex-col gap-0.5">
+                  <span className="text-xs font-semibold">Total</span>
+                  <GenerationCost generations={questionJobGenerations} />
+                </div>
+              )}
+            </section>
 
             {attempts.length > 0 && (
               <div className="flex flex-col gap-3">

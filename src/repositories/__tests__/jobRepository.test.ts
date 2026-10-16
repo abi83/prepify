@@ -21,7 +21,7 @@ const META = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 32_
 const FAILED: JobOutcome<unknown> = { status: "failed", failureReason: "boom", wastedMetas: [] }
 
 function executedOcr(text: string): Extract<JobOutcome<unknown>, { status: "executed" }> {
-  return { status: "executed", output: { text, visual_elements: [] }, metas: [ META ], wastedMetas: [] }
+  return { status: "executed", output: { title: "T", text, visual_elements: [] }, metas: [ META ], wastedMetas: [] }
 }
 
 const store = createPrismaStore()
@@ -217,7 +217,7 @@ describe("commitJob", () => {
     expect(lost).toBe(false)
 
     const reloaded = await prisma.prepImage.findUniqueOrThrow({ where: { id: image.id } })
-    expect(reloaded.ocrResult).toEqual({ text: "winner", visual_elements: [] })
+    expect(reloaded.ocrResult).toEqual({ title: "T", text: "winner", visual_elements: [] })
     expect(await prisma.generationMeta.count({ where: { jobId: job.id } })).toBe(1)
   })
 

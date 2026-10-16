@@ -18,6 +18,7 @@ const visualElementSchema = z.object({
 
 // Free ISO 639-1 detection — any 2-letter code. Supported-language check happens after parse.
 const ocrSchema = z.object({
+  title: z.string(),
   text: z.string(),
   confidence: z.number().min(0).max(1),
   language: z.string().regex(/^[a-z]{2}$/),
@@ -31,9 +32,11 @@ const SUPPORTED_LANGUAGE_NAMES = SUPPORTED_LANGUAGES.map(l => LANGUAGE_LABELS[l]
 
 const SYSTEM_PROMPT = "You are an OCR agent. Extract all text and visual elements from the textbook page image provided."
 
-export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "1.1.0", text: SYSTEM_PROMPT }
 
 const USER_PROMPT = `Extract as much text as you can see from this textbook page. Also describe any visual elements (diagrams, formulas, tables, charts, molecules, images). Do your best even if the image is imperfect.
+
+For the title field, return the most informative title for this page: the chapter heading or topic if visible, otherwise the page number.
 
 For the language field, return the detected language as a 2-letter ISO 639-1 code (e.g. en, de, fr). Do not include regional variants — use "en" not "en_GB".
 

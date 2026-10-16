@@ -4,7 +4,7 @@ import { requireUserId } from "@/lib/currentUser"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 import * as prepStateRepository from "@/repositories/prepStateRepository"
-import type { GeneratedPrepState, PrepProgress } from "@/repositories/prepStateRepository"
+import type { GeneratedPrepState, JobGeneration, PrepProgress } from "@/repositories/prepStateRepository"
 
 async function assertOwnsPrep(prepId: string): Promise<void> {
   const userId = await requireUserId()
@@ -15,6 +15,11 @@ async function assertOwnsPrep(prepId: string): Promise<void> {
 export async function loadMyPrepState(prepId: string): Promise<GeneratedPrepState> {
   await assertOwnsPrep(prepId)
   return prepStateRepository.loadPrepState(prepId)
+}
+
+export async function loadMyJobGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
+  await assertOwnsPrep(prepId)
+  return prepStateRepository.loadJobGenerations(prepId)
 }
 
 export async function getMyPrepProgress(prepId: string): Promise<PrepProgress | null> {

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 
 import { getReadSignedUrl } from "@/actions/uploads"
+import GenerationCost from "@/components/GenerationCost"
 import { Button } from "@/components/ui/button"
+import type { JobGeneration } from "@/repositories/prepStateRepository"
 import type { VisualElement, Page } from "@/types/prep"
 
 function VisualElementItem({ el }: { el: VisualElement }) {
@@ -21,7 +23,7 @@ function VisualElementItem({ el }: { el: VisualElement }) {
   )
 }
 
-export default function PageSection({ prepId, page }: { prepId: string; page: Page }) {
+export default function PageSection({ prepId, page, generation }: { prepId: string; page: Page; generation: JobGeneration | null }) {
   const [ open, setOpen ] = useState(false)
   const [ imageUrl, setImageUrl ] = useState<string | null>(null)
   const hasVisuals = page.visual_elements.length > 0
@@ -39,16 +41,24 @@ export default function PageSection({ prepId, page }: { prepId: string; page: Pa
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Page {page.page}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{page.title}</span>
+          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{page.language}</span>
+        </div>
         <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setOpen(v => !v)}>
           {open ? "Collapse" : "Expand"}
         </Button>
       </div>
+      {generation && (
+        <div className="border-b border-border px-5 py-2">
+          <GenerationCost generations={[ generation ]} />
+        </div>
+      )}
       {open && (
         <>
           {imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element -- signed GCS URL, not a static next/image source
-            <img src={imageUrl} alt={`Page ${page.page} original`} className="block max-h-[600px] w-full object-contain border-b border-border bg-muted" />
+            <img src={imageUrl} alt={`${page.title} original`} className="block max-h-[600px] w-full object-contain border-b border-border bg-muted" />
           )}
           <div className="max-h-[2000px] overflow-hidden transition-[max-height]">
             <pre className="p-5 font-body text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">{page.text}</pre>

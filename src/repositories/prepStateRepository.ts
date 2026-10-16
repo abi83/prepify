@@ -18,15 +18,15 @@ export interface GenerationCall {
   wasted: boolean
 }
 
-/** The job that produced a concept, with all its LLM calls. */
-export interface ConceptGeneration {
+/** A job with all its LLM calls. */
+export interface JobGeneration {
   jobId: string
   model: string
   tier: string
   calls: GenerationCall[]
 }
 
-export type StatedConcept = PrepState["concepts"][number] & { createdAt: Date; generation: ConceptGeneration }
+export type StatedConcept = PrepState["concepts"][number] & { createdAt: Date; generation: JobGeneration }
 
 /** `PrepState` with each concept's generation meta, for the prep page. */
 export type GeneratedPrepState = PrepState & { concepts: StatedConcept[] }
@@ -66,7 +66,16 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
   }
 }
 
-export type RunState = "idle" | "running" | "interrupted"
+/** Every job of the prep that made LLM calls, keyed by job id. No ownership check — callers resolve the prep first. */
+export async function loadJobGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
+  const jobs = await prisma.job.findMany({ where: { prepId, generationMetas: { some: {} } }, include: { generationMetas: true } })
+  return Object.fromEntries(jobs.map(job => {
+    const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
+    return [ job.id, { jobId: job.id, model: job.model, tier: job.tier, calls } ]
+  }))
+}
+
+export type RunState ="idle" | "running" | "interrupted"
 
 export interface PrepProgress {
   runState: RunState // any job running, else any interrupted (needs the key to resume)

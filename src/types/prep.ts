@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import type { SupportedLanguage } from "@/lib/config"
+
 /** Identifier-safe discipline values stored on `Prep.discipline`; mirrors the Prisma `PrepDiscipline` enum. */
 export type PrepDisciplineId =
   | "History" | "Geography" | "Literature" | "SocialStudies" | "Economics" | "PhilosophyEthics"
@@ -31,6 +33,8 @@ export type VisualElement = {
 
 export type Page = {
   page: number
+  title: string
+  language: SupportedLanguage
   text: string
   gcsKey: string
   visual_elements: VisualElement[]
@@ -47,6 +51,7 @@ const visualElementSchema: z.ZodType<VisualElement> = z.object({
 
 /** Shape written to `PrepImage.ocrResult` once OCR for that image finishes successfully. */
 export const ocrResultSchema = z.object({
+  title: z.string(),
   text: z.string(),
   visual_elements: z.array(visualElementSchema),
 })
