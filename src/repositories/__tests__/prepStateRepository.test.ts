@@ -38,9 +38,14 @@ describe("prepStateRepository", () => {
     const finished = await prepRepository.createPrep(OWNER, { title: "Finished", language: "en" })
     const image = await prepImageRepository.createImage(OWNER, finished.id, "key")
     await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
-    const job = (type: string) => prisma.job.create({
-      data: { prepId: finished.id, type, status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
+    const job = (type: string, output: object = []) => prisma.job.create({
+      data: {
+        prepId: finished.id, type, status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output,
+        inputs: { create: [ { entityType: "prepImage", entityId: image.id } ] },
+      },
     })
+    const extracted = { name: "Mitosis", description: "Cell division process in eukaryotes that yields two identical cells", importance: 0.9, misconceptions: [], language: "en" }
+    await job("concepts.extract", { status: "found", concepts: [ extracted ] })
     const conceptsJob = await job("concepts")
     await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
     await addMeta(conceptsJob.id)
@@ -53,7 +58,25 @@ describe("prepStateRepository", () => {
 
     const preps = await listUnfinishedPreps(OWNER, TARGET)
     expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
-    expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1 })
+    expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1, images: [ { id: image.id, merge: "merged" } ] })
+  })
+
+  it("derives each page's merge state from its concepts jobs: none, planned or merged", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Merges", language: "en" })
+    const [ none, planned, merged ] = await Promise.all([ "k1", "k2", "k3" ].map(key => prepImageRepository.createImage(OWNER, prep.id, key)))
+    const mergeJob = (status: "created" | "executed", imageId: string) => prisma.job.create({
+      data: {
+        prepId: prep.id, type: "concepts", status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
+        ...(status === "executed" ? { output: [] } : {}),
+        inputs: { create: [ { entityType: "prepImage", entityId: imageId } ] },
+      },
+    })
+    await mergeJob("created", planned.id)
+    await mergeJob("executed", merged.id)
+
+    const { images } = await loadPrepState(prep.id)
+
+    expect(images.map(image => [ image.id, image.merge ])).toEqual([ [ none.id, "none" ], [ planned.id, "planned" ], [ merged.id, "merged" ] ])
   })
 
   it("lists questions that need an asset and have neither an asset nor an asset job", async () => {
@@ -91,14 +114,16 @@ describe("prepStateRepository", () => {
     expect(concepts[0].generation.calls.map(call => call.wasted).sort()).toEqual([ false, true ])
   })
 
-  it("throws for a concept whose job has no GenerationMeta", async () => {
+  it("gives a concept whose job made no LLM call an empty call list", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "No meta", language: "en" })
     const conceptsJob = await prisma.job.create({
       data: { prepId: prep.id, type: "concepts", status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
     })
     await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: conceptsJob.id } })
 
-    await expect(loadPrepState(prep.id)).rejects.toThrow("no GenerationMeta")
+    const { concepts } = await loadPrepState(prep.id)
+
+    expect(concepts[0].generation.calls).toEqual([])
   })
 
   describe("getPrepProgress", () => {

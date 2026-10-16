@@ -293,6 +293,7 @@ function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output
 
 /** Creates one `Concept` row per merged concept, and records their language on the `Prep`. */
 async function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: StoredConcept[]) {
+  if (output.length === 0) return
   await tx.concept.createMany({ data: output.map(c => ({ ...c, producedByJobId: job.id })) })
   await tx.prep.update({ where: { id: job.prepId }, data: { language: resolveLanguage(output) } })
 }

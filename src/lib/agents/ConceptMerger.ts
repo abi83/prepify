@@ -1,52 +1,56 @@
 import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
-import { runAgent, AgentResult, EMPTY_AGENT_META } from "@/lib/agent"
+import { runAgent, AgentResult } from "@/lib/agent"
 import type { Prompt } from "@/lib/prompt"
 import type { Concept } from "@/types/pipeline"
 
-const SYSTEM_PROMPT = `You are a deduplication assistant for concept lists extracted from study material.
+const SYSTEM_PROMPT = `You are a deduplication assistant for study material. A prep already stores a set of concepts; a new page has just yielded more.
 
-You will receive a JSON array of concepts with fields: name, importance.
-These were extracted from different sections of the same text, so some may refer to the same concept under different names or phrasings (e.g. "Mitose" and "cell division", "DNA-Replikation" and "DNA replication").
+You will receive a JSON object { "existing": [...], "incoming": [...] }; every concept has fields name and description.
 
-Your task: group concepts that refer to the same underlying idea.
+For each incoming concept decide: is the same idea already covered by an existing concept?
 
 RULES:
-- Each concept belongs to exactly one group
-- A concept that has no duplicates forms a singleton group ["Mitose"]
-- Concepts in the same group must genuinely mean the same thing — do not merge related-but-distinct concepts
-- Names may differ in language, phrasing, or specificity — use semantic meaning, not surface similarity
-- Use the exact name strings from the input — do not paraphrase or invent new names
+- "duplicate": an existing concept already covers the idea. Set "duplicateOf" to that existing concept's exact name.
+- "new": no existing concept covers it. Set "duplicateOf" to null.
+- Compare meaning, not wording. Names may differ in language, phrasing, or specificity (e.g. "Mitose" and "cell division", "DNA-Replikation" and "DNA replication").
+- A refinement, restatement or narrower/broader form of an existing concept is a duplicate.
+- Related-but-distinct ideas are new.
+- When unsure, answer "duplicate": a near-duplicate concept produces near-duplicate questions.
+- Use exact name strings from the input — do not paraphrase or invent names.
 
-Return a JSON object: { "groups": [["Mitose", "cell division"], ["DNA replication"], ...] }
-Every input name must appear in exactly one group.`
+Return a JSON object: { "decisions": [{ "name": "<incoming name>", "duplicateOf": "<existing name>" | null }, ...] }
+Every incoming name must appear exactly once.`
 
-export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
+export const prompt: Prompt = { version: "2.0.0", text: SYSTEM_PROMPT }
 
 const mergerResponseSchema = z.object({
-  groups: z.array(z.array(z.string())),
+  decisions: z.array(z.object({ name: z.string(), duplicateOf: z.string().nullable() })),
 })
 
+export interface ConceptVerdict {
+  concept: Concept
+  /** The stored concept it repeats, or null when it is new. */
+  duplicateOfId: string | null
+}
+
+/** Compares each incoming concept with the prep's stored concepts. */
 export async function runConceptMerger(
-  concepts: Concept[],
+  incoming: Concept[],
+  existing: (Concept & { id: string })[],
   model: string,
   tier: string,
-  language: string,
   signal: AbortSignal,
   deps: AgentDeps,
-): Promise<AgentResult<Concept[]>> {
-  if (concepts.length === 0) return { output: [], meta: EMPTY_AGENT_META }
-
-  const nameSet = new Set(concepts.map(c => c.name))
-  const payload = concepts.map(c => ({ name: c.name, importance: c.importance }))
-  const langInstruction = language !== "en" ? `\nRespond in the same language as the concept names (${language}).` : ""
+): Promise<AgentResult<ConceptVerdict[]>> {
+  const brief = (c: Concept) => ({ name: c.name, description: c.description })
 
   const result = await runAgent({
     name: "ConceptMerger",
     promptVersion: prompt.version,
-    systemPrompt: SYSTEM_PROMPT + langInstruction,
-    userContent: { textContent: JSON.stringify(payload) },
+    systemPrompt: SYSTEM_PROMPT,
+    userContent: { textContent: JSON.stringify({ existing: existing.map(brief), incoming: incoming.map(brief) }) },
     schema: mergerResponseSchema,
     model,
     tier,
@@ -54,19 +58,17 @@ export async function runConceptMerger(
     deps,
   })
 
-  const conceptByName = new Map(concepts.map(c => [ c.name, c ]))
+  const idByName = new Map(existing.map(c => [ c.name, c.id ]))
+  const duplicateOfByName = new Map(result.output.decisions.map(d => [ d.name, d.duplicateOf ]))
 
-  const merged: Concept[] = result.output.groups.flatMap(group => {
-    const members = group.flatMap(name => {
-      if (!nameSet.has(name)) {
-        deps.logger.warn("ConceptMerger: unmatched name in response, skipping", { name })
-        return []
-      }
-      return [ conceptByName.get(name)! ]
-    })
-    if (members.length === 0) return []
-    return [ members.reduce((best, c) => (c.importance > best.importance ? c : best), members[0]) ]
+  const output = incoming.map(concept => {
+    const duplicateOf = duplicateOfByName.get(concept.name)
+    if (duplicateOf === undefined) throw new Error(`ConceptMerger returned no decision for "${concept.name}"`)
+    if (duplicateOf === null) return { concept, duplicateOfId: null }
+    const duplicateOfId = idByName.get(duplicateOf)
+    if (!duplicateOfId) throw new Error(`ConceptMerger marked "${concept.name}" a duplicate of unknown "${duplicateOf}"`)
+    return { concept, duplicateOfId }
   })
 
-  return { output: merged, meta: result.meta }
+  return { output, meta: result.meta }
 }

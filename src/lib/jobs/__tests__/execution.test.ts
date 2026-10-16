@@ -17,8 +17,8 @@ const concept = { id: "c1", name: "Mitosis", description: "Cell division process
 const FOUND: PageConcepts = { status: "found", concepts: [ concept ] }
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
-function fakeDeps(failType?: string, extraction: PageConcepts = FOUND) {
-  const state: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds = [ "i1" ]) {
+  const state: PrepState = { images: pageIds.map(id => ({ id, ocrDone: false, concepts: { status: "pending" as const }, merge: "none" as const })), concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
   const ran: string[] = []
   let inFlight = 0
   let maxInFlight = 0
@@ -39,9 +39,15 @@ function fakeDeps(failType?: string, extraction: PageConcepts = FOUND) {
         if (job.type === "asset") state.assetQuestionIds = []
         if (job.type === failType) throw new Error("boom")
         ran.push(job.type)
-        if (job.type === "ocr") state.images = [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ]
-        if (job.type === "concepts.extract") state.images = [ { id: "i1", ocrDone: true, concepts: extraction } ]
-        if (job.type === "concepts") state.concepts = [ concept ]
+        const update = (patch: Partial<PrepState["images"][number]>) => {
+          state.images = state.images.map(image => job.inputIds.includes(image.id) ? { ...image, ...patch } : image)
+        }
+        if (job.type === "ocr") update({ ocrDone: true })
+        if (job.type === "concepts.extract") update({ concepts: extraction })
+        if (job.type === "concepts") {
+          update({ merge: "merged" })
+          state.concepts = [ concept ]
+        }
         if (job.type === "prep.meta") state.prepMetaDone = true
         if (job.type === "question") { state.questionCount++; state.questionJobCount++; state.assetQuestionIds = [ "q1" ] }
         return { output: null, metas: [], wastedMetas: [] }
@@ -60,6 +66,14 @@ describe("executePrep", () => {
     const { deps, ran } = fakeDeps()
     await executePrep(deps, params(2))
     expect(ran).toEqual([ "ocr", "concepts.extract", "prep.meta", "concepts", "question", "question", "question", "asset" ])
+  })
+
+  it("merges each page in turn, after every extraction and before any question", async () => {
+    const { deps, ran } = fakeDeps(undefined, FOUND, [ "i1", "i2", "i3" ])
+    await executePrep(deps, params(5))
+    expect(ran.filter(type => type === "concepts")).toHaveLength(3)
+    expect(ran.lastIndexOf("concepts.extract")).toBeLessThan(ran.indexOf("concepts"))
+    expect(ran.lastIndexOf("concepts")).toBeLessThan(ran.indexOf("question"))
   })
 
   it("plans an asset job per question needing one after the question jobs", async () => {

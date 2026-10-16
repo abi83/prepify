@@ -12,9 +12,12 @@ import { buildQuestionTasks } from "./taskBuilder"
 /** A page's concept extraction: not run yet, or its outcome. */
 export type PageConceptsState = PageConcepts | { status: "pending" }
 
+/** A page's merge into the prep's stored concepts: no `concepts` job yet, one that hasn't executed, or an executed one. */
+export type PageMergeState = "none" | "planned" | "merged"
+
 /** What a prep already has — completed outputs only, not jobs that exist but haven't run. */
 export interface PrepState {
-  images: { id: string; ocrDone: boolean; concepts: PageConceptsState }[]
+  images: { id: string; ocrDone: boolean; concepts: PageConceptsState; merge: PageMergeState }[]
   concepts: (StoredConcept & { id: string })[]
   prepMetaDone: boolean
   questionCount: number
@@ -33,14 +36,20 @@ export interface JobSpec {
   question: QuestionSpec | null
 }
 
-function nextConceptsJobs(images: PrepState["images"]): JobSpec[] {
-  const pending = images.filter(image => image.concepts.status === "pending")
+/**
+ * Extraction for every page first, then one merge at a time in upload order: a page merges into the
+ * concepts stored so far, so it waits for the pages before it. `null` once every found page is merged.
+ * A merged page is never re-extracted: preps merged before extraction jobs existed have none.
+ */
+function nextConceptsJobs(images: PrepState["images"]): JobSpec[] | null {
+  const pending = images.filter(image => image.concepts.status === "pending" && image.merge !== "merged")
   if (pending.length > 0) {
     return pending.map(image => ({ type: CONCEPTS_EXTRACT_JOB_TYPE, inputIds: [ image.id ], question: null }))
   }
-  const found = images.filter(image => image.concepts.status === "found")
-  if (found.length === 0) return []
-  return [ { type: CONCEPTS_JOB_TYPE, inputIds: found.map(image => image.id), question: null } ]
+  const next = images.find(image => image.concepts.status === "found" && image.merge !== "merged")
+  if (!next) return null
+  if (next.merge === "planned") return []
+  return [ { type: CONCEPTS_JOB_TYPE, inputIds: [ next.id ], question: null } ]
 }
 
 /** Throws when the planner stopped because no page yielded concepts, naming why. Call once it has nothing left to plan. */
@@ -51,8 +60,8 @@ export function assertConceptsFound(state: PrepState): void {
 }
 
 /**
- * The jobs for the next unmet stage: OCR → concept extraction (per page) → concepts merge →
- * question tasks → one asset job per question that needs one. `prep.meta` reads raw OCR text, so it
+ * The jobs for the next unmet stage: OCR → concept extraction (per page) → concepts merge (per page, in
+ * order) → question tasks → one asset job per question that needs one. `prep.meta` reads raw OCR text, so it
  * is planned with the first stage after OCR and runs alongside it. Empty when the prep has no images
  * to start from, every page came up empty (see `assertConceptsFound`), or its question and asset
  * jobs are already planned — unfinished ones are resumed, not topped up to `target`.
@@ -69,7 +78,9 @@ export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
 }
 
 function nextStageJobs(state: PrepState, target: PlanTarget): JobSpec[] {
-  if (state.concepts.length === 0) return nextConceptsJobs(state.images)
+  const conceptsJobs = nextConceptsJobs(state.images)
+  if (conceptsJobs) return conceptsJobs
+  if (state.concepts.length === 0) return []
 
   if (state.questionJobCount > 0) {
     return state.assetQuestionIds.map(questionId => ({ type: ASSET_JOB_TYPE, inputIds: [ questionId ], question: null }))

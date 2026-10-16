@@ -7,7 +7,7 @@ import type { ListUnfinishedJobs, PrepData, PrepImageRef, Store } from "@/core/p
 import { activeAssetHint } from "@/lib/assetHint"
 import type { SupportedLanguage } from "@/lib/config"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
-import { indexPageConcepts } from "@/lib/jobs/pageConcepts"
+import { indexMerges, indexPageConcepts } from "@/lib/jobs/pageConcepts"
 import type { PrepState } from "@/lib/planner"
 import type { StoredConcept } from "@/types/pipeline"
 import type { GeneratedQuestion } from "@/types/questions"
@@ -83,8 +83,9 @@ export function createFilePrep(dir: string): FilePrep {
       ])
       const assetJobQuestionIds = new Set(jobs.filter(job => job.type === ASSET_JOB_TYPE).flatMap(job => job.inputIds))
       const pageConcepts = indexPageConcepts(extractions.map(({ job, output }) => ({ inputIds: job.inputIds, output })))
+      const merges = indexMerges(jobs.filter(job => job.type === CONCEPTS_JOB_TYPE))
       return {
-        images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" as const } })),
+        images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" as const }, merge: merges.get(image.id) ?? "none" as const })),
         concepts: allConcepts,
         prepMetaDone: meta.length > 0,
         questionCount: allQuestions.length,

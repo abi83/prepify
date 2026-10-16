@@ -9,14 +9,29 @@ import { testCatalog } from "@/test/modelCatalog"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
-const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
+const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
 
-const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[] }))
+const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[], mergesInFlight: 0, maxMergesInFlight: 0, merged: [] as string[] }))
 
 vi.mock("../ocrJob", () => ({
   createOcrJobDefinition: (_images: unknown, deps: { llm: unknown }) => ({
     type: "ocr",
     run: async () => { h.llmsSeen.push(deps.llm); return { output: { language: "de" }, metas: [], wastedMetas: [] } },
+  }),
+}))
+
+vi.mock("../conceptsJob", () => ({
+  createConceptsJobDefinition: (incoming: { name: string }[]) => ({
+    type: "concepts",
+    run: async () => {
+      h.mergesInFlight++
+      h.maxMergesInFlight = Math.max(h.maxMergesInFlight, h.mergesInFlight)
+      await new Promise(resolve => setTimeout(resolve, 1))
+      h.mergesInFlight--
+      h.merged.push(incoming[0].name)
+      return { output: [], metas: [], wastedMetas: [] }
+    },
   }),
 }))
 
@@ -63,7 +78,7 @@ describe("generation with swapped roots", () => {
   })
 
   it("resumes the jobs the root's listUnfinishedJobs port returns", async () => {
-    const done: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ], concepts: [ { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const } ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, assetQuestionIds: [] }
+    const done: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, assetQuestionIds: [] }
     const ports = root({ complete: () => { throw new Error("unused") } }, done)
     const unfinished = await ports.store.createJob("u1", "ocr", [ "i1" ], CONFIG)
     h.llmsSeen.length = 0
@@ -74,8 +89,7 @@ describe("generation with swapped roots", () => {
   })
 
   it("resumes unfinished question jobs without planning more to reach the target", async () => {
-    const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
-    const planned: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "pending" } } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1, assetQuestionIds: [] }
+    const planned: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1, assetQuestionIds: [] }
     const ports = root({ complete: () => { throw new Error("unused") } }, planned)
     const unfinished = await ports.store.createJob("u1", "question", [ "c1" ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
     const createJob = vi.spyOn(ports.store, "createJob")
@@ -87,8 +101,32 @@ describe("generation with swapped roots", () => {
   })
 })
 
+describe("resuming merges", () => {
+  it("runs unfinished concepts jobs one at a time, in order", async () => {
+    const found = (name: string) => ({ status: "found" as const, concepts: [ { ...concept, name } ] })
+    const state: PrepState = {
+      images: [
+        { id: "i1", ocrDone: true, concepts: found("first"), merge: "planned" },
+        { id: "i2", ocrDone: true, concepts: found("second"), merge: "planned" },
+      ],
+      concepts: [], prepMetaDone: true, questionCount: 0, questionJobCount: 0, assetQuestionIds: [],
+    }
+    const ports = root({ complete: () => { throw new Error("unused") } }, state)
+    const first = await ports.store.createJob("u1", "concepts", [ "i1" ], CONFIG)
+    const second = await ports.store.createJob("u1", "concepts", [ "i2" ], CONFIG)
+    h.mergesInFlight = 0
+    h.maxMergesInFlight = 0
+    h.merged.length = 0
+
+    await runCreatedJobs({ ...ports, listUnfinishedJobs: async () => [ first, second ] }, { ...params(), jobIds: [] })
+
+    expect(h.merged).toEqual([ "first", "second" ])
+    expect(h.maxMergesInFlight).toBe(1)
+  })
+})
+
 describe("create/run split", () => {
-  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" } }, { id: "i2", ocrDone: false, concepts: { status: "pending" } } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" }, { id: "i2", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
   const unusedLlm: Llm = { complete: () => { throw new Error("unused") } }
 
   function twoImageRoot() {
