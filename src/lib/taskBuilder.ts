@@ -59,16 +59,18 @@ export function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concept {
+/** Picks by importance, discounted by how many existing questions (`usage`, by concept name) use the concept. */
+export function weightedPick(concepts: Concept[], exclude?: Set<string>, usage?: Map<string, number>): Concept {
   const pool = exclude && exclude.size > 0
     ? concepts.filter(c => !exclude.has(c.name))
     : concepts
   const source = pool.length > 0 ? pool : concepts
 
-  const total = source.reduce((sum, c) => sum + Math.max(c.importance, 0.05), 0)
+  const weightOf = (c: Concept) => Math.max(c.importance, 0.05) / (1 + (usage?.get(c.name) ?? 0))
+  const total = source.reduce((sum, c) => sum + weightOf(c), 0)
   let r = Math.random() * total
   for (const c of source) {
-    r -= Math.max(c.importance, 0.05)
+    r -= weightOf(c)
     if (r <= 0) return c
   }
   return source[source.length - 1]
@@ -80,11 +82,14 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>): Concep
  * - concept count comes from the difficulty tier (easy 1–2, medium 2, hard 2–3),
  *   capped by the number of available concepts
  * - spreads load across concepts weighted by importance
- * - guarantees each of the top-5 concepts appears at least once
+ * - guarantees each of the top-5 concepts appears at least once, unless `priorUsage`
+ *   (existing questions per concept name) already covers it
+ * - biases picks toward concepts with the least prior usage
  */
 export function buildQuestionTasks(
   concepts: Concept[],
   config: { questionCount: number; enabledTypes: QuestionType[]; difficultyMix: DifficultyMix },
+  priorUsage: Map<string, number> = new Map(),
 ): QuestionTask[] {
   if (concepts.length === 0) throw new Error("No concepts to build tasks from")
 
@@ -115,7 +120,7 @@ export function buildQuestionTasks(
           .map(([ name ]) => name)
       )
       const exclude = new Set([ ...capped, ...slotExclude ])
-      const concept = weightedPick(sorted, exclude)
+      const concept = weightedPick(sorted, exclude, priorUsage)
       slotConcepts.push(concept)
       slotExclude.add(concept.name)
       conceptCounts.set(concept.name, (conceptCounts.get(concept.name) ?? 0) + 1)
@@ -128,7 +133,7 @@ export function buildQuestionTasks(
   const topN = Math.min(sorted.length, 5)
   for (let i = 0; i < topN; i++) {
     const top = sorted[i]
-    if (tasks.some(t => t.concepts.some(c => c.name === top.name))) continue
+    if ((priorUsage.get(top.name) ?? 0) > 0 || tasks.some(t => t.concepts.some(c => c.name === top.name))) continue
 
     const counts = new Map<string, number>()
     tasks.forEach(t => t.concepts.forEach(c => counts.set(c.name, (counts.get(c.name) ?? 0) + 1)))

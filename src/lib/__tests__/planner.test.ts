@@ -30,6 +30,8 @@ function state(overrides: Partial<PrepState> = {}): PrepState {
     prepMetaDone: true,
     questionCount: 0,
     questionJobCount: 0,
+    unfinishedJobCount: 0,
+    conceptUsage: {},
     assetQuestionIds: [],
     ...overrides,
   }
@@ -160,6 +162,37 @@ describe("nextJobs", () => {
 
   it("plans nothing once question jobs exist, even with fewer questions than the target", () => {
     expect(nextJobs(state({ questionCount: 2, questionJobCount: 5 }), { ...TARGET, questionCount: 10 })).toEqual([])
+  })
+
+  describe("additionalQuestions", () => {
+    const EXISTING = { questionCount: 5, questionJobCount: 5 }
+
+    it("plans that many new question jobs on a prep that already has questions", () => {
+      const specs = nextJobs(state(EXISTING), { ...TARGET, additionalQuestions: 5 })
+      expect(specs).toHaveLength(5)
+      expect(specs.every(spec => spec.type === "question")).toBe(true)
+    })
+
+    it("applies the config's types to the new questions", () => {
+      const specs = nextJobs(state(EXISTING), { ...TARGET, enabledTypes: [ "flashcard" ], additionalQuestions: 3 })
+      expect(specs.map(spec => spec.question?.questionType)).toEqual([ "flashcard", "flashcard", "flashcard" ])
+    })
+
+    it("plans only assets while jobs are unfinished", () => {
+      const specs = nextJobs(state({ ...EXISTING, unfinishedJobCount: 1, assetQuestionIds: [ "q1" ] }), { ...TARGET, additionalQuestions: 5 })
+      expect(specs).toEqual([ { type: "asset", inputIds: [ "q1" ], question: null } ])
+    })
+
+    it("favours concepts the existing questions don't cover", () => {
+      const skewed = state({ ...EXISTING, conceptUsage: { c1: 40 } })
+      const uses = { c1: 0, other: 0 }
+      for (let run = 0; run < 50; run++) {
+        for (const spec of nextJobs(skewed, { ...TARGET, additionalQuestions: 5 })) {
+          for (const id of spec.inputIds) uses[id === "c1" ? "c1" : "other"]++
+        }
+      }
+      expect(uses.other).toBeGreaterThan(uses.c1 * 3)
+    })
   })
 
   it("plans one asset job per question needing an asset once question jobs exist", () => {

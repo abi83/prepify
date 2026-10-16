@@ -22,6 +22,7 @@ import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/gene
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
 import { requestServerRun } from "@/lib/jobs/serverRunClient"
 import { consoleLogger } from "@/lib/logger"
+import type { PlanTarget } from "@/lib/planner"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
@@ -55,6 +56,7 @@ export default function GenerationPanel({
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
   const [ totalTokens, setTotalTokens ] = useState(0)
+  const [ addCount, setAddCount ] = useState(5)
   const [ genError, setGenError ] = useState<string | null>(null)
   const [ modeDialogOpen, setModeDialogOpen ] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -71,11 +73,11 @@ export default function GenerationPanel({
     })
   }
 
-  async function runOnServer() {
+  async function runOnServer(target: PlanTarget = localConfig) {
     const keyConfig = getApiKey()!
     setGenError(null)
     try {
-      await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target: localConfig })
+      await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target })
       expectRun()
       await refreshProgress()
     } catch (e: unknown) {
@@ -83,7 +85,7 @@ export default function GenerationPanel({
     }
   }
 
-  async function runInBrowser() {
+  async function runInBrowser(target: PlanTarget = localConfig) {
     const keyConfig = getApiKey()!
     setGenError(null)
     setProgress(null)
@@ -102,7 +104,7 @@ export default function GenerationPanel({
         apiKey: keyConfig.key,
         model: keyConfig.model,
         tier: keyConfig.tier,
-        target: localConfig,
+        target,
         signal: abortRef.current.signal,
         logger: consoleLogger,
         sampler: clientSampler,
@@ -169,6 +171,15 @@ export default function GenerationPanel({
     withModeCheck(() => getExecutionMode() === "server" ? runOnServer() : runInBrowser())
   }
 
+  function handleAddMore() {
+    if (!getApiKey()) {
+      router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
+      return
+    }
+    const target = { ...localConfig, additionalQuestions: addCount }
+    withModeCheck(() => getExecutionMode() === "server" ? runOnServer(target) : runInBrowser(target))
+  }
+
   async function handleRetryTerminal() {
     setGenError(null)
     try {
@@ -188,7 +199,33 @@ export default function GenerationPanel({
   const isServerRunning = prepProgress?.runState === "running"
   const isInterrupted = prepProgress?.runState === "interrupted"
 
-  if (hasQuestions && genPhase === "idle") return null
+  const hasUnfinishedJobs = prepProgress !== null && (
+    prepProgress.runState !== "idle"
+    || prepProgress.failedQuestions > 0
+    || prepProgress.completedQuestions + prepProgress.failedQuestions + prepProgress.terminalQuestions < prepProgress.totalQuestions
+  )
+
+  if (hasQuestions && genPhase === "idle" && !genError) {
+    return (
+      <>
+        <ExecutionModeDialog open={modeDialogOpen} onConfirm={handleModeConfirm} />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Add more</Label>
+          <Input
+            type="number"
+            min={1}
+            max={20}
+            value={addCount}
+            onChange={e => setAddCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
+            className="h-11 w-[84px]"
+            aria-label="Number of questions to add"
+          />
+          <Button className="h-11" disabled={hasUnfinishedJobs} onClick={handleAddMore}>Add {addCount} more</Button>
+          {hasUnfinishedJobs && <p className="text-sm text-muted-foreground">Resume the unfinished jobs first.</p>}
+        </div>
+      </>
+    )
+  }
 
   const checklistRows = isRunning
     ? rowsFromProgress(progress)

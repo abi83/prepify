@@ -24,7 +24,7 @@ const staleCutoff = () => new Date(Date.now() - STALE_HEARTBEAT_MS)
 export const MAX_JOB_ATTEMPTS = 3
 
 /** Re-executable jobs: not yet run, or failed with attempts left. */
-const RESUMABLE: Prisma.JobWhereInput = {
+export const RESUMABLE: Prisma.JobWhereInput = {
   OR: [
     { status: { in: [ "created", "interrupted" ] } },
     { status: "failed", attempts: { lt: MAX_JOB_ATTEMPTS } },

@@ -10,7 +10,7 @@ import { testCatalog } from "@/test/modelCatalog"
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
-const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
 
 const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[], mergesInFlight: 0, maxMergesInFlight: 0, merged: [] as string[] }))
 
@@ -78,7 +78,7 @@ describe("generation with swapped roots", () => {
   })
 
   it("resumes the jobs the root's listUnfinishedJobs port returns", async () => {
-    const done: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, assetQuestionIds: [] }
+    const done: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 1, questionJobCount: 1, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
     const ports = root({ complete: () => { throw new Error("unused") } }, done)
     const unfinished = await ports.store.createJob("u1", "ocr", [ "i1" ], CONFIG)
     h.llmsSeen.length = 0
@@ -89,7 +89,7 @@ describe("generation with swapped roots", () => {
   })
 
   it("resumes unfinished question jobs without planning more to reach the target", async () => {
-    const planned: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1, assetQuestionIds: [] }
+    const planned: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
     const ports = root({ complete: () => { throw new Error("unused") } }, planned)
     const unfinished = await ports.store.createJob("u1", "question", [ "c1" ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
     const createJob = vi.spyOn(ports.store, "createJob")
@@ -126,7 +126,7 @@ describe("resuming merges", () => {
 })
 
 describe("create/run split", () => {
-  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" }, { id: "i2", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+  const TWO_IMAGES: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" }, { id: "i2", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
   const unusedLlm: Llm = { complete: () => { throw new Error("unused") } }
 
   function twoImageRoot() {

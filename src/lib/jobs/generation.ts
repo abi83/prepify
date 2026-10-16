@@ -236,14 +236,30 @@ export async function runOcr(ports: RunnerPorts, options: GenerationParams): Pro
   await runStaged(runner, created)
 }
 
+/** Plans and runs the `additionalQuestions` new question jobs; their assets follow from the normal flow. */
+async function runAdditionalQuestions(ports: RunnerPorts, runner: Runner, options: GenerationParams): Promise<void> {
+  const { actorId, prepId, config, target } = options
+  const unfinished = await ports.listUnfinishedJobs(actorId, prepId)
+  if (unfinished.length > 0) throw new Error(`${unfinished.length} unfinished job(s) exist (${unfinished.map(job => job.id).join(", ")}); resume them first`)
+  const specs = nextJobs(await ports.data.loadState(prepId), target)
+  const jobs = await createJobs(ports.store, actorId, config, specs)
+  await runStaged(runner, jobs)
+}
+
 /**
  * Re-executes the prep's `created`/`failed` jobs, then plans and runs whatever is still
- * missing to reach `target`.
+ * missing to reach `target`. With `target.additionalQuestions`, resumes nothing: it adds that
+ * many questions (throwing while jobs are unfinished) and finishes their assets.
  */
 export async function runGeneration(ports: RunnerPorts, options: GenerationParams): Promise<void> {
-  const { config, target, ...rest } = options
+  const { config, target: requested, ...rest } = options
+  const { additionalQuestions, ...target } = requested
   const runner = createRunner(ports, rest)
-  await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId))
+  if (additionalQuestions === undefined) {
+    await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId))
+  } else {
+    await runAdditionalQuestions(ports, runner, options)
+  }
 
   const deps: ExecutionDeps = {
     ...runner.deps,

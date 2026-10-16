@@ -23,12 +23,26 @@ export interface PrepState {
   questionCount: number
   /** `question` jobs in any status — once any exist, they are the question plan. */
   questionJobCount: number
+  /** Jobs that are not executed and can still be resumed. */
+  unfinishedJobCount: number
+  /** Existing questions per concept id; concepts without questions are absent. */
+  conceptUsage: Record<string, number>
   /** Questions whose `asset_hint` asks for an asset and that have neither an asset nor an `asset` job (any status). */
   assetQuestionIds: string[]
 }
 
-/** `questionCount` is the total a first question plan should reach. */
-export type PlanTarget = GenerationConfig
+/**
+ * `questionCount` is the total a first question plan should reach. `additionalQuestions` is a
+ * one-off request to add that many questions to a prep that already has question jobs.
+ */
+export type PlanTarget = GenerationConfig & { additionalQuestions?: number }
+
+/** Tallies concept ids, one per question that uses the concept. */
+export function countConceptUsage(conceptIds: string[]): Record<string, number> {
+  const usage: Record<string, number> = {}
+  for (const id of conceptIds) usage[id] = (usage[id] ?? 0) + 1
+  return usage
+}
 
 export interface JobSpec {
   type: string
@@ -65,6 +79,7 @@ export function assertConceptsFound(state: PrepState): void {
  * is planned with the first stage after OCR and runs alongside it. Empty when the prep has no images
  * to start from, every page came up empty (see `assertConceptsFound`), or its question and asset
  * jobs are already planned — unfinished ones are resumed, not topped up to `target`.
+ * A `target.additionalQuestions` request instead plans that many new question jobs, unless jobs are unfinished.
  */
 export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   const pendingImages = state.images.filter(image => !image.ocrDone)
@@ -82,12 +97,15 @@ function nextStageJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   if (conceptsJobs) return conceptsJobs
   if (state.concepts.length === 0) return []
 
-  if (state.questionJobCount > 0) {
+  const requested = target.additionalQuestions
+  if (state.questionJobCount > 0 && (requested === undefined || state.unfinishedJobCount > 0)) {
     return state.assetQuestionIds.map(questionId => ({ type: ASSET_JOB_TYPE, inputIds: [ questionId ], question: null }))
   }
 
   const idByConcept = new Map<Concept, string>(state.concepts.map(concept => [ concept, concept.id ]))
-  return buildQuestionTasks(state.concepts, target).map(task => ({
+  const usageByName = new Map(state.concepts.map(concept => [ concept.name, state.conceptUsage[concept.id] ?? 0 ]))
+  const config = { ...target, questionCount: requested ?? target.questionCount }
+  return buildQuestionTasks(state.concepts, config, usageByName).map(task => ({
     type: QUESTION_JOB_TYPE,
     inputIds: task.concepts.map(concept => idByConcept.get(concept)!),
     question: { questionType: task.type, difficulty: task.difficulty },

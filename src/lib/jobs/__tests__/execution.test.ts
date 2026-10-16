@@ -18,7 +18,7 @@ const FOUND: PageConcepts = { status: "found", concepts: [ concept ] }
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
 function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds = [ "i1" ]) {
-  const state: PrepState = { images: pageIds.map(id => ({ id, ocrDone: false, concepts: { status: "pending" as const }, merge: "none" as const })), concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, assetQuestionIds: [] }
+  const state: PrepState = { images: pageIds.map(id => ({ id, ocrDone: false, concepts: { status: "pending" as const }, merge: "none" as const })), concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
   const ran: string[] = []
   let inFlight = 0
   let maxInFlight = 0
