@@ -21,7 +21,25 @@ describe("runOcrAgent", () => {
   })
 })
 
+const MATH_EXERCISE_PAGE = `10 Gib die größere der beiden Zahlen an. Begründe deine Entscheidung. Überprüfe anschließend mit deinem Taschenrechner.
+a) 3² ; 3^(1/3)   b) 2^(1/3) ; 2^(−1/2)   c) 7^(2/3) ; 7^(3/2)   d) 5^(−2) ; 5^(−1/2)
+e) 2^(1/3) ; 3^(1/3)   f) 2^(−1/3) ; 3^(−1/3)   g) (−3)^(−1/3) ; 3^(−1/3)   h) (−3)^(−1/3) ; (−2)^(−1/3)
+11 In welcher Beziehung stehen die Zahlen zueinander? Übertrage die Tabelle in dein Heft und ergänze sie mit den angegebenen Zahlenpaaren.
+Die Zahlen sind ... gleich. Zahl und deren Kehrwert. Gegenzahlen zueinander. Zahl und deren Quadratzahl.
+a) (−2)³ ; 64^(1/2)   b) 2^(1/2) ; 1/√2   c) 3^(2/3) ; ∛9   d) 3^(−2) ; 1/81
+e) 1/√125 ; 5^(3/2)   f) 2^(−1/3) ; 2^(−2/3)   g) (−1/7)² ; 49^(−1)   h) (−5)^(−3) ; (1/5)³
+12 Gib jeweils an, zwischen welchen beiden natürlichen Zahlen der Term liegt. Beispiel: 4 < √23 < 5
+a) √10 ; ∛10 ; ∜10 ; ⁵√10 ; ¹⁰⁰√10
+b) √100 ; ∛100 ; ∜100 ; ⁵√100 ; ¹⁰⁰√100
+c) ∛10 ; ∛100 ; ∛1000 ; ∛10 000 ; ∛100 000
+13 Schreibe jeweils als Potenz mit möglichst kleiner natürlicher Basis.
+a) ⁵√16   b) ¹⁰√256   c) ⁹√0,008   d) ⁴√25   e) ¹²√(16/640)   f) ⁴√32   g) ⁶√27   h) ⁵√1000`
+
 describe("assertReadableText", () => {
+  it("accepts a math exercise page where digits and symbols dominate", () => {
+    expect(() => assertReadableText(MATH_EXERCISE_PAGE)).not.toThrow()
+  })
+
   it("accepts a normal paragraph", () => {
     expect(() => assertReadableText("La photosynthèse est le processus par lequel les plantes produisent de l'énergie.")).not.toThrow()
   })
@@ -34,7 +52,7 @@ describe("assertReadableText", () => {
     expect(() => assertReadableText(text)).toThrow(/^ocr_text_too_short:/)
   })
 
-  it.each([ "{".repeat(40), "1234567890 ".repeat(5), "... --- ,,, ;;; !!! ??? ((( )))" ])(
+  it.each([ "{".repeat(40), "1234567890 ".repeat(5), "... --- ,,, ;;; !!! ??? ((( )))", "|~=|~=|~=|~=|~=|~=|~=|~=", "| | ~ ~ = = + + | | ~ ~ 1 2 3 4", "\u0000\u0001\u0002".repeat(10) ])(
     "rejects non-letter text %j",
     text => {
       expect(() => assertReadableText(text)).toThrow(/^ocr_text_not_letters:/)
