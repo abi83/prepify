@@ -56,9 +56,11 @@ const deps = (dir: string, llm: Llm) => ({
 describe("runExperiment (OCR)", () => {
   it("judges each sample, writes results and a summary, shows the judge the images and output", async () => {
     const { dir, samples, experiment } = await setup(2)
+    // concurrency:1 — this test checks per-sample scores by call order; parallel would be a race
+    const sequentialExperiment = { ...experiment, judge: { ...experiment.judge, concurrency: 1 } }
     const { llm, requests } = fakeJudge([ 0.5, 1 ])
 
-    const summary = await runExperiment(experiment, deps(dir, llm))
+    const summary = await runExperiment(sequentialExperiment, deps(dir, llm))
 
     const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
     const judgePrompt = { promptVersion: ocrEvaluator.prompt.version, promptHash }
