@@ -7,6 +7,7 @@ import { useState } from "react"
 
 import AttemptFlow from "@/components/attempt/AttemptFlow"
 import { Button } from "@/components/ui/button"
+import { describeOcrError } from "@/lib/ocrRejection"
 import { useUrlParams } from "@/lib/urlState"
 import { useSyncedState } from "@/lib/useSyncedState"
 import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
@@ -18,6 +19,7 @@ import DraftPrep from "./DraftPrep"
 import PrepHeader from "./PrepHeader"
 import PrepTabs from "./PrepTabs"
 import SharePrepDialog from "./SharePrepDialog"
+import type { PageEntry } from "./tabs/types"
 import { usePrepMe } from "./usePrepMe"
 
 /** The generation of the job that produced an entity; null when that job is gone. */
@@ -26,14 +28,21 @@ function generationOf(jobId: string | null, generations: Record<string, JobGener
   return generations[jobId] ?? null
 }
 
-function toPages(images: PrepImage[], generations: Record<string, JobGeneration>) {
+function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>): PageEntry | null {
+  if (img.status === "failed") {
+    if (!img.error) throw new Error(`PrepImage ${img.id} failed without an error`)
+    return { verdict: "rejected", number, gcsKey: img.gcsKey, reason: describeOcrError(img.error) }
+  }
+  if (img.ocrResult === null) return null
+  if (!img.language) throw new Error(`PrepImage ${img.id} has an OCR result but no language`)
+  const page = { page: number, gcsKey: img.gcsKey, language: img.language, ...ocrResultSchema.parse(img.ocrResult) }
+  return { verdict: "accepted", page, generation: generationOf(img.producedByJobId, generations) }
+}
+
+function toPages(images: PrepImage[], generations: Record<string, JobGeneration>): PageEntry[] {
   return images
-    .filter(img => img.ocrResult !== null)
-    .map((img, i) => {
-      if (!img.language) throw new Error(`PrepImage ${img.id} has an OCR result but no language`)
-      const page = { page: i + 1, gcsKey: img.gcsKey, language: img.language, ...ocrResultSchema.parse(img.ocrResult) }
-      return { page, generation: generationOf(img.producedByJobId, generations) }
-    })
+    .map((img, i) => toPageEntry(img, i + 1, generations))
+    .filter(entry => entry !== null)
 }
 
 interface Props {

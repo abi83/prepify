@@ -56,7 +56,8 @@ function questionsStatus(progress: PrepProgress | null): string | null {
 
 function pagesStatus(progress: PrepProgress | null): string | null {
   if (!progress || progress.ocrPages === progress.totalPages) return null
-  return `${progress.ocrPages}/${progress.totalPages} recognised`
+  const rejected = progress.rejectedPages > 0 ? ` · ${progress.rejectedPages} unreadable` : ""
+  return `${progress.ocrPages}/${progress.totalPages} recognised${rejected}`
 }
 
 function conceptsStatus(progress: PrepProgress | null, count: number): string | null {
@@ -103,7 +104,7 @@ export default function MainTab({ flashcards, studyQuestions, concepts, pages, a
         <StatTile label="Flashcards" value={flashcards.length} onClick={open("flashcards")} />
         <StatTile label="Questions" value={studyQuestions.length} status={questionsStatus(progress)} onClick={open("questions")} />
         <StatTile label="Concepts" value={concepts.length} status={conceptsStatus(progress, concepts.length)} onClick={open("concepts")} />
-        <StatTile label="Pages" value={pages.length} status={pagesStatus(progress)} onClick={open("pages")} />
+        <StatTile label="Pages" value={pages.filter(entry => entry.verdict === "accepted").length} status={pagesStatus(progress)} onClick={open("pages")} />
       </div>
 
       <Section title="Progress"><Progress attempts={attempts} /></Section>

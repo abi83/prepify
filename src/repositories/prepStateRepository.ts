@@ -81,6 +81,7 @@ export interface PrepProgress {
   runState: RunState // any job running, else any interrupted (needs the key to resume)
   totalPages: number
   ocrPages: number // pages with an OCR result
+  rejectedPages: number // pages OCR rejected
   hasConcepts: boolean
   totalQuestions: number // question jobs created so far, any status
   completedQuestions: number // executed
@@ -92,7 +93,7 @@ export interface PrepProgress {
 export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
   await interruptStaleJobs({ prepId })
   const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs, terminalQuestions ] = await Promise.all([
-    prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true } }),
+    prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true, status: true } }),
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
     prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
     prisma.job.count({ where: { prepId, type: { notIn: [ OCR_JOB_TYPE, QUESTION_JOB_TYPE ] } } }),
@@ -108,6 +109,7 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
     runState,
     totalPages: images.length,
     ocrPages: images.filter(image => image.ocrResult !== null).length,
+    rejectedPages: images.filter(image => image.status === "failed").length,
     hasConcepts: conceptCount > 0,
     totalQuestions: questionJobs.reduce((sum, group) => sum + group._count, 0),
     completedQuestions: countOf("executed"),
