@@ -5,6 +5,7 @@ import type { Logger } from "@/core/logger"
 import { DEFAULT_MAX_TOKENS, NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
 import { runAgent, sanitizeLLMText } from "@/lib/agent"
+import { createLogger } from "@/lib/logger/core"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { testCatalog } from "@/test/modelCatalog"
@@ -79,6 +80,66 @@ describe("runAgent", () => {
   function lastRequest(): LlmRequest {
     return complete.mock.calls[complete.mock.calls.length - 1][0]
   }
+
+  it("logs the prompt before and the raw response after each call at debug, with images as sizes only", async () => {
+    complete.mockResolvedValue({ content: JSON.stringify({ answer: "ok" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 512 })
+    const base64 = "A".repeat(400)
+    await run("ocr", noopSampler, { textContent: "hello", images: [ { base64, mimeType: "image/jpeg" } ] })
+
+    expect(debug).toHaveBeenCalledWith("agent:ocr: request", expect.objectContaining({
+      model: "gpt-5-nano", attempt: 1, systemPrompt: "system", textContent: "hello", images: [ { mimeType: "image/jpeg", bytes: 300 } ],
+    }))
+    expect(debug).toHaveBeenCalledWith("agent:ocr: response", expect.objectContaining({ attempt: 1, rawResponse: JSON.stringify({ answer: "ok" }) }))
+    expect(JSON.stringify(debug.mock.calls)).not.toContain(base64)
+  })
+
+  it("puts the raw response, truncated, in the warn when it fails schema validation", async () => {
+    vi.useFakeTimers()
+    const raw = JSON.stringify({ wrong: "x".repeat(5000) })
+    complete.mockResolvedValue({ content: raw, promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 512 })
+
+    const result = run("ocr")
+    const assertion = expect(result).rejects.toThrow()
+    await drainTimers()
+    await assertion
+
+    const failed = warn.mock.calls.filter(([ message ]) => String(message).includes("failed"))
+    expect(failed).toHaveLength(3)
+    expect(failed[0][1].rawResponse).toBe(`${raw.slice(0, 2000)}… [truncated, ${raw.length} chars]`)
+  })
+
+  it("emits no request or response lines at info, but still the warn with the raw response", async () => {
+    vi.useFakeTimers()
+    const lines: string[] = []
+    const infoLogger = createLogger({ minLevel: "info", transport: (line) => lines.push(line) })
+    complete.mockResolvedValue({ content: JSON.stringify({ wrong: "x" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 512 })
+
+    const result = runAgent({
+      name: "ocr", promptVersion: "1.0.0", systemPrompt: "system", userContent: { textContent: "hello" }, schema,
+      signal: new AbortController().signal,
+      deps: { llm, logger: infoLogger, sampler: noopSampler, catalog: testCatalog, timeoutMs: TIMEOUT_MS },
+    })
+    const assertion = expect(result).rejects.toThrow()
+    await drainTimers()
+    await assertion
+
+    const entries = lines.map((line) => JSON.parse(line) as { level: string, message: string, rawResponse?: string })
+    expect(entries.filter((e) => e.message.endsWith(": request") || e.message.endsWith(": response"))).toEqual([])
+    expect(entries.every((e) => e.level !== "debug")).toBe(true)
+    expect(entries.some((e) => e.level === "warn" && e.rawResponse === JSON.stringify({ wrong: "x" }))).toBe(true)
+  })
+
+  it("warns without a raw response when the call itself fails", async () => {
+    vi.useFakeTimers()
+    complete.mockRejectedValue(new Error("boom"))
+
+    const result = run("ocr")
+    const assertion = expect(result).rejects.toThrow()
+    await drainTimers()
+    await assertion
+
+    expect(warn.mock.calls[0][1].rawResponse).toBeUndefined()
+  })
 
   it("sends the deps' timeout to the Llm", async () => {
     await run("ocr")

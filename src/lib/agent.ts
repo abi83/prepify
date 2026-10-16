@@ -71,6 +71,18 @@ export function sanitizeLLMText(s: string): string {
 }
 
 const MAX_ATTEMPTS = 3
+const MAX_LOGGED_RAW_CHARS = 2000
+
+/** Bounds model output echoed into warn lines; the full text goes to debug only. */
+export function truncateForLog(text: string): string {
+  if (text.length <= MAX_LOGGED_RAW_CHARS) return text
+  return `${text.slice(0, MAX_LOGGED_RAW_CHARS)}… [truncated, ${text.length} chars]`
+}
+
+// Image payloads are logged as sizes: a textbook photo (~200 KB base64) would blow Cloud Logging's 256 KB entry cap.
+function describeImages(images: AgentImage[] = []) {
+  return images.map(({ mimeType, base64 }) => ({ mimeType, bytes: Math.floor(base64.length * 3 / 4) }))
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -112,7 +124,11 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const t0 = performance.now()
+    let rawResponse: string | undefined
     logger.debug(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} started`, { model, tier, attempt, timeoutMs, ...promptIdentity })
+    logger.debug(`agent:${name}: request`, {
+      model, tier, attempt, ...promptIdentity, systemPrompt, textContent: userContent.textContent, images: describeImages(userContent.images),
+    })
 
     try {
       const response = await llm.complete(
@@ -131,6 +147,8 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       )
 
       const executionMs = Math.round(performance.now() - t0)
+      rawResponse = response.content
+      logger.debug(`agent:${name}: response`, { model, tier, attempt, ...promptIdentity, rawResponse })
 
       const rawText = sanitizeLLMText(response.content)
       const parsed = JSON.parse(rawText)
@@ -167,6 +185,7 @@ export async function runAgent<T>(config: RunAgentConfig<T>): Promise<AgentResul
       const retryable = !(err instanceof NonRetryableLlmError || (err instanceof Error && err.name === "AbortError"))
       logger.warn(`agent:${name}: attempt ${attempt}/${MAX_ATTEMPTS} failed${retryable ? "" : " (not retryable)"}`, {
         model, tier, attempt, timeoutMs, elapsedMs, ...promptIdentity, error: serializeError(err),
+        rawResponse: rawResponse === undefined ? undefined : truncateForLog(rawResponse),
       })
       lastError = err
       if (!retryable) throw err
