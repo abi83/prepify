@@ -112,7 +112,6 @@ model Attempt {
   id        String   @id @default(uuid())
   prepId    String
   userId    String
-  mode      String
   score     Int
   total     Int
   createdAt DateTime @default(now())

@@ -10,6 +10,6 @@ export async function listForPrep(userId: string, prepId: string): Promise<Attem
   })
 }
 
-export async function insert(userId: string, prepId: string, mode: string, score: number, total: number): Promise<Attempt> {
-  return prisma.attempt.create({ data: { prepId, userId, mode, score, total } })
+export async function insert(userId: string, prepId: string, score: number, total: number): Promise<Attempt> {
+  return prisma.attempt.create({ data: { prepId, userId, score, total } })
 }

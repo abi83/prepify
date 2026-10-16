@@ -1,11 +1,7 @@
 import type { Question } from "@prisma/client"
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect } from "vitest"
 
-vi.mock("@/actions/attempts", () => ({
-  insertAttempt: vi.fn().mockResolvedValue({}),
-}))
-
-import { isAnswerValid } from "@/components/attempt/AttemptFlow"
+import { isAnswerValid } from "@/components/attempt/questionUtils"
 import { emptyAnswer } from "@/components/questions/QuestionBody"
 
 const NO_ASSET = { needed: false, type: null, description: null } as const

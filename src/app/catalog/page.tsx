@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "Study Catalog",
-  description: "Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.",
+  description: "Browse publicly shared study sets — flashcards and practice questions for every subject.",
   openGraph: {
     title: "Study Catalog",
-    description: "Browse publicly shared study sets — flashcards, quizzes, and tests for every subject.",
+    description: "Browse publicly shared study sets — flashcards and practice questions for every subject.",
   },
 }
 

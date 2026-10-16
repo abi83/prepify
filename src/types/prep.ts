@@ -8,7 +8,7 @@ export type PrepDisciplineId =
   | "Biology" | "Chemistry" | "Physics" | "Mathematics" | "ComputerScience"
   | "English" | "French" | "German" | "Spanish" | "Italian" | "Latin" | "Russian"
 
-export const STUDY_TABS =[ "cards", "quiz", "test" ] as const
+export const STUDY_TABS = [ "flashcards", "questions" ] as const
 export type StudyTab = (typeof STUDY_TABS)[number]
 
 export function isStudyTab(value: string): value is StudyTab {
@@ -17,7 +17,7 @@ export function isStudyTab(value: string): value is StudyTab {
 
 /** Reads the `tab` query param, falling back to the default for anything absent or invalid. */
 export function parseStudyTab(value: string | null): StudyTab {
-  return value !== null && isStudyTab(value) ? value : "cards"
+  return value !== null && isStudyTab(value) ? value : "flashcards"
 }
 
 export type VisualElementType = "diagram" | "formula" | "table" | "chart" | "molecule" | "image"

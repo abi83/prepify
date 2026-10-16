@@ -21,7 +21,7 @@ export default function StudyPage({ prep, questions, assets }: Props) {
   const { searchParams, set: setUrlParams } = useUrlParams()
 
   const tab = parseStudyTab(searchParams.get("tab"))
-  const [ activeAttempt, setActiveAttempt ] = useState<"quiz" | "test" | null>(null)
+  const [ activeAttempt, setActiveAttempt ] = useState(false)
   const { data: session } = useSession()
   const userId = session?.user.id ?? null
 
@@ -36,7 +36,7 @@ export default function StudyPage({ prep, questions, assets }: Props) {
     return (
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <div className="flex items-center justify-between">
-          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => setActiveAttempt(null)}>
+          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => setActiveAttempt(false)}>
             ← Back to Study
           </Button>
           {!userId && (
@@ -46,10 +46,9 @@ export default function StudyPage({ prep, questions, assets }: Props) {
         <AttemptFlow
           questions={studyQuestions}
           assets={assets}
-          mode={activeAttempt}
           prepId={prep.id}
           userId={userId}
-          onExit={() => setActiveAttempt(null)}
+          onExit={() => setActiveAttempt(false)}
         />
       </main>
     )
@@ -72,7 +71,8 @@ export default function StudyPage({ prep, questions, assets }: Props) {
           onTabChange={setTab}
           flashcards={flashcards}
           studyQuestions={studyQuestions}
-          onStartAttempt={setActiveAttempt}
+          assets={assets}
+          onStartAttempt={() => setActiveAttempt(true)}
         />
       )}
     </main>
