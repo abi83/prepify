@@ -1,13 +1,23 @@
 "use server"
 
 import type { PrepImage } from "@prisma/client"
+import { revalidatePath } from "next/cache"
 
+import { deletePrepObjects } from "@/actions/uploads"
 import { requireUserId } from "@/lib/currentUser"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import type { OcrResult } from "@/types/prep"
 
 export async function createPrepImage(prepId: string, gcsKey: string): Promise<PrepImage> {
-  return prepImageRepository.createImage(await requireUserId(), prepId, gcsKey)
+  const image = await prepImageRepository.createImage(await requireUserId(), prepId, gcsKey)
+  revalidatePath(`/preps/${prepId}`)
+  return image
+}
+
+export async function deleteMyPrepImage(imageId: string): Promise<void> {
+  const image = await prepImageRepository.deleteImage(await requireUserId(), imageId)
+  await deletePrepObjects([ image.gcsKey ])
+  revalidatePath(`/preps/${image.prepId}`)
 }
 
 export async function listMyPrepImages(prepId: string): Promise<PrepImage[]> {

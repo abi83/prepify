@@ -28,6 +28,15 @@ export async function listImages(userId: string, prepId: string): Promise<PrepIm
   return prisma.prepImage.findMany({ where: { prepId }, orderBy: { createdAt: "asc" } })
 }
 
+/** Deletes a draft prep's image row and returns it, so the caller can remove its GCS object. */
+export async function deleteImage(userId: string, imageId: string): Promise<PrepImage> {
+  const image = await assertOwnsImage(userId, imageId)
+  const prep = await prisma.prep.findUniqueOrThrow({ where: { id: image.prepId } })
+  if (prep.isActive) throw new Error(`PrepImage ${imageId} belongs to an active prep and can't be removed`)
+  await prisma.prepImage.delete({ where: { id: imageId } })
+  return image
+}
+
 /** Moves a row to `processing` — the only valid predecessor for both a first OCR attempt (`pending`)
  *  and a retry of a previously failed one (`failed`). Clears any stale error from a prior attempt. */
 export async function startProcessing(userId: string, imageId: string): Promise<void> {

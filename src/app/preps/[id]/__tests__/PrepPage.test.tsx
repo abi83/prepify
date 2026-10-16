@@ -1,8 +1,19 @@
 import type { Attempt, Prep, PrepImage, Question } from "@prisma/client"
-import { render, screen, within } from "@testing-library/react"
+import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useRouter } from "next/navigation"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+
+const h = vi.hoisted(() => ({
+  runOcr: vi.fn(),
+  requestServerRun: vi.fn(),
+  awaitRunStart: vi.fn(),
+  updatePrep: vi.fn(),
+  listMyPrepImages: vi.fn(),
+  deleteMyPrepImage: vi.fn(),
+  uploadPrepImage: vi.fn(),
+  getApiKey: vi.fn(),
+}))
 
 vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
 vi.mock("next/navigation", async () => {
@@ -11,17 +22,22 @@ vi.mock("next/navigation", async () => {
 })
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "u1" } } }) }))
 vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: vi.fn() }))
-vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn(), deletePrep: vi.fn() }))
+vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn(), deletePrep: vi.fn(), updatePrep: h.updatePrep }))
+vi.mock("@/actions/prepImages", () => ({ listMyPrepImages: h.listMyPrepImages, deleteMyPrepImage: h.deleteMyPrepImage, createPrepImage: vi.fn() }))
 vi.mock("@/actions/jobs", () => ({ retryTerminalJobs: vi.fn() }))
 vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
-vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: vi.fn() }))
+vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: vi.fn().mockResolvedValue("https://gcs/signed"), getUploadSignedUrl: vi.fn() }))
 vi.mock("@/actions/attempts", () => ({ insertAttempt: vi.fn() }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
-vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: vi.fn() }))
-vi.mock("@/lib/apiKey", () => ({ getApiKey: () => null }))
+vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: vi.fn(), runOcr: h.runOcr }))
+vi.mock("@/lib/jobs/serverRunClient", () => ({ requestServerRun: h.requestServerRun, awaitRunStart: h.awaitRunStart }))
+vi.mock("@/lib/prepImageUpload", async importActual => ({ ...await importActual<typeof import("@/lib/prepImageUpload")>(), uploadPrepImage: h.uploadPrepImage }))
+vi.mock("@/lib/apiKey", () => ({ getApiKey: h.getApiKey }))
 
 import PrepPage from "@/app/preps/[id]/PrepPage"
+import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { formatDate } from "@/lib/format"
+import { clearUploads } from "@/lib/uploadQueue"
 import type { JobGeneration, StatedConcept } from "@/repositories/prepStateRepository"
 
 const prep: Prep = {
@@ -70,7 +86,11 @@ function renderPage(concepts: StatedConcept[], { images = [], questions = [], at
 }
 
 // The navigation mock keeps the URL across tests.
-beforeEach(() => useRouter().replace("?"))
+beforeEach(() => {
+  vi.clearAllMocks()
+  useRouter().replace("?")
+  h.getApiKey.mockReturnValue(null)
+})
 
 const openTab = (name: RegExp) => userEvent.click(screen.getByRole("tab", { name }))
 
@@ -185,5 +205,157 @@ describe("PrepPage generation log", () => {
     const log = screen.getByRole("heading", { name: "Generation log" }).closest("section")!
     expect(log).toHaveTextContent("gpt-5-nano · flex · 10 in / 5 out · $0.500")
     expect(log).toHaveTextContent("gpt-5-mini · flex · 20 in / 5 out · $0.100")
+  })
+})
+
+describe("PrepPage draft", () => {
+  const draft: Prep = { ...prep, isActive: false }
+  const KEY = { provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }
+  const imageRow = (id: string, ocrText: string | null = null): PrepImage => ({
+    id, prepId: "p1", gcsKey: `prep-pages/p1/page-${id}.png`, status: "pending", error: null, language: null, producedByJobId: null,
+    ocrResult: ocrText === null ? null : { title: "t", text: ocrText, visual_elements: [] }, createdAt: CREATED_AT, updatedAt: CREATED_AT,
+  })
+
+  function renderDraft(images: PrepImage[] = []) {
+    return render(
+      <PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={images} generations={{}} />,
+    )
+  }
+
+  const prepMe = () => screen.getByRole("button", { name: "Prep me" })
+
+  beforeEach(() => {
+    clearUploads("p1")
+    localStorage.clear()
+    h.runOcr.mockResolvedValue(undefined)
+    h.requestServerRun.mockResolvedValue("triggered")
+    h.awaitRunStart.mockResolvedValue(undefined)
+    h.updatePrep.mockResolvedValue(undefined)
+    h.deleteMyPrepImage.mockResolvedValue(undefined)
+    h.listMyPrepImages.mockResolvedValue([ imageRow("0", "some text") ])
+  })
+
+  it("renders the draft view instead of the tabs, with the persisted images", async () => {
+    renderDraft([ imageRow("0"), imageRow("1") ])
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument()
+    expect(await screen.findByAltText("Page 2")).toHaveAttribute("src", "https://gcs/signed")
+    expect(screen.getByText("2 / 10 pages")).toBeInTheDocument()
+  })
+
+  it("keeps rendering a prep with jobs as before", () => {
+    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
+    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} />)
+    expect(screen.getAllByRole("tab")).not.toHaveLength(0)
+  })
+
+  it("disables Prep me with no images, enables it with one", () => {
+    const { unmount } = renderDraft([])
+    expect(prepMe()).toBeDisabled()
+    unmount()
+    renderDraft([ imageRow("0") ])
+    expect(prepMe()).toBeEnabled()
+  })
+
+  it("disables Prep me while an added image uploads, and enables it once persisted", async () => {
+    let finish: (image: { id: string }) => void = () => {}
+    h.uploadPrepImage.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    renderDraft([ imageRow("0") ])
+
+    await userEvent.upload(document.querySelector("input[type=file]:not([capture])")!, new File([ "x" ], "new.png", { type: "image/png" }))
+    expect(await screen.findByRole("status", { name: "Uploading page 2" })).toBeInTheDocument()
+    expect(h.uploadPrepImage).toHaveBeenCalledWith("p1", 1, expect.any(File))
+    expect(prepMe()).toBeDisabled()
+
+    act(() => finish({ id: "new" }))
+    await waitFor(() => expect(prepMe()).toBeEnabled())
+  })
+
+  it("disables Prep me after a failed upload until the image is removed", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    h.uploadPrepImage.mockRejectedValue(new Error("boom"))
+    renderDraft([ imageRow("0") ])
+
+    await userEvent.upload(document.querySelector("input[type=file]:not([capture])")!, new File([ "x" ], "bad.png", { type: "image/png" }))
+    expect(await screen.findByRole("img", { name: "Page 2 failed to upload" })).toBeInTheDocument()
+    expect(prepMe()).toBeDisabled()
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove page 2" }))
+    expect(h.deleteMyPrepImage).not.toHaveBeenCalled()
+    expect(prepMe()).toBeEnabled()
+  })
+
+  it("removes a persisted image on the server", async () => {
+    renderDraft([ imageRow("0"), imageRow("1") ])
+    await userEvent.click(screen.getByRole("button", { name: "Remove page 2" }))
+    expect(h.deleteMyPrepImage).toHaveBeenCalledWith("1")
+  })
+
+  it("asks for the execution mode first, then runs OCR in the browser and activates the prep", async () => {
+    h.getApiKey.mockReturnValue(KEY)
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    expect(await screen.findByRole("heading", { name: /where should your prep run/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }))
+
+    await waitFor(() => expect(h.updatePrep).toHaveBeenCalledWith("p1", { isActive: true }))
+    expect(h.runOcr).toHaveBeenCalledOnce()
+    expect(h.requestServerRun).not.toHaveBeenCalled()
+    expect(useRouter().refresh).toHaveBeenCalled()
+  })
+
+  it("runs on the server with the saved preference", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    h.getApiKey.mockReturnValue(KEY)
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    await waitFor(() => expect(h.awaitRunStart).toHaveBeenCalledWith("p1"))
+    expect(h.updatePrep).toHaveBeenCalledWith("p1", { isActive: true })
+    expect(h.requestServerRun).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-secret", prepId: "p1", model: "gpt-5-mini", tier: "flex" }))
+    expect(h.runOcr).not.toHaveBeenCalled()
+    expect(useRouter().refresh).toHaveBeenCalled()
+  })
+
+  it("shows the error when the server rejects the run", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    h.getApiKey.mockReturnValue(KEY)
+    h.requestServerRun.mockRejectedValue(new Error("You are signed out. Sign in again."))
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    expect(await screen.findByText(/signed out/i)).toBeInTheDocument()
+    expect(useRouter().refresh).not.toHaveBeenCalled()
+  })
+
+  it("shows an error when no API key is configured", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    expect(await screen.findByText(/No API key configured/)).toBeInTheDocument()
+    expect(h.runOcr).not.toHaveBeenCalled()
+  })
+
+  it("shows an error when OCR finds no text", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    h.getApiKey.mockReturnValue(KEY)
+    h.listMyPrepImages.mockResolvedValue([ imageRow("0", "  ") ])
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    expect(await screen.findByText(/No text detected/)).toBeInTheDocument()
+    expect(h.updatePrep).not.toHaveBeenCalled()
+  })
+
+  it("shows an error when the extracted text is over the limit", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    h.getApiKey.mockReturnValue(KEY)
+    h.listMyPrepImages.mockResolvedValue([ imageRow("0", "x".repeat(BYOK_TEXT_HARD_LIMIT + 1)) ])
+    renderDraft([ imageRow("0") ])
+    await userEvent.click(prepMe())
+
+    expect(await screen.findByText(/character limit/)).toBeInTheDocument()
+    expect(h.updatePrep).not.toHaveBeenCalled()
   })
 })
