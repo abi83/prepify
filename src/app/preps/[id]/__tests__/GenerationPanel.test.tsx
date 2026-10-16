@@ -10,6 +10,28 @@ const { mockPush, mockRefresh, mockGetProgress, mockRunInBrowser, mockRetryTermi
   mockRunInBrowser: vi.fn(),
 }))
 
+const mockSse = vi.hoisted(() => {
+  const doneListeners: (() => void)[] = []
+  const inst = {
+    onmessage: null as ((e: MessageEvent) => void) | null,
+    onerror: null as ((e: Event) => void) | null,
+    close: vi.fn(),
+    addEventListener: vi.fn((event: string, handler: () => void) => {
+      if (event === "done") doneListeners.push(handler)
+    }),
+    message(data: object) { inst.onmessage?.({ data: JSON.stringify(data) } as MessageEvent) },
+    done() { doneListeners.forEach(h => h()) },
+    reset() {
+      inst.close.mockClear()
+      inst.addEventListener.mockClear()
+      inst.onmessage = null
+      inst.onerror = null
+      doneListeners.length = 0
+    },
+  }
+  return inst
+})
+
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
 vi.mock("sonner", () => ({ toast: { error: toastError } }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush, refresh: mockRefresh }) }))
@@ -24,7 +46,6 @@ vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: 
 
 import { getMyPrep } from "@/actions/preps"
 import GenerationPanel from "@/app/preps/[id]/GenerationPanel"
-import { POLL_INTERVAL_MS } from "@/app/preps/[id]/useRunProgress"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
 
 const fetchMock = vi.fn()
@@ -50,6 +71,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   vi.stubGlobal("fetch", fetchMock)
+  vi.stubGlobal("EventSource", class { constructor() { return mockSse as never } })
+  mockSse.reset()
   fetchMock.mockResolvedValue({ status: 202 })
   mockGetProgress.mockResolvedValue(progress())
 })
@@ -149,23 +172,18 @@ describe("GenerationPanel progress from the DB", () => {
     expect(screen.getByText("(1/3)")).toBeInTheDocument()
   })
 
-  it("polls while a server run is live and refreshes the page when it ends", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    mockGetProgress.mockResolvedValueOnce(progress({ runState: "running", totalQuestions: 4, completedQuestions: 1 }))
-    mockGetProgress.mockResolvedValueOnce(progress({ totalQuestions: 4, completedQuestions: 4 }))
+  it("opens an SSE stream while a server run is live and refreshes the page when it ends", async () => {
     renderPanel(progress({ runState: "running", totalQuestions: 4 }))
     expect(screen.getByText(/running on the server/i)).toBeInTheDocument()
 
-    await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS))
-    expect(mockGetProgress).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      mockSse.message(progress({ runState: "running", totalQuestions: 4, completedQuestions: 1 }))
+    })
     expect(mockRefresh).not.toHaveBeenCalled()
 
-    await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS))
-    expect(mockGetProgress).toHaveBeenCalledTimes(2)
+    await act(async () => { mockSse.done() })
     expect(mockRefresh).toHaveBeenCalledOnce()
-
-    await act(() => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2))
-    expect(mockGetProgress).toHaveBeenCalledTimes(2)
+    expect(mockSse.close).toHaveBeenCalled()
   })
 
   it("offers a resume for interrupted jobs that re-sends the key to the same endpoint", async () => {
