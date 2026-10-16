@@ -39,13 +39,9 @@
     "version": "1.1.0",
     "hash": "00c5d3d9df8b031655e33e207df14c1216f40937cb452afe9bd2565ae65a6753"
   },
-  "prep-labeler": {
+  "prep-meta": {
     "version": "1.0.0",
-    "hash": "0fc709396de9bd708fe7ae6ccfe148406b8a9fcc8b98f5ed1322d9fce0732278"
-  },
-  "prep-namer": {
-    "version": "1.0.0",
-    "hash": "abe0bda8930dbf064570c140d16d9e9dc6b0e17bca63a1d2772bbc951a79dae2"
+    "hash": "82569b7fc2bd17b31a4926b1011977a0e34865fe111826661252f1e0bb40ada7"
   },
   "question-reviewer": {
     "version": "1.0.0",

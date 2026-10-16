@@ -1,12 +1,10 @@
 import type { JobRunResult } from "@/core/job"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
-import { runPrepLabeler } from "@/lib/agents/PrepLabeler"
-import { runPrepNamer } from "@/lib/agents/PrepNamer"
+import { runPrepMeta } from "@/lib/agents/PrepMeta"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
 import { resolveLanguage } from "@/lib/language"
-import type { StoredConcept } from "@/types/pipeline"
-import type { PrepDisciplineId } from "@/types/prep"
+import type { Page, PrepDisciplineId } from "@/types/prep"
 
 import { PREP_META_JOB_TYPE } from "./jobTypes"
 
@@ -18,31 +16,29 @@ export interface PrepMetaOutput {
 }
 
 /**
- * One job per set of `Concept` ids — `inputIds` are those rows' ids. `concepts` must already be
- * fetched by the caller; this wraps `PrepNamer` and `PrepLabeler` (the same agents
- * `ShareModal.tsx` calls).
+ * One job per prep — `inputIds` are the `PrepImage` ids, `pages` their OCR results in page order,
+ * fetched by the caller.
  */
-export function createPrepMetaJobDefinition(concepts: StoredConcept[], deps: JobDeps): JobDefinition<PrepMetaOutput> {
-  const language = resolveLanguage(concepts)
+export function createPrepMetaJobDefinition(pages: Pick<Page, "text" | "language">[], deps: JobDeps): JobDefinition<PrepMetaOutput> {
+  const language = resolveLanguage(pages)
+  const pageTexts = pages.map(page => page.text)
   return {
     type: PREP_META_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<PrepMetaOutput>> {
       const { model, tier, timeoutMs } = ctx.job.config
-      const agentDeps = { ...deps, timeoutMs }
 
-      const [ named, labeled ] = await Promise.all([
-        runPrepNamer(concepts, model, tier, language, ctx.signal, agentDeps),
-        runPrepLabeler(concepts, model, tier, ctx.signal, agentDeps),
-      ])
+      const { output, meta } = await runPrepMeta(pageTexts, language, model, tier, ctx.signal, { ...deps, timeoutMs })
 
-      const output: PrepMetaOutput = {
-        title: named.output.title,
-        description: named.output.description,
-        grade: labeled.output.grade,
-        discipline: disciplineToEnum(labeled.output.discipline),
+      return {
+        output: {
+          title: output.title,
+          description: output.description,
+          grade: output.grade,
+          discipline: disciplineToEnum(output.discipline),
+        },
+        metas: [ meta ],
+        wastedMetas: [],
       }
-
-      return { output, metas: [ named.meta, labeled.meta ], wastedMetas: [] }
     },
   }
 }

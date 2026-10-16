@@ -19,8 +19,7 @@ const RESPONSES: Record<string, unknown> = {
     concepts: [ { name: "Mitosis", description: "Division of a cell nucleus into two identical daughter nuclei.", importance: 0.9, misconceptions: [] } ],
     emptyReason: null,
   },
-  PrepNamer: { title: "Mitosis Basics", description: "Covers mitosis, the process by which a cell nucleus divides into two identical daughter nuclei." },
-  PrepLabeler: { grade: 9, discipline: "Biology", confidence: 0.9 },
+  PrepMeta: { title: "Mitosis Basics", description: "Covers mitosis, the process by which a cell nucleus divides into two identical daughter nuclei.", grade: 9, discipline: "Biology" },
   FlashcardBuilder: {
     content: { front: "Which process splits a nucleus into two identical nuclei?", back: "Mitosis", back_explanation: "Mitosis yields identical daughter nuclei.", asset_hint: { needed: false, type: null, description: null } },
   },
@@ -59,14 +58,14 @@ const options = (prepDir: string, llm: Llm) => ({
 })
 
 describe("CLI root", () => {
-  it("runs OCR → concepts → meta → questions on a prep directory with a fake Llm", async () => {
+  it("runs OCR → concepts + meta → questions on a prep directory with a fake Llm", async () => {
     const dir = await makePrepFixture()
     const calls: string[] = []
 
     await runCli(options(dir, fakeLlm(calls)))
 
     expect(calls[0]).toBe("ocr")
-    expect(calls).toEqual(expect.arrayContaining([ "ConceptExtractor", "PrepNamer", "PrepLabeler", "FlashcardBuilder", "QuestionReviewer" ]))
+    expect(calls).toEqual(expect.arrayContaining([ "ConceptExtractor", "PrepMeta", "FlashcardBuilder", "QuestionReviewer" ]))
     expect(await createFilePrep(dir).data.loadState("p")).toMatchObject({
       images: [ { id: "page-1", ocrDone: true } ],
       concepts: [ { name: "Mitosis" } ],
@@ -143,7 +142,7 @@ describe("CLI root", () => {
     await expect(runCli(options(dir, noConcepts))).rejects.toThrow("No concepts found in any page (not_educational)")
 
     expect(calls.filter(name => name === "ConceptExtractor")).toHaveLength(1)
-    expect(calls).not.toContain("PrepNamer")
+    expect(calls.filter(name => name === "PrepMeta")).toHaveLength(1)
   })
 
   it("fails a concepts.extract job whose input image has no OCR language", async () => {

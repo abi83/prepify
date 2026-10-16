@@ -14,6 +14,9 @@ export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   uk: "Українська",
 }
 
+/** Most pages (images) one prep may have. */
+export const MAX_IMAGES = 10
+
 /** Largest serialized page ConceptExtractor accepts; a larger one is a broken OCR result, not a case to split. */
 export const MAX_PAGE_CHARS = 15_000
 

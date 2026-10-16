@@ -2,8 +2,8 @@ import type { PrepImage } from "@prisma/client"
 
 import { createPrepImage } from "@/actions/prepImages"
 import { getUploadSignedUrl } from "@/actions/uploads"
+import { MAX_IMAGES } from "@/lib/config"
 
-export const MAX_IMAGES = 10
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
 /** Picks the files that fit into the `MAX_IMAGES` budget. Any oversized file rejects the whole selection. */
