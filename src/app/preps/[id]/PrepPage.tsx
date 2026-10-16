@@ -128,7 +128,7 @@ export default function PrepPage({
 
       <DeletePrepDialog prep={prep} open={deleteOpen} onOpenChange={setDeleteOpen} />
       {shareOpen && isOwner && (
-        <SharePrepDialog prep={prep} concepts={concepts} onSaved={setPrep} onClose={() => setShareOpen(false)} />
+        <SharePrepDialog prep={prep} onSaved={setPrep} onClose={() => setShareOpen(false)} />
       )}
     </main>
   )

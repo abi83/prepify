@@ -2,7 +2,7 @@
 
 import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepLabeler"
+import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepMeta"
 import { LANGUAGE_LABELS, type SupportedLanguage } from "@/lib/config"
 import { disciplineFromEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"

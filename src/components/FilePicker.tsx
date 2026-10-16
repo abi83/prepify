@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react"
 import { createPrepImage } from "@/actions/prepImages"
 import { listMyPreps, createPrep } from "@/actions/preps"
 import { getUploadSignedUrl } from "@/actions/uploads"
+import { MAX_IMAGES } from "@/lib/config"
 
 import { Button } from "./ui/button"
 
-const MAX_IMAGES = 10
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
 type UploadStatus = "uploading" | "done" | "error"

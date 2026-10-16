@@ -1,9 +1,10 @@
 import type { Evaluator } from "@evals/evaluator"
 
 import { ocrEvaluator } from "./ocr"
+import { prepMetaEvaluator } from "./prepMeta"
 
 /** Register an agent's evaluator here. */
-const EVALUATORS: Evaluator[] = [ ocrEvaluator ]
+const EVALUATORS: Evaluator[] = [ ocrEvaluator, prepMetaEvaluator ]
 
 export function getEvaluator(agent: string): Evaluator {
   const evaluator = EVALUATORS.find(e => e.agent === agent)

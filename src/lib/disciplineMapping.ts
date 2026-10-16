@@ -1,6 +1,6 @@
 import type { PrepDisciplineId } from "@/types/prep"
 
-import type { Discipline } from "./agents/PrepLabeler"
+import type { Discipline } from "./agents/PrepMeta"
 
 /**
  * Prisma's generated enum values are identifier-safe ('SocialStudies'), while

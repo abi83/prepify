@@ -1,11 +1,13 @@
 import { after, NextResponse } from "next/server"
 
 import { auth } from "@/lib/auth"
+import { MAX_IMAGES } from "@/lib/config"
 import { acquirePrepRun, releasePrepRun, RunInProgressError, runServerGeneration, serverRunRequestSchema } from "@/lib/jobs/serverRun"
 import { assertModelAndTier } from "@/lib/modelCatalog"
 import { loadModelCatalog } from "@/lib/modelCatalogFile"
 import { withHandler } from "@/lib/withHandler"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
+import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 
 // Cloud Run request timeout must match; `after()` work is cut off at this duration.
@@ -30,6 +32,8 @@ export const POST = withHandler(async req => {
   try {
     const prep = await prepRepository.getPrep(userId, prepId)
     if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} is not owned by ${userId}`)
+    const pageCount = (await prepImageRepository.listImages(userId, prepId)).length
+    if (pageCount > MAX_IMAGES) return error(`A prep has at most ${MAX_IMAGES} pages, got ${pageCount}`, 400)
     await acquirePrepRun(prepId)
   } catch (e) {
     if (e instanceof NotFoundError) return error("Prep not found", 404)

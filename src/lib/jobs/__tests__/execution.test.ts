@@ -56,10 +56,10 @@ const params = (concurrency: number): ExecutionParams => ({
 })
 
 describe("executePrep", () => {
-  it("chains OCR → concept extraction → concepts → prep.meta → question jobs until the target is met", async () => {
+  it("chains OCR → concept extraction + prep.meta → concepts → question jobs until the target is met", async () => {
     const { deps, ran } = fakeDeps()
     await executePrep(deps, params(2))
-    expect(ran).toEqual([ "ocr", "concepts.extract", "concepts", "prep.meta", "question", "question", "question", "asset" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract", "prep.meta", "concepts", "question", "question", "question", "asset" ])
   })
 
   it("plans an asset job per question needing one after the question jobs", async () => {
@@ -82,12 +82,12 @@ describe("executePrep", () => {
   it("throws when a stage fails instead of re-planning it", async () => {
     const { deps, ran } = fakeDeps("concepts")
     await expect(executePrep(deps, params(2))).rejects.toThrow(/boom/)
-    expect(ran).toEqual([ "ocr", "concepts.extract" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract", "prep.meta" ])
   })
 
   it("throws once, without re-planning, when no page yields concepts", async () => {
     const { deps, ran } = fakeDeps(undefined, { status: "empty", reason: "not_educational" })
     await expect(executePrep(deps, params(2))).rejects.toThrow("No concepts found in any page (not_educational)")
-    expect(ran).toEqual([ "ocr", "concepts.extract" ])
+    expect(ran).toEqual([ "ocr", "concepts.extract", "prep.meta" ])
   })
 })
