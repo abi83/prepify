@@ -38,7 +38,7 @@ import PrepPage from "@/app/preps/[id]/PrepPage"
 import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
 import { formatDate } from "@/lib/format"
 import { clearUploads } from "@/lib/uploadQueue"
-import type { JobGeneration, StatedConcept } from "@/repositories/prepStateRepository"
+import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "private",
@@ -77,11 +77,11 @@ const question = (id: string, producedByJobId: string): Question =>
     },
   })
 
-interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attempts?: Attempt[]; generations?: Record<string, JobGeneration>; tokensUsed?: number; costUsd?: number }
+interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attempts?: Attempt[]; progress?: PrepProgress | null; generations?: Record<string, JobGeneration>; tokensUsed?: number; costUsd?: number }
 
-function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], generations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
+function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], progress = null, generations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
   return render(
-    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={null} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} />,
+    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={progress} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} />,
   )
 }
 
@@ -163,20 +163,34 @@ describe("PrepPage shell", () => {
     expect(screen.getByRole("banner")).toHaveTextContent("1,300 tokens · $0.002")
   })
 
-  it("Main previews questions and lists the attempt history", () => {
-    const attempt: Attempt = { id: "at1", prepId: "p1", userId: "u1", score: 3, total: 4, createdAt: CREATED_AT }
-    renderPage([], { questions: [ flashcard("f1"), question("a", "q1") ], attempts: [ attempt ] })
+  it("Main summarizes progress: stats, history and tile links", async () => {
+    const attempts: Attempt[] = [
+      { id: "at2", prepId: "p1", userId: "u1", score: 3, total: 4, createdAt: CREATED_AT },
+      { id: "at1", prepId: "p1", userId: "u1", score: 2, total: 4, createdAt: CREATED_AT },
+    ]
+    renderPage([ concept() ], { questions: [ flashcard("f1"), question("a", "q1") ], attempts })
     const main = screen.getByRole("tabpanel")
-    expect(within(main).getByText("Question a?")).toBeInTheDocument()
+    expect(within(main).queryByText("Question a?")).not.toBeInTheDocument()
     expect(within(main).getByRole("button", { name: "Start attempt" })).toBeEnabled()
     expect(within(main).getByRole("list", { name: "Attempt history" })).toHaveTextContent("3/4 (75%)")
+    expect(within(main).getByText("75% (+25 pts)")).toBeInTheDocument()
+    expect(within(main).getByRole("img", { name: "Scores: 50%, 75%" })).toBeInTheDocument()
+    expect(within(main).getByRole("list", { name: "Concept names" })).toHaveTextContent("Mitosis")
+    await userEvent.click(within(main).getByRole("button", { name: /^Flashcards/ }))
+    expect(screen.getByRole("tab", { name: /^Flashcards/ })).toHaveAttribute("aria-selected", "true")
   })
 
-  it("with no questions, Main points to the Generation tab", async () => {
-    renderPage([])
-    await userEvent.click(screen.getByRole("button", { name: "Go to Generation" }))
-    expect(screen.getByRole("tab", { name: "Generation" })).toHaveAttribute("aria-selected", "true")
-    expect(screen.getByRole("button", { name: "Generate questions" })).toBeVisible()
+  it("with no questions, Main disables Start attempt and shows generation status", () => {
+    const progress: PrepProgress = {
+      runState: "idle", totalPages: 3, ocrPages: 3, hasConcepts: false,
+      totalQuestions: 10, completedQuestions: 0, failedQuestions: 1, terminalQuestions: 0,
+    }
+    renderPage([], { progress })
+    const main = screen.getByRole("tabpanel")
+    expect(within(main).getByRole("button", { name: "Start attempt" })).toBeDisabled()
+    expect(within(main).getByRole("button", { name: /^Questions/ })).toHaveTextContent("0/10 generated · 1 failed")
+    expect(within(main).getByRole("button", { name: /^Concepts/ })).toHaveTextContent("pending")
+    expect(within(main).getByText("No attempts yet.")).toBeInTheDocument()
   })
 
   it.each([ "Audio", "Video" ])("%s is a placeholder tab", async name => {
