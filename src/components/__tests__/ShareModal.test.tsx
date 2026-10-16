@@ -2,36 +2,17 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("@/actions/modelCatalog", async () => ({ getModelCatalog: async () => (await import("@/test/modelCatalog")).testCatalog }))
 const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }))
-vi.mock("@/actions/samples", () => ({ getSampleRate: vi.fn(), recordSample: vi.fn() }))
 vi.mock("@/actions/preps", () => ({
   updatePrep: vi.fn().mockResolvedValue({}),
 }))
-
-vi.mock("@/lib/agents/PrepLabeler", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/agents/PrepLabeler")>(
-    "@/lib/agents/PrepLabeler",
-  )
-  return {
-    ...actual,
-    runPrepLabeler: vi.fn().mockResolvedValue({
-      output: { grade: 9, discipline: "Biology", confidence: 0.9 },
-      meta: { model: "gpt-5-nano", tier: "flex", promptTokens: 50, cachedTokens: 0, completionTokens: 20, totalTokens: 70, costUsd: 0.0001, toolCalls: 0, executionMs: 100 },
-    }),
-  }
-})
 
 import { updatePrep } from "@/actions/preps"
 import ShareModal from "@/components/ShareModal"
 
 const baseProps = {
   prepId: "prep-123",
-  concepts: [],
-  apiKey: "sk-test",
-  model: "gpt-5-nano",
-  tier: "flex",
   initialVisibility: "private" as const,
   initialGrade: null,
   initialDiscipline: null,

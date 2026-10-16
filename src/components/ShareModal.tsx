@@ -1,16 +1,10 @@
 import type { PrepVisibility } from "@prisma/client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import { toast } from "sonner"
 
-import { getModelCatalog } from "@/actions/modelCatalog"
 import { updatePrep } from "@/actions/preps"
-import { runPrepLabeler, DISCIPLINES, type Discipline } from "@/lib/agents/PrepLabeler"
-import { DEFAULT_TIMEOUT_MS } from "@/lib/config"
+import { DISCIPLINES, type Discipline } from "@/lib/agents/PrepMeta"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
-import { OpenAiLlm } from "@/lib/llm/openAiLlm"
-import { consoleLogger } from "@/lib/logger"
-import { clientSampler } from "@/lib/sampler/clientSampler"
-import type { Concept } from "@/types/pipeline"
 
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
@@ -20,10 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 
 interface Props {
   prepId: string
-  concepts: Concept[]
-  apiKey: string
-  model: string
-  tier: string
   initialVisibility: PrepVisibility
   initialGrade: number | null
   initialDiscipline: Discipline | null
@@ -31,17 +21,11 @@ interface Props {
   onClose: () => void
 }
 
-type LabelPhase = "loading" | "done" | "error"
-
 const GRADE_OPTIONS = Array.from({ length: 13 }, (_, i) => i + 1)
 const UNSET = "__unset__"
 
 export default function ShareModal({
   prepId,
-  concepts,
-  apiKey,
-  model,
-  tier,
   initialVisibility,
   initialGrade,
   initialDiscipline,
@@ -53,42 +37,13 @@ export default function ShareModal({
   )
   const [ grade, setGrade ] = useState<number | null>(initialGrade)
   const [ discipline, setDiscipline ] = useState<Discipline | null>(initialDiscipline)
-  const needsLabeling = initialVisibility === "private"
-        && initialGrade === null && initialDiscipline === null
-        && concepts.length > 0 && !!apiKey
-  const [ labelPhase, setLabelPhase ] = useState<LabelPhase>(needsLabeling ? "loading" : "done")
-  const [ lowConfidence, setLowConfidence ] = useState(false)
   const [ saving, setSaving ] = useState(false)
   const [ copied, setCopied ] = useState(false)
   const [ saved, setSaved ] = useState(initialVisibility !== "private")
-  const abortRef = useRef<AbortController | null>(null)
   // ShareModal is mounted/unmounted by its parent rather than opened via a
   // DialogTrigger, so Radix has no trigger element to return focus to on
   // close — capture it ourselves and restore it in onCloseAutoFocus below.
   const triggerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null)
-
-  useEffect(() => {
-    if (!needsLabeling) return
-
-    const ac = new AbortController()
-    abortRef.current = ac
-
-    getModelCatalog().then(catalog =>
-      runPrepLabeler(concepts, model, tier, ac.signal, { llm: new OpenAiLlm({ apiKey }), logger: consoleLogger, sampler: clientSampler, catalog, timeoutMs: DEFAULT_TIMEOUT_MS })
-    ).then(result => {
-      if (ac.signal.aborted) return
-      setGrade(prev => prev ?? result.output.grade)
-      setDiscipline(prev => prev ?? result.output.discipline)
-      setLowConfidence(result.output.confidence <= 0.5)
-      setLabelPhase("done")
-    }).catch(() => {
-      if (!ac.signal.aborted) setLabelPhase("error")
-    })
-
-    return () => ac.abort()
-    // Runs once on mount only — deps captured are the mount-time values on purpose.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   async function handleConfirm() {
     setSaving(true)
@@ -162,23 +117,6 @@ export default function ShareModal({
           </div>
         ) : (
           <>
-            {labelPhase === "loading" && (
-              <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-primary" />
-                <span>Detecting subject and grade…</span>
-              </div>
-            )}
-
-            {labelPhase === "error" && (
-              <p className="text-sm text-muted-foreground">Could not auto-detect subject — you can set it manually below.</p>
-            )}
-
-            {lowConfidence && labelPhase === "done" && (
-              <p className="rounded-md border border-error/30 bg-error/5 px-3.5 py-2.5 text-sm text-muted-foreground">
-                This material doesn&apos;t look like school curriculum. Grade and subject may not apply.
-              </p>
-            )}
-
             <div className="flex flex-col gap-2">
               <Label>Visibility</Label>
               <div className="flex gap-2">
@@ -242,7 +180,7 @@ export default function ShareModal({
 
             <div className="mt-1 flex justify-end gap-2.5">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={saving || labelPhase === "loading"}>
+              <Button onClick={handleConfirm} disabled={saving}>
                 {saving ? "Publishing…" : "Publish"}
               </Button>
             </div>

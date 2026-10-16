@@ -55,7 +55,7 @@ describe("nextJobs", () => {
 
   it("plans one concepts.extract job per image once OCR is done", () => {
     const images = [ { id: "i1", ocrDone: true, concepts: PENDING }, { id: "i2", ocrDone: true, concepts: PENDING } ]
-    const specs = nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)
+    const specs = nextJobs(state({ images, concepts: [] }), TARGET)
     expect(specs).toEqual([
       { type: "concepts.extract", inputIds: [ "i1" ], question: null },
       { type: "concepts.extract", inputIds: [ "i2" ], question: null },
@@ -68,7 +68,7 @@ describe("nextJobs", () => {
       { id: "i2", ocrDone: true, concepts: EMPTY },
       { id: "i3", ocrDone: true, concepts: PENDING },
     ]
-    const specs = nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)
+    const specs = nextJobs(state({ images, concepts: [] }), TARGET)
     expect(specs).toEqual([ { type: "concepts.extract", inputIds: [ "i3" ], question: null } ])
   })
 
@@ -78,23 +78,34 @@ describe("nextJobs", () => {
       { id: "i2", ocrDone: true, concepts: EMPTY },
       { id: "i3", ocrDone: true, concepts: FOUND },
     ]
-    const specs = nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)
+    const specs = nextJobs(state({ images, concepts: [] }), TARGET)
     expect(specs).toEqual([ { type: "concepts", inputIds: [ "i1", "i3" ], question: null } ])
   })
 
   it("plans nothing when every page came up empty", () => {
     const images = [ { id: "i1", ocrDone: true, concepts: EMPTY }, { id: "i2", ocrDone: true, concepts: EMPTY } ]
-    expect(nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)).toEqual([])
+    expect(nextJobs(state({ images, concepts: [] }), TARGET)).toEqual([])
   })
 
-  it("skips extraction when the prep already has concepts", () => {
-    const specs = nextJobs(state({ images: [ { id: "i1", ocrDone: true, concepts: PENDING } ], prepMetaDone: false }), TARGET)
-    expect(specs).toEqual([ { type: "prep.meta", inputIds: [ "c1", "c2", "c3" ], question: null } ])
+  it("plans prep.meta over every page's OCR alongside concept extraction", () => {
+    const images = [ { id: "i1", ocrDone: true, concepts: PENDING }, { id: "i2", ocrDone: true, concepts: PENDING } ]
+    const specs = nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)
+    expect(specs).toEqual([
+      { type: "concepts.extract", inputIds: [ "i1" ], question: null },
+      { type: "concepts.extract", inputIds: [ "i2" ], question: null },
+      { type: "prep.meta", inputIds: [ "i1", "i2" ], question: null },
+    ])
   })
 
-  it("plans prep.meta over all concepts once concepts are done", () => {
+  it("plans prep.meta alongside question jobs when it is still missing", () => {
     const specs = nextJobs(state({ prepMetaDone: false }), TARGET)
-    expect(specs).toEqual([ { type: "prep.meta", inputIds: [ "c1", "c2", "c3" ], question: null } ])
+    expect(specs.filter(spec => spec.type === "question")).toHaveLength(5)
+    expect(specs.filter(spec => spec.type === "prep.meta")).toEqual([ { type: "prep.meta", inputIds: [ "i1" ], question: null } ])
+  })
+
+  it("plans prep.meta even when every page came up empty", () => {
+    const images = [ { id: "i1", ocrDone: true, concepts: EMPTY } ]
+    expect(nextJobs(state({ images, concepts: [], prepMetaDone: false }), TARGET)).toEqual([ { type: "prep.meta", inputIds: [ "i1" ], question: null } ])
   })
 
   it("plans one question job per missing question, carrying type and difficulty", () => {

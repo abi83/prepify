@@ -7,11 +7,8 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-const runPrepNamer = vi.fn()
-vi.mock("@/lib/agents/PrepNamer", () => ({ runPrepNamer: (...args: unknown[]) => runPrepNamer(...args) }))
-
-const runPrepLabeler = vi.fn()
-vi.mock("@/lib/agents/PrepLabeler", () => ({ runPrepLabeler: (...args: unknown[]) => runPrepLabeler(...args) }))
+const runPrepMeta = vi.fn()
+vi.mock("@/lib/agents/PrepMeta", async importOriginal => ({ ...(await importOriginal<typeof import("@/lib/agents/PrepMeta")>()), runPrepMeta: (...args: unknown[]) => runPrepMeta(...args) }))
 
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm, ProgressSink } from "@/core/ports"
@@ -22,7 +19,6 @@ import { prisma } from "@/lib/prisma"
 import { noopSampler } from "@/lib/sampler/noopSampler"
 import { ForbiddenError } from "@/repositories/errors"
 import { createPrismaStore } from "@/repositories/jobRepository"
-import * as prepRepository from "@/repositories/prepRepository"
 import { testCatalog } from "@/test/modelCatalog"
 
 const OWNER = "user-owner"
@@ -34,19 +30,12 @@ const NOOP_PROGRESS: ProgressSink = { report: () => {} }
 
 const META = { model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
 
-const CONCEPT = { name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [] }
+const PAGE = { text: "Mitosis is the process of cell division.", language: "en" as const }
 
-async function makeConcept(userId: string) {
-  const prep = await prepRepository.createPrep(userId, { title: "Prep", language: "en" })
-  const conceptsJob = await prisma.job.create({
-    data: {
-      prepId: prep.id, type: "concepts", status: "executed",
-      model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0,
-      createdBy: userId, output: [],
-    },
-  })
-  const concept = await prisma.concept.create({ data: { ...CONCEPT, language: "en", producedByJobId: conceptsJob.id } })
-  return { prep, concept }
+async function makeImage(userId: string) {
+  const prep = await prisma.prep.create({ data: { title: "Prep", language: "en", userId } })
+  const image = await prisma.prepImage.create({ data: { prepId: prep.id, gcsKey: "k" } })
+  return { prep, image }
 }
 
 beforeEach(async () => {
@@ -56,29 +45,27 @@ beforeEach(async () => {
   await prisma.concept.deleteMany()
   await prisma.prepImage.deleteMany()
   await prisma.prep.deleteMany()
-  runPrepNamer.mockReset()
-  runPrepLabeler.mockReset()
+  runPrepMeta.mockReset()
 })
 
-it("throws when the input concepts span languages", () => {
-  expect(() => createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" }, { ...CONCEPT, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }))
+it("throws when the input pages span languages", () => {
+  expect(() => createPrepMetaJobDefinition([ PAGE, { ...PAGE, language: "de" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog }))
     .toThrow("more than one language")
 })
 
 describe("prep.meta job", () => {
   it("runs end-to-end: Prep title/description/grade/discipline and GenerationMeta rows are persisted", async () => {
-    const { prep, concept } = await makeConcept(OWNER)
+    const { prep, image } = await makeImage(OWNER)
 
-    runPrepNamer.mockResolvedValue({
-      output: { title: "Cell Division", description: "Covers mitosis and the stages of eukaryotic cell division in detail." },
+    runPrepMeta.mockResolvedValue({
+      output: { title: "Cell Division", description: "Covers mitosis and the stages of eukaryotic cell division in detail.", grade: 9, discipline: "Biology" },
       meta: META,
     })
-    runPrepLabeler.mockResolvedValue({ output: { grade: 9, discipline: "Biology", confidence: 0.9 }, meta: META })
 
     const store = createPrismaStore()
-    const job = await store.createJob(OWNER, "prep.meta", [ concept.id ], CONFIG)
+    const job = await store.createJob(OWNER, "prep.meta", [ image.id ], CONFIG)
 
-    const definition = createPrepMetaJobDefinition([ { ...CONCEPT, language: "en" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
+    const definition = createPrepMetaJobDefinition([ PAGE ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
     const result = await runJob(
       definition,
       { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },
@@ -96,14 +83,14 @@ describe("prep.meta job", () => {
     })
 
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
-    expect(metas).toHaveLength(2)
+    expect(metas).toHaveLength(1)
     expect(metas[0]).toMatchObject({ jobId: job.id, promptTokens: 10 })
   })
 
   it("rejects a non-owner actor", async () => {
-    const { concept } = await makeConcept(OWNER)
+    const { image } = await makeImage(OWNER)
     const store = createPrismaStore()
 
-    await expect(store.createJob(OTHER, "prep.meta", [ concept.id ], CONFIG)).rejects.toThrow(ForbiddenError)
+    await expect(store.createJob(OTHER, "prep.meta", [ image.id ], CONFIG)).rejects.toThrow(ForbiddenError)
   })
 })

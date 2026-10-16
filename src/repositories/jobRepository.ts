@@ -297,15 +297,9 @@ async function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInp
   await tx.prep.update({ where: { id: job.prepId }, data: { language: resolveLanguage(output) } })
 }
 
-/** Writes title/description/grade/discipline onto the `Prep` row, resolved through the input concept's `producedByJob`. */
-async function writePrepMetaOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: PrepMetaOutput) {
-  const conceptId = job.inputs[0].entityId
-  const concept = await tx.concept.findUnique({
-    where: { id: conceptId },
-    select: { producedByJob: { select: { prepId: true } } },
-  })
-  if (!concept) throw new NotFoundError(`Concept ${conceptId} not found`)
-  return tx.prep.update({ where: { id: concept.producedByJob.prepId }, data: output })
+/** Writes title/description/grade/discipline onto the job's `Prep` row. */
+function writePrepMetaOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: PrepMetaOutput) {
+  return tx.prep.update({ where: { id: job.prepId }, data: output })
 }
 
 /** Creates the `Question` row, typed by the job's `questionType`/`difficulty`, in its input concepts' language. */

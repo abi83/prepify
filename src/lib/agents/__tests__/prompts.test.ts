@@ -11,15 +11,14 @@ import { prompt as sorting } from "@/lib/agents/builders/SortingBuilder"
 import { prompt as conceptExtractor } from "@/lib/agents/ConceptExtractor"
 import { prompt as conceptMerger } from "@/lib/agents/ConceptMerger"
 import { prompt as ocr } from "@/lib/agents/OcrAgent"
-import { prompt as prepLabeler } from "@/lib/agents/PrepLabeler"
-import { prompt as prepNamer } from "@/lib/agents/PrepNamer"
+import { prompt as prepMeta } from "@/lib/agents/PrepMeta"
 import { prompt as questionReviewer } from "@/lib/agents/QuestionReviewer"
 import type { Prompt } from "@/lib/prompt"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { prompt as judgeOcr } from "@evals/evaluators/ocr"
 
 const PROMPTS: Record<string, Prompt> = {
-  "ocr": ocr, "concept-extractor": conceptExtractor, "concept-merger": conceptMerger, "prep-labeler": prepLabeler, "prep-namer": prepNamer,
+  "ocr": ocr, "concept-extractor": conceptExtractor, "concept-merger": conceptMerger, "prep-meta": prepMeta,
   "question-reviewer": questionReviewer, "single-choice": singleChoice, "multiple-choice": multipleChoice, "fill-the-gap": fillTheGap,
   "flashcard": flashcard, "sorting": sorting, "diagram": diagram, "formula": formula, "molecule": molecule, "judge/ocr": judgeOcr,
 }

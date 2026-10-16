@@ -52,9 +52,10 @@ export function assertConceptsFound(state: PrepState): void {
 
 /**
  * The jobs for the next unmet stage: OCR → concept extraction (per page) → concepts merge →
- * `prep.meta` → question tasks → one asset job per question that needs one. Empty when the prep
- * has no images to start from, every page came up empty (see `assertConceptsFound`), or its
- * question and asset jobs are already planned — unfinished ones are resumed, not topped up to `target`.
+ * question tasks → one asset job per question that needs one. `prep.meta` reads raw OCR text, so it
+ * is planned with the first stage after OCR and runs alongside it. Empty when the prep has no images
+ * to start from, every page came up empty (see `assertConceptsFound`), or its question and asset
+ * jobs are already planned — unfinished ones are resumed, not topped up to `target`.
  */
 export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   const pendingImages = state.images.filter(image => !image.ocrDone)
@@ -63,11 +64,12 @@ export function nextJobs(state: PrepState, target: PlanTarget): JobSpec[] {
   }
   if (state.images.length === 0) return []
 
-  if (state.concepts.length === 0) return nextConceptsJobs(state.images)
+  const meta: JobSpec[] = state.prepMetaDone ? [] : [ { type: PREP_META_JOB_TYPE, inputIds: state.images.map(image => image.id), question: null } ]
+  return [ ...nextStageJobs(state, target), ...meta ]
+}
 
-  if (!state.prepMetaDone) {
-    return [ { type: PREP_META_JOB_TYPE, inputIds: state.concepts.map(concept => concept.id), question: null } ]
-  }
+function nextStageJobs(state: PrepState, target: PlanTarget): JobSpec[] {
+  if (state.concepts.length === 0) return nextConceptsJobs(state.images)
 
   if (state.questionJobCount > 0) {
     return state.assetQuestionIds.map(questionId => ({ type: ASSET_JOB_TYPE, inputIds: [ questionId ], question: null }))

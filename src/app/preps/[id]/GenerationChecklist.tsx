@@ -22,7 +22,7 @@ const DEFAULT_TITLE_RE = /^Prep #\d+$/
 export function rowsFromProgress(progress: GenerationProgress | null): ChecklistRowData[] {
   const stage = progress?.stage ?? null
   const ocrDone = stage !== "ocr"
-  const conceptsDone = stage === "meta" || stage === "questions" || stage === "assets" || stage === "done"
+  const conceptsDone = stage === "questions" || stage === "assets" || stage === "done"
   const namingDone = stage === "questions" || stage === "assets" || stage === "done"
   const questionsDone = stage === "assets" || stage === "done"
   const assetsDone = stage === "done"
@@ -34,7 +34,7 @@ export function rowsFromProgress(progress: GenerationProgress | null): Checklist
       detail: progress?.stage === "ocr" ? `${progress.done}/${progress.total}` : undefined,
     },
     { label: "Extract educational concepts", status: conceptsDone ? "done" : ocrDone ? "running" : "pending" },
-    { label: "Name the prep", status: namingDone ? "done" : conceptsDone ? "running" : "pending" },
+    { label: "Name the prep", status: namingDone ? "done" : ocrDone ? "running" : "pending" },
     {
       label: "Craft and validate questions",
       status: questionsDone ? "done" : stage === "questions" ? "running" : "pending",

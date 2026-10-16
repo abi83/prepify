@@ -15,7 +15,7 @@ import { createPrepMetaJobDefinition } from "./prepMetaJob"
 import { createQuestionJobDefinition } from "./questionJob"
 
 /** A stage's progress: the planner's stages in order. */
-export type GenerationStage = "ocr" | "concepts" | "meta" | "questions" | "assets"
+export type GenerationStage = "ocr" | "concepts" | "questions" | "assets"
 export type GenerationProgress =
   | { stage: GenerationStage; done: number; total: number }
   | { stage: "done" }
@@ -29,11 +29,11 @@ const STAGE_BY_JOB_TYPE: Record<string, GenerationStage> = {
   [OCR_JOB_TYPE]: "ocr",
   [CONCEPTS_EXTRACT_JOB_TYPE]: "concepts",
   [CONCEPTS_JOB_TYPE]: "concepts",
-  [PREP_META_JOB_TYPE]: "meta",
+  [PREP_META_JOB_TYPE]: "concepts",
   [QUESTION_JOB_TYPE]: "questions",
   [ASSET_JOB_TYPE]: "assets",
 }
-const STAGES: GenerationStage[] = [ "ocr", "concepts", "meta", "questions", "assets" ]
+const STAGES: GenerationStage[] = [ "ocr", "concepts", "questions", "assets" ]
 
 function stageOf(jobType: string): GenerationStage {
   const stage = STAGE_BY_JOB_TYPE[jobType]
@@ -81,8 +81,16 @@ function createDefinitionFor({ prepId }: DefinitionOptions, { data, ...deps }: D
       })
       return createConceptsJobDefinition(pages, deps)
     }
-    case PREP_META_JOB_TYPE:
-      return createPrepMetaJobDefinition(await conceptsFor(job), deps)
+    case PREP_META_JOB_TYPE: {
+      const images = await data.listImages(prepId)
+      const pages = job.inputIds.map(id => {
+        const image = images.find(i => i.id === id)
+        if (!image) throw new Error(`PrepImage ${id} not found for job ${job.id}`)
+        if (!image.language) throw new Error(`PrepImage ${id} has no language for job ${job.id}`)
+        return { language: image.language, text: ocrResultSchema.parse(image.ocrResult).text }
+      })
+      return createPrepMetaJobDefinition(pages, deps)
+    }
     case QUESTION_JOB_TYPE:
       return createQuestionJobDefinition(await conceptsFor(job), deps)
     case ASSET_JOB_TYPE:
