@@ -20,6 +20,7 @@ export const serverRunRequestSchema = z.object({
     questionCount: z.number().int().min(5).max(20),
     enabledTypes: z.array(questionTypeSchema).min(1),
     difficultyMix: z.record(difficultySchema, z.number().min(0)).refine(mix => Object.values(mix).some(w => w > 0)),
+    additionalQuestions: z.number().int().min(1).max(20).optional(),
   }).default(DEFAULT_GEN_CONFIG),
 })
 export type ServerRunRequest = z.infer<typeof serverRunRequestSchema>
