@@ -33,11 +33,6 @@ const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
   runState: "idle", totalPages: 1, ocrPages: 1, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, ...overrides,
 })
 
-async function overrideToServer() {
-  await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
-  await userEvent.click(screen.getByRole("radio", { name: /server-assisted/i }))
-}
-
 function renderPanel(initialProgress: PrepProgress | null = null) {
   return render(
     <GenerationPanel
@@ -64,20 +59,23 @@ afterEach(() => {
 })
 
 describe("GenerationPanel execution mode", () => {
-  it("defaults to client-only and never calls the server endpoint", async () => {
+  it("with no mode saved, shows mode dialog; selecting client then runs in browser", async () => {
     mockRunInBrowser.mockResolvedValue(undefined)
     renderPanel()
 
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
-    expect(screen.getByRole("radio", { name: /client/i })).toBeChecked()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
+
+    expect(await screen.findByRole("heading", { name: /where should your prep run/i })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: /client/i })).toBeChecked()
+
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }))
 
     expect(mockRunInBrowser).toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it("shows an error toast when the generated title cannot be loaded", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
     vi.mocked(getMyPrep).mockRejectedValue(new Error("boom"))
     mockRunInBrowser.mockImplementation(async ({ onProgress }) => {
       onProgress({ stage: "questions" })
@@ -90,7 +88,7 @@ describe("GenerationPanel execution mode", () => {
     expect(toastError).toHaveBeenCalledWith("Could not load the generated title")
   })
 
-  it("uses the saved server preference without any override", async () => {
+  it("uses the saved server preference without any dialog", async () => {
     localStorage.setItem("prepify_execution_mode", "server")
     renderPanel()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
@@ -99,21 +97,9 @@ describe("GenerationPanel execution mode", () => {
     expect(mockRunInBrowser).not.toHaveBeenCalled()
   })
 
-  it("lets a run override the saved preference", async () => {
-    localStorage.setItem("prepify_execution_mode", "server")
-    mockRunInBrowser.mockResolvedValue(undefined)
-    renderPanel()
-    await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
-    await userEvent.click(screen.getByRole("radio", { name: /client/i }))
-    await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
-
-    expect(mockRunInBrowser).toHaveBeenCalled()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it("posts the key, prep and user settings in server mode, without running in the browser", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
     renderPanel()
-    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(fetchMock).toHaveBeenCalledOnce()
@@ -136,8 +122,8 @@ describe("GenerationPanel execution mode", () => {
     [ 404, /not found/i ],
   ])("shows an error for a %i response", async (status, message) => {
     fetchMock.mockResolvedValue({ status })
+    localStorage.setItem("prepify_execution_mode", "server")
     renderPanel()
-    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(await screen.findByText(message)).toBeInTheDocument()
@@ -146,8 +132,8 @@ describe("GenerationPanel execution mode", () => {
   it("treats 409 as an already-running run, not an error", async () => {
     fetchMock.mockResolvedValue({ status: 409 })
     mockGetProgress.mockResolvedValue(progress({ runState: "running" }))
+    localStorage.setItem("prepify_execution_mode", "server")
     renderPanel()
-    await overrideToServer()
     await userEvent.click(screen.getByRole("button", { name: "Generate questions" }))
 
     expect(await screen.findByText(/running on the server/i)).toBeInTheDocument()
@@ -183,13 +169,50 @@ describe("GenerationPanel progress from the DB", () => {
   })
 
   it("offers a resume for interrupted jobs that re-sends the key to the same endpoint", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
     renderPanel(progress({ runState: "interrupted", hasConcepts: true, totalQuestions: 4, completedQuestions: 2 }))
     expect(screen.getByText(/interrupted/i)).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole("button", { name: "Resume on server" }))
+    await userEvent.click(screen.getByRole("button", { name: "Resume" }))
 
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ apiKey: "sk-secret", prepId: "prep-1" })
+  })
+
+  it("resumes interrupted jobs in the browser in client mode, without fetch", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    mockRunInBrowser.mockResolvedValue(undefined)
+    renderPanel(progress({ runState: "interrupted", hasConcepts: true, totalQuestions: 4, completedQuestions: 2 }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Resume" }))
+
+    expect(mockRunInBrowser).toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("retries terminal jobs then runs in the browser in client mode", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    mockRetryTerminal.mockResolvedValue(undefined)
+    mockRunInBrowser.mockResolvedValue(undefined)
+    renderPanel(progress({ hasConcepts: true, totalQuestions: 3, completedQuestions: 1, failedQuestions: 1, terminalQuestions: 1 }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+
+    expect(mockRetryTerminal).toHaveBeenCalledWith("prep-1")
+    expect(mockRunInBrowser).toHaveBeenCalled()
+    expect(mockRetryTerminal.mock.invocationCallOrder[0]).toBeLessThan(mockRunInBrowser.mock.invocationCallOrder[0])
+  })
+
+  it("retries terminal jobs and refreshes progress in server mode, without running in the browser", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    mockRetryTerminal.mockResolvedValue(undefined)
+    renderPanel(progress({ hasConcepts: true, totalQuestions: 3, completedQuestions: 1, failedQuestions: 1, terminalQuestions: 1 }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+
+    expect(mockRetryTerminal).toHaveBeenCalledWith("prep-1")
+    expect(mockGetProgress).toHaveBeenCalled()
+    expect(mockRunInBrowser).not.toHaveBeenCalled()
   })
 
   it("shows terminally failed questions apart from retryable ones and retries them on click", async () => {

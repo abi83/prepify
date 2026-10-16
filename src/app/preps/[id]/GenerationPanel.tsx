@@ -9,13 +9,13 @@ import { toast } from "sonner"
 import { retryTerminalJobs } from "@/actions/jobs"
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
-import { AdditionalSettings } from "@/components/AdditionalSettings"
+import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiKey } from "@/lib/apiKey"
-import { getExecutionMode, type ExecutionMode } from "@/lib/executionMode"
+import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
 import type { GenerationConfig } from "@/lib/generationConfig"
 import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/lib/generationConfig"
 import { runGeneration as runJobGeneration, type GenerationProgress } from "@/lib/jobs/clientExecution"
@@ -50,14 +50,15 @@ export default function GenerationPanel({
   const { data: session } = useSession()
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
   const [ progress, setProgress ] = useState<GenerationProgress | null>(null)
-  const [ executionMode, setExecutionMode ] = useState<ExecutionMode>(() => getExecutionMode())
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
   const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
   const [ totalTokens, setTotalTokens ] = useState(0)
   const [ genError, setGenError ] = useState<string | null>(null)
+  const [ modeDialogOpen, setModeDialogOpen ] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
+  const pendingActionRef = useRef<(() => Promise<void>) | null>(null)
   const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
   const { progress: prepProgress, refresh: refreshProgress, expectRun } = useRunProgress(prepId, initialProgress, handlePollError)
 
@@ -134,13 +135,29 @@ export default function GenerationPanel({
     }
   }
 
+  function withModeCheck(action: () => Promise<void>) {
+    if (!isExecutionModeSet()) {
+      pendingActionRef.current = action
+      setModeDialogOpen(true)
+      return
+    }
+    void action()
+  }
+
+  function handleModeConfirm() {
+    setModeDialogOpen(false)
+    const action = pendingActionRef.current
+    pendingActionRef.current = null
+    if (action) void action()
+  }
+
   async function handleGenerate() {
     const keyConfig = getApiKey()
     if (!keyConfig) {
       router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
       return
     }
-    await (executionMode === "server" ? runOnServer() : runInBrowser())
+    withModeCheck(() => getExecutionMode() === "server" ? runOnServer() : runInBrowser())
   }
 
   async function handleResumeInterrupted() {
@@ -148,14 +165,18 @@ export default function GenerationPanel({
       router.push(`/settings?returnTo=${encodeURIComponent(`/preps/${prepId}`)}`)
       return
     }
-    await runOnServer()
+    withModeCheck(() => getExecutionMode() === "server" ? runOnServer() : runInBrowser())
   }
 
   async function handleRetryTerminal() {
     setGenError(null)
     try {
       await retryTerminalJobs(prepId)
-      await refreshProgress()
+      if (getExecutionMode() === "server") {
+        await refreshProgress()
+      } else {
+        await runInBrowser()
+      }
     } catch (e: unknown) {
       setGenError((e as Error).message)
     }
@@ -174,6 +195,8 @@ export default function GenerationPanel({
 
   return (
     <>
+      <ExecutionModeDialog open={modeDialogOpen} onConfirm={handleModeConfirm} />
+
       {!hasQuestions && (
         <div className="flex flex-col gap-3">
           {checklistRows ? (
@@ -188,8 +211,8 @@ export default function GenerationPanel({
                   <p className="text-sm text-muted-foreground">Running on the server. You can close this tab.</p>
                 ) : isInterrupted ? (
                   <>
-                    <Button onClick={handleResumeInterrupted}>Resume on server</Button>
-                    <p className="text-sm text-error">Interrupted. Resume to send your key again; finished steps are kept.</p>
+                    <Button onClick={handleResumeInterrupted}>Resume</Button>
+                    <p className="text-sm text-error">Interrupted. Resume to continue; finished steps are kept.</p>
                   </>
                 ) : (
                   <Button onClick={handleGenerate}>
@@ -205,7 +228,6 @@ export default function GenerationPanel({
                   </p>
                 </div>
               )}
-              {!isRunning && !isServerRunning && !isInterrupted && <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />}
             </>
           ) : (
             <>
@@ -263,7 +285,6 @@ export default function GenerationPanel({
                 )}
               </div>
 
-              <AdditionalSettings executionMode={executionMode} onExecutionModeChange={setExecutionMode} />
               <Button className="self-start" onClick={handleGenerate}>Generate questions</Button>
             </>
           )}

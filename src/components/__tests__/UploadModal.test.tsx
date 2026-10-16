@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const h = vi.hoisted(() => ({
@@ -18,11 +17,8 @@ vi.mock("@/lib/jobs/serverRunClient", () => ({ requestServerRun: h.requestServer
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
 vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }) }))
 vi.mock("@/components/FilePicker", () => ({
-  FilePicker: ({ onRecognise, children }: { onRecognise: (args: unknown) => void; children: ReactNode }) => (
-    <>
-      {children}
-      <button onClick={() => onRecognise({ prepId: "prep-1", files: [ new File([ "x" ], "a.png") ], images: [] })}>Recognise & Create</button>
-    </>
+  FilePicker: ({ onRecognise }: { onRecognise: (args: unknown) => void }) => (
+    <button onClick={() => onRecognise({ prepId: "prep-1", files: [ new File([ "x" ], "a.png") ], images: [] })}>Prep me</button>
   ),
 }))
 
@@ -32,11 +28,6 @@ const onDone = vi.fn()
 
 function renderModal() {
   return render(<UploadModal onClose={vi.fn()} onDone={onDone} />)
-}
-
-async function overrideTo(mode: RegExp) {
-  await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
-  await userEvent.click(screen.getByRole("radio", { name: mode }))
 }
 
 beforeEach(() => {
@@ -49,14 +40,24 @@ beforeEach(() => {
 })
 
 describe("UploadModal execution mode", () => {
-  it("collapses Additional settings and defaults to client OCR", async () => {
+  it("when mode not set, shows mode dialog; selecting client then runs OCR", async () => {
     renderModal()
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
 
-    await userEvent.click(screen.getByRole("button", { name: /additional settings/i }))
+    expect(await screen.findByRole("heading", { name: /where should your prep run/i })).toBeInTheDocument()
     expect(screen.getByRole("radio", { name: /client/i })).toBeChecked()
 
-    await userEvent.click(screen.getByRole("button", { name: "Recognise & Create" }))
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }))
+
+    expect(h.runOcr).toHaveBeenCalledOnce()
+    expect(h.requestServerRun).not.toHaveBeenCalled()
+  })
+
+  it("uses saved client preference without dialog", async () => {
+    localStorage.setItem("prepify_execution_mode", "client")
+    renderModal()
+    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
+
     expect(h.runOcr).toHaveBeenCalledOnce()
     expect(h.requestServerRun).not.toHaveBeenCalled()
   })
@@ -64,7 +65,7 @@ describe("UploadModal execution mode", () => {
   it("runs on the server with the saved preference, then redirects to the prep", async () => {
     localStorage.setItem("prepify_execution_mode", "server")
     renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Recognise & Create" }))
+    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
 
     expect(h.updatePrep).toHaveBeenCalledWith("prep-1", { isActive: true })
     expect(h.requestServerRun).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-secret", prepId: "prep-1", model: "gpt-5-mini", tier: "flex" }))
@@ -73,20 +74,11 @@ describe("UploadModal execution mode", () => {
     expect(onDone).toHaveBeenCalledWith("prep-1")
   })
 
-  it("lets a run override the saved preference", async () => {
-    renderModal()
-    await overrideTo(/server-assisted/i)
-    await userEvent.click(screen.getByRole("button", { name: "Recognise & Create" }))
-
-    expect(h.requestServerRun).toHaveBeenCalledOnce()
-    expect(h.runOcr).not.toHaveBeenCalled()
-  })
-
   it("shows the error and stays open when the server rejects the run", async () => {
     localStorage.setItem("prepify_execution_mode", "server")
     h.requestServerRun.mockRejectedValue(new Error("You are signed out. Sign in again."))
     renderModal()
-    await userEvent.click(screen.getByRole("button", { name: "Recognise & Create" }))
+    await userEvent.click(screen.getByRole("button", { name: "Prep me" }))
 
     expect(await screen.findByText(/signed out/i)).toBeInTheDocument()
     expect(onDone).not.toHaveBeenCalled()

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { createPrepImage } from "@/actions/prepImages"
 import { listMyPreps, createPrep } from "@/actions/preps"
@@ -21,11 +21,9 @@ export type RecogniseArgs = {
 
 type Props = {
   onRecognise: (args: RecogniseArgs) => void
-  /** Rendered above the action buttons. */
-  children?: ReactNode
 }
 
-export function FilePicker({ onRecognise, children }: Props) {
+export function FilePicker({ onRecognise }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const draftRef = useRef<Promise<string> | null>(null)
@@ -196,8 +194,6 @@ export function FilePicker({ onRecognise, children }: Props) {
         </p>
       )}
 
-      {files.length > 0 && children}
-
       <div className="flex flex-col gap-2.5">
         {files.length === 0 && (
           <Button variant="outline" className="w-full" onClick={() => cameraInputRef.current?.click()}>
@@ -206,7 +202,7 @@ export function FilePicker({ onRecognise, children }: Props) {
         )}
         {files.length > 0 && (
           <Button className="w-full" onClick={handleRecognise} disabled={hasUploadErrors}>
-            Recognise & Create
+            Prep me
           </Button>
         )}
       </div>

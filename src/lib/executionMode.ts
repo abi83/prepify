@@ -30,6 +30,14 @@ export const EXECUTION_MODE_INFO: Record<ExecutionMode, { label: string; facts: 
   },
 }
 
+export function isExecutionModeSet(): boolean {
+  try {
+    return isExecutionMode(localStorage.getItem(STORAGE_KEY))
+  } catch {
+    return false
+  }
+}
+
 export function getExecutionMode(): ExecutionMode {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
