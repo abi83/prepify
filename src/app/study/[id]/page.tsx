@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   try {
     const prep = await getSharedPrep(id)
-    const description = prep.description || `Study ${prep.title} with flashcards, quizzes, and tests.`
+    const description = prep.description || `Study ${prep.title} with flashcards and practice questions.`
     return {
       title: prep.title,
       description,

@@ -1,8 +1,9 @@
-import type { Question } from "@prisma/client"
+import type { Question, Asset } from "@prisma/client"
 
 import { isStudyTab, type StudyTab } from "@/types/prep"
 import type { FlashcardContent } from "@/types/questions"
 
+import PracticeFlow from "./attempt/PracticeFlow"
 import FlashCard from "./questions/FlashCard"
 import { Button } from "./ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
@@ -12,31 +13,11 @@ interface Props {
   onTabChange: (tab: StudyTab) => void
   flashcards: FlashcardContent[]
   studyQuestions: Question[]
-  onStartAttempt: (mode: "quiz" | "test") => void
+  assets: Asset[]
+  onStartAttempt: () => void
 }
 
-function ModePanel({
-  description,
-  label,
-  count,
-  onStart,
-}: {
-  description: string
-  label: string
-  count: number
-  onStart: () => void
-}) {
-  return (
-    <div className="flex flex-col gap-3.5 rounded-lg border border-border bg-background p-6">
-      <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
-      <Button className="self-start" onClick={onStart} disabled={count === 0}>
-        {label} ({count} questions)
-      </Button>
-    </div>
-  )
-}
-
-export default function StudyTabs({ tab, onTabChange, flashcards, studyQuestions, onStartAttempt }: Props) {
+export default function StudyTabs({ tab, onTabChange, flashcards, studyQuestions, assets, onStartAttempt }: Props) {
   return (
     <Tabs
       value={tab}
@@ -45,13 +26,17 @@ export default function StudyTabs({ tab, onTabChange, flashcards, studyQuestions
         onTabChange(v)
       }}
     >
-      <TabsList>
-        <TabsTrigger value="cards">Cards</TabsTrigger>
-        <TabsTrigger value="quiz">Quiz</TabsTrigger>
-        <TabsTrigger value="test">Test</TabsTrigger>
-      </TabsList>
+      <div className="flex items-center justify-between gap-3">
+        <TabsList>
+          <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+          <TabsTrigger value="questions">Questions</TabsTrigger>
+        </TabsList>
+        <Button onClick={onStartAttempt} disabled={studyQuestions.length === 0}>
+          Start attempt
+        </Button>
+      </div>
 
-      <TabsContent value="cards">
+      <TabsContent value="flashcards">
         {flashcards.length > 0 ? (
           <FlashCard cards={flashcards} />
         ) : (
@@ -59,22 +44,8 @@ export default function StudyTabs({ tab, onTabChange, flashcards, studyQuestions
         )}
       </TabsContent>
 
-      <TabsContent value="quiz">
-        <ModePanel
-          description="Answer questions one at a time — get instant feedback after each."
-          label="Start Quiz"
-          count={studyQuestions.length}
-          onStart={() => onStartAttempt("quiz")}
-        />
-      </TabsContent>
-
-      <TabsContent value="test">
-        <ModePanel
-          description="Answer all questions without hints — results revealed at the end."
-          label="Start Test"
-          count={studyQuestions.length}
-          onStart={() => onStartAttempt("test")}
-        />
+      <TabsContent value="questions">
+        <PracticeFlow questions={studyQuestions} assets={assets} />
       </TabsContent>
     </Tabs>
   )

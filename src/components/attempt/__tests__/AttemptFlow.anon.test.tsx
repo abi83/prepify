@@ -23,39 +23,15 @@ const singleQ: Question = {
   },
 }
 
-async function runThroughAttempt(userId: string | null, mode: "quiz" | "test") {
+async function runThroughAttempt(userId: string | null) {
   const user = userEvent.setup()
-  const onExit = vi.fn()
 
-  render(
-    <AttemptFlow
-      questions={[ singleQ ]}
-      assets={[]}
-      mode={mode}
-      prepId="prep-1"
-      userId={userId}
-      onExit={onExit}
-    />,
-  )
+  render(<AttemptFlow questions={[ singleQ ]} assets={[]} prepId="prep-1" userId={userId} onExit={vi.fn()} />)
 
-  // Answers render as buttons; the answer text is inside a span within the button.
-  // Click the span containing the answer text — userEvent will bubble up to the button.
-  const optionText = await screen.findByText("4")
-  await user.click(optionText)
-
-  if (mode === "quiz") {
-    await user.click(screen.getByRole("button", { name: /submit answer/i }))
-    // After submitting, the last question shows Finish
-    await waitFor(() => screen.getByRole("button", { name: /finish/i }))
-    await user.click(screen.getByRole("button", { name: /finish/i }))
-  } else {
-    await waitFor(() => screen.getByRole("button", { name: /submit test/i }))
-    await user.click(screen.getByRole("button", { name: /submit test/i }))
-  }
-
-  // Confirm dialog
-  await waitFor(() => screen.getByRole("button", { name: /confirm/i }))
-  await user.click(screen.getByRole("button", { name: /confirm/i }))
+  // Click the span containing the answer text — userEvent bubbles up to the button.
+  await user.click(await screen.findByText("4"))
+  await user.click(screen.getByRole("button", { name: /submit attempt/i }))
+  await user.click(await screen.findByRole("button", { name: /confirm/i }))
 }
 
 beforeEach(() => {
@@ -64,40 +40,29 @@ beforeEach(() => {
 
 describe("AttemptFlow — attempt saving", () => {
   it("saves attempt when userId is provided", async () => {
-    await runThroughAttempt("user-123", "quiz")
+    await runThroughAttempt("user-123")
     await waitFor(() => {
-      expect(insertAttemptMock).toHaveBeenCalledWith("prep-1", "quiz", expect.any(Number), expect.any(Number))
+      expect(insertAttemptMock).toHaveBeenCalledWith("prep-1", expect.any(Number), expect.any(Number))
     })
   })
 
   it("skips DB insert when userId is null", async () => {
-    await runThroughAttempt(null, "quiz")
-    await waitFor(() => screen.getByText(/quiz complete/i))
+    await runThroughAttempt(null)
+    await waitFor(() => screen.getByText(/attempt complete/i))
     expect(insertAttemptMock).not.toHaveBeenCalled()
   })
 
-  it("shows score screen after finalize regardless of userId", async () => {
-    await runThroughAttempt(null, "test")
-    await waitFor(() => {
-      expect(screen.getByText(/test complete/i)).toBeInTheDocument()
-    })
+  it("shows score screen with review after finalize", async () => {
+    await runThroughAttempt(null)
+    await waitFor(() => expect(screen.getByText(/attempt complete/i)).toBeInTheDocument())
+    expect(screen.getByText("Review")).toBeInTheDocument()
   })
 
-  it("shows sign-in hint in quiz confirm dialog when anonymous", async () => {
+  it("shows sign-in hint in confirm dialog when anonymous", async () => {
     const user = userEvent.setup()
-    render(
-      <AttemptFlow
-        questions={[ singleQ ]}
-        assets={[]}
-        mode="quiz"
-        prepId="prep-1"
-        userId={null}
-        onExit={vi.fn()}
-      />,
-    )
+    render(<AttemptFlow questions={[ singleQ ]} assets={[]} prepId="prep-1" userId={null} onExit={vi.fn()} />)
     await user.click(screen.getByText("4"))
-    await user.click(screen.getByRole("button", { name: /submit answer/i }))
-    await user.click(screen.getByRole("button", { name: /finish/i }))
+    await user.click(screen.getByRole("button", { name: /submit attempt/i }))
     await waitFor(() => {
       expect(screen.getByText(/sign in to save/i)).toBeInTheDocument()
     })

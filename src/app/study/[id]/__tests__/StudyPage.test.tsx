@@ -1,6 +1,5 @@
 import type { Prep, Question } from "@prisma/client"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("next-auth/react", () => ({
@@ -61,24 +60,14 @@ describe("StudyPage — loaded with questions", () => {
     expect(screen.getByText("Biology Basics")).toBeInTheDocument()
   })
 
-  it("renders the Cards, Quiz, and Test tabs", () => {
+  it("renders the Flashcards and Questions tabs", () => {
     render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    expect(screen.getByRole("tab", { name: "Cards" })).toBeInTheDocument()
-    expect(screen.getByRole("tab", { name: "Quiz" })).toBeInTheDocument()
-    expect(screen.getByRole("tab", { name: "Test" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Flashcards" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Questions" })).toBeInTheDocument()
   })
 
-  it("shows quiz start button when Quiz tab is selected", async () => {
-    const user = userEvent.setup()
+  it("shows the start attempt button", () => {
     render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    await user.click(screen.getByRole("tab", { name: "Quiz" }))
-    expect(screen.getByRole("button", { name: /start quiz/i })).toBeInTheDocument()
-  })
-
-  it("shows test start button when Test tab is selected", async () => {
-    const user = userEvent.setup()
-    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    await user.click(screen.getByRole("tab", { name: "Test" }))
-    expect(screen.getByRole("button", { name: /start test/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /start attempt/i })).toBeInTheDocument()
   })
 })

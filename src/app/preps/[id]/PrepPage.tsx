@@ -79,7 +79,7 @@ export default function PrepPage({
     setQuestions(initialQuestions)
   }
 
-  const [ activeAttempt, setActiveAttempt ] = useState<StudyTab | null>(null)
+  const [ activeAttempt, setActiveAttempt ] = useState(false)
   const [ showShareModal, setShowShareModal ] = useState(false)
   const [ showDeleteConfirm, setShowDeleteConfirm ] = useState(false)
   const [ deleting, setDeleting ] = useState(false)
@@ -109,11 +109,11 @@ export default function PrepPage({
   }
 
   function handleExitAttempt() {
-    setActiveAttempt(null)
+    setActiveAttempt(false)
     router.refresh()
   }
 
-  if (activeAttempt && (activeAttempt === "quiz" || activeAttempt === "test") && userId) {
+  if (activeAttempt && userId) {
     return (
       <main className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-7 px-6 py-10">
         <Button variant="link" className="h-auto self-start p-0 text-muted-foreground" onClick={handleExitAttempt}>
@@ -122,7 +122,6 @@ export default function PrepPage({
         <AttemptFlow
           questions={studyQuestions}
           assets={assets}
-          mode={activeAttempt}
           prepId={prep.id}
           userId={userId}
           onExit={handleExitAttempt}
@@ -230,7 +229,8 @@ export default function PrepPage({
               onTabChange={setTab}
               flashcards={flashcards}
               studyQuestions={studyQuestions}
-              onStartAttempt={mode => setActiveAttempt(mode)}
+              assets={assets}
+              onStartAttempt={() => setActiveAttempt(true)}
             />
 
             <section className="flex flex-col gap-1.5">
@@ -260,7 +260,6 @@ export default function PrepPage({
                 <div className="flex flex-col gap-1.5">
                   {attempts.map(a => (
                     <div key={a.id} className="flex items-center gap-3 rounded-sm border border-border bg-background px-4 py-3 text-sm">
-                      <span className="min-w-[40px] font-semibold capitalize">{a.mode}</span>
                       <span className="font-semibold text-primary">
                         {a.score}/{a.total} ({Math.round((a.score / a.total) * 100)}%)
                       </span>
