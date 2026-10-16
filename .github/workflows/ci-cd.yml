@@ -188,7 +188,7 @@ jobs:
     with:
       environment: dev
       environment_url: https://prepify-529277275400.us-central1.run.app/
-      image_tag: ${{ github.sha }}
+      image_tag: ${{ needs.resolve-dev-version.outputs.app_version }}
       build_suffix: ${{ needs.resolve-dev-version.outputs.app_version }}
       revision_version: ${{ needs.resolve-dev-version.outputs.app_version }}
       build: true
