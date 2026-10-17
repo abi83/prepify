@@ -16,7 +16,7 @@ import { FLASHCARDS_TAB, QUESTIONS_TAB, type SharedTabData } from "@/components/
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "link",
-  grade: 10, discipline: null, language: null, description: "", isActive: true,
+  grade: 10, discipline: null, language: null, description: "", isActive: true, status: "ready",
 }
 
 const data: SharedTabData = {
