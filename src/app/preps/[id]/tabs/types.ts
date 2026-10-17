@@ -14,7 +14,10 @@ export interface PrepTabProps extends SharedTabData {
   prep: Prep
   questions: Question[]
   attempts: Attempt[]
+  /** Live: the server-rendered progress, updated by the run watcher. */
   progress: PrepProgress | null
+  refreshProgress: () => Promise<void>
+  expectRun: () => void
   pages: PageEntry[]
   generations: Record<string, JobGeneration>
   onTitleReady: (title: string) => void

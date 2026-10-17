@@ -19,10 +19,12 @@ interface Handlers {
   onError: (message: string) => void
   /** After a successful run, once the page is refreshed. */
   onFinished: () => void
+  /** The server accepted a run, before the page refreshes: start watching its progress. */
+  onServerRunStarted: () => void
 }
 
 /** Starts a run: execution mode → key/session checks → browser or server run → refresh. */
-export function useRunTrigger(prepId: string, { onError, onFinished }: Handlers) {
+export function useRunTrigger(prepId: string, { onError, onFinished, onServerRunStarted }: Handlers) {
   const router = useRouter()
   const { data: session } = useSession()
   const pendingRef = useRef<RunRequest | null>(null)
@@ -31,6 +33,7 @@ export function useRunTrigger(prepId: string, { onError, onFinished }: Handlers)
   async function runOnServer(request: RunRequest, keyConfig: ApiKeyConfig) {
     await request.beforeServerRun()
     await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target: request.config })
+    onServerRunStarted()
     await awaitRunStart(prepId)
   }
 

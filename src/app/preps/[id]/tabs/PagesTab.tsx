@@ -13,7 +13,7 @@ import { clientSampler } from "@/lib/sampler/clientSampler"
 
 import type { PrepTabProps } from "./types"
 
-export default function PagesTab({ prep, pages }: PrepTabProps) {
+export default function PagesTab({ prep, pages, expectRun }: PrepTabProps) {
   const [ retrying, setRetrying ] = useState(false)
   const [ error, setError ] = useState("")
   const trigger = useRunTrigger(prep.id, {
@@ -22,6 +22,7 @@ export default function PagesTab({ prep, pages }: PrepTabProps) {
       setError(message)
     },
     onFinished: () => setRetrying(false),
+    onServerRunStarted: expectRun,
   })
 
   async function retry(imageIds: string[]) {
