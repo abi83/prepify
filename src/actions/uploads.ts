@@ -2,8 +2,10 @@
 
 import { Storage } from "@google-cloud/storage"
 
+import { MAX_IMAGES } from "@/lib/config"
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
+import { assertPrepPageKey, prepPagesPrefix } from "@/lib/prepPageStorage"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 
@@ -31,10 +33,14 @@ export async function getUploadSignedUrl(
   const prep = await prepRepository.getPrep(userId, prepId)
   if (prep.userId !== userId) throw new ForbiddenError(`Prep ${prepId} does not belong to this user`)
 
+  if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= MAX_IMAGES) {
+    throw new Error(`pageIndex must be an integer in [0, ${MAX_IMAGES}), got ${pageIndex}`)
+  }
+
   const ext = MIME_TO_EXT[mimeType]
   if (!ext) throw new Error(`Unsupported mime type: ${mimeType}`)
 
-  const key = `prep-pages/${prepId}/page-${pageIndex}.${ext}`
+  const key = `${prepPagesPrefix(prepId)}page-${pageIndex}.${ext}`
   const contentLengthRange = `0,${MAX_UPLOAD_BYTES}`
 
   const [ signedUrl ] = await storage
@@ -53,17 +59,10 @@ export async function getUploadSignedUrl(
   return { key, signedUrl, contentLengthRange }
 }
 
-/** Deletes a prep's uploaded page images from GCS. Called by `deletePrep` before/with the DB
- *  delete — the caller is responsible for having already checked ownership of the prep. */
-export async function deletePrepObjects(gcsKeys: string[]): Promise<void> {
-  await Promise.all(
-    gcsKeys.map(key => storage.bucket(config.GCS_BUCKET_NAME).file(key).delete({ ignoreNotFound: true }))
-  )
-}
-
 export async function getReadSignedUrl(prepId: string, gcsKey: string): Promise<string> {
   const userId = await requireUserId()
   await prepRepository.getPrep(userId, prepId)
+  assertPrepPageKey(prepId, gcsKey)
 
   const [ signedUrl ] = await storage
     .bucket(config.GCS_BUCKET_NAME)

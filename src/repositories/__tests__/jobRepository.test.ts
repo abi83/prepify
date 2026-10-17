@@ -39,7 +39,7 @@ beforeEach(async () => {
 
 async function makeImage(userId: string) {
   const prep = await prepRepository.createPrep(userId, { title: "Prep", language: "en" })
-  const image = await prepImageRepository.createImage(userId, prep.id, "key")
+  const image = await prepImageRepository.createImage(userId, prep.id, `prep-pages/${prep.id}/key`)
   return { prep, image }
 }
 

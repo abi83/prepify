@@ -27,7 +27,7 @@ beforeEach(async () => {
 
 async function makeJob(status: "created" | "running" | "interrupted" | "failed", heartbeatAt: Date | null, attempts = 0) {
   const prep = await prepRepository.createPrep(USER, { title: "Prep", language: "en" })
-  const image = await prepImageRepository.createImage(USER, prep.id, "key")
+  const image = await prepImageRepository.createImage(USER, prep.id, `prep-pages/${prep.id}/key`)
   const job = await prisma.job.create({
     data: {
       prepId: prep.id, type: "ocr", status, heartbeatAt, attempts, ...CONFIG, createdBy: USER,

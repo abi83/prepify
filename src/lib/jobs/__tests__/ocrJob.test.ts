@@ -40,7 +40,7 @@ beforeEach(async () => {
 describe("ocr job", () => {
   it("runs end-to-end: OCR fields and a linked GenerationMeta row are persisted", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     runOcrAgent.mockResolvedValue({
       output: { title: "Cells", text: "hello page", confidence: 0.9, language: "de", visual_elements: [] },

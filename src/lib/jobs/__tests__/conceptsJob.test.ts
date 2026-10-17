@@ -50,7 +50,7 @@ beforeEach(async () => {
 
 async function createPrepWithImages(count: number) {
   const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: null })
-  const images = await Promise.all(Array.from({ length: count }, (_, i) => prepImageRepository.createImage(OWNER, prep.id, `key-${i}`)))
+  const images = await Promise.all(Array.from({ length: count }, (_, i) => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key-${i}`)))
   return { prep, imageIds: images.map(image => image.id) }
 }
 

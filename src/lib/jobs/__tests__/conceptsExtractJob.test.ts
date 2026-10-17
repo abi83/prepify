@@ -62,7 +62,7 @@ async function extract(output: PageConcepts, imageId: string) {
 describe("concepts.extract job", () => {
   it("keeps the page's concepts on the job, writes no Concept rows, and records a GenerationMeta row", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: null })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     const { job, result } = await extract(FOUND, image.id)
 
@@ -73,7 +73,7 @@ describe("concepts.extract job", () => {
 
   it("is read back by loadPrepState as the image's found or empty outcome, pending until it ran", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: null })
-    const [ first, second, third ] = await Promise.all([ "a", "b", "c" ].map(key => prepImageRepository.createImage(OWNER, prep.id, key)))
+    const [ first, second, third ] = await Promise.all([ "a", "b", "c" ].map(key => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/${key}`)))
 
     await extract(FOUND, first.id)
     await extract({ status: "empty", reason: "not_educational" }, second.id)
