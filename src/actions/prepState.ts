@@ -22,6 +22,11 @@ export async function loadMyJobGenerations(prepId: string): Promise<Record<strin
   return prepStateRepository.loadJobGenerations(prepId)
 }
 
+export async function loadMyRejectedPageGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
+  await assertOwnsPrep(prepId)
+  return prepStateRepository.loadRejectedPageGenerations(prepId)
+}
+
 export async function getMyPrepProgress(prepId: string): Promise<PrepProgress | null> {
   await assertOwnsPrep(prepId)
   return prepStateRepository.getPrepProgress(prepId)

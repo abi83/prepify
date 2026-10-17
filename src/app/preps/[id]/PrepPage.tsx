@@ -28,10 +28,10 @@ function generationOf(jobId: string | null, generations: Record<string, JobGener
   return generations[jobId] ?? null
 }
 
-function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>): PageEntry | null {
+function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>, rejectedGenerations: Record<string, JobGeneration>): PageEntry | null {
   if (img.status === "failed") {
     if (!img.error) throw new Error(`PrepImage ${img.id} failed without an error`)
-    return { verdict: "rejected", number, gcsKey: img.gcsKey, reason: describeOcrError(img.error) }
+    return { verdict: "rejected", number, gcsKey: img.gcsKey, reason: describeOcrError(img.error), generation: rejectedGenerations[img.id] ?? null }
   }
   if (img.ocrResult === null) return null
   if (!img.language) throw new Error(`PrepImage ${img.id} has an OCR result but no language`)
@@ -39,9 +39,9 @@ function toPageEntry(img: PrepImage, number: number, generations: Record<string,
   return { verdict: "accepted", page, generation: generationOf(img.producedByJobId, generations) }
 }
 
-function toPages(images: PrepImage[], generations: Record<string, JobGeneration>): PageEntry[] {
+function toPages(images: PrepImage[], generations: Record<string, JobGeneration>, rejectedGenerations: Record<string, JobGeneration>): PageEntry[] {
   return images
-    .map((img, i) => toPageEntry(img, i + 1, generations))
+    .map((img, i) => toPageEntry(img, i + 1, generations, rejectedGenerations))
     .filter(entry => entry !== null)
 }
 
@@ -56,6 +56,8 @@ interface Props {
   concepts: StatedConcept[]
   images: PrepImage[]
   generations: Record<string, JobGeneration>
+  /** Wasted OCR calls by rejected image id. */
+  rejectedGenerations: Record<string, JobGeneration>
 }
 
 export default function PrepPage({
@@ -69,6 +71,7 @@ export default function PrepPage({
   concepts,
   images,
   generations,
+  rejectedGenerations,
 }: Props) {
   const router = useRouter()
   const { searchParams, set: setUrlParams } = useUrlParams()
@@ -145,7 +148,7 @@ export default function PrepPage({
           assets,
           progress,
           concepts,
-          pages: toPages(images, generations),
+          pages: toPages(images, generations, rejectedGenerations),
           generations,
           generationOfQuestion: q => generationOf(q.producedByJobId, generations),
           onTitleReady: title => setPrep(p => ({ ...p, title })),

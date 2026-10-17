@@ -80,6 +80,18 @@ export async function loadJobGenerations(prepId: string): Promise<Record<string,
   }))
 }
 
+/** Wasted OCR calls of pages the prep rejected, keyed by image id. A rejected page has no `producedByJobId`, so its job is found by input; retries accumulate metas on that one job. Pages without wasted calls are absent. */
+export async function loadRejectedPageGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
+  const jobs = await prisma.job.findMany({
+    where: { prepId, type: OCR_JOB_TYPE, generationMetas: { some: { wasted: true } } },
+    include: { generationMetas: { where: { wasted: true } }, inputs: { select: { entityId: true } } },
+  })
+  return Object.fromEntries(jobs.map(job => {
+    const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
+    return [ job.inputs[0].entityId, { jobId: job.id, model: job.model, tier: job.tier, calls } ]
+  }))
+}
+
 export type RunState ="idle" | "running" | "interrupted"
 
 export interface PrepProgress {
