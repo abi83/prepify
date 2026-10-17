@@ -5,7 +5,7 @@ import { listMyAssets } from "@/actions/assets"
 import { listMyAttempts } from "@/actions/attempts"
 import { listMyPrepImages } from "@/actions/prepImages"
 import { getMyPrep, getPrepCost, getPrepTokens } from "@/actions/preps"
-import { getMyPrepProgress, loadMyJobGenerations, loadMyPrepState, loadMyRejectedPageGenerations } from "@/actions/prepState"
+import { getMyPrepProgress, listConcepts, listJobGenerations, loadMyRejectedPageGenerations } from "@/actions/prepState"
 import { listMyQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
 import { Button } from "@/components/ui/button"
@@ -43,15 +43,15 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const [ questions, attempts, progress, tokensUsed, costUsd, state, images, generations, rejectedGenerations ] = await Promise.all([
+  const [ questions, attempts, progress, tokensUsed, costUsd, concepts, images, generations, rejectedGenerations ] = await Promise.all([
     listMyQuestions(id),
     listMyAttempts(id),
     getMyPrepProgress(id),
     getPrepTokens(id),
     getPrepCost(id),
-    loadMyPrepState(id),
+    listConcepts(id),
     listMyPrepImages(id),
-    loadMyJobGenerations(id),
+    listJobGenerations(id),
     loadMyRejectedPageGenerations(id),
   ])
 
@@ -59,6 +59,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <PrepPage
+      userId={session.user.id}
       prep={prep}
       questions={questions}
       attempts={attempts}
@@ -66,7 +67,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       progress={progress}
       tokensUsed={tokensUsed}
       costUsd={costUsd}
-      concepts={state.concepts}
+      concepts={concepts}
       images={images}
       generations={generations}
       rejectedGenerations={rejectedGenerations}

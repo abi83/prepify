@@ -4,39 +4,46 @@ import type { Prep, Question, Asset } from "@prisma/client"
 
 import PrepHeader from "@/components/prep/PrepHeader"
 import PrepView from "@/components/prep/PrepView"
-import { FLASHCARDS_TAB, QUESTIONS_TAB, type SharedTabData } from "@/components/prep/tabs/sharedTabs"
+import { generationOf, SHARED_TABS, toFlashcardQuestions, toFlashcards, toStudyQuestions, type SharedTabData } from "@/components/prep/tabs/sharedTabs"
 import { useUrlParams } from "@/lib/urlState"
+import type { JobGeneration, StatedConcept } from "@/repositories/prepStateRepository"
 import { parseStudyTab } from "@/types/prep"
-import type { FlashcardContent } from "@/types/questions"
 
 interface Props {
+  userId: string | null
   prep: Prep
   questions: Question[]
   assets: Asset[]
+  concepts: StatedConcept[]
+  generations: Record<string, JobGeneration>
+  tokensUsed: number
+  costUsd: number
 }
 
-const STUDY_TABS = [ FLASHCARDS_TAB, QUESTIONS_TAB ]
-
-/** Read-only view of a shared prep: the owner's prep view without editing, generation or usage controls. */
-export default function StudyPage({ prep, questions, assets }: Props) {
-  const { searchParams } = useUrlParams()
-  const studyQuestions = questions.filter(q => q.type !== "flashcard")
+/** Read-only view of a shared prep: the owner's prep view without editing, generation control or owner data. */
+export default function StudyPage({ userId, prep, questions, assets, concepts, generations, tokensUsed, costUsd }: Props) {
+  const { searchParams, set: setUrlParams } = useUrlParams()
+  const studyQuestions = toStudyQuestions(questions)
+  const flashcardQuestions = toFlashcardQuestions(questions)
 
   return (
     <PrepView
       prepId={prep.id}
+      userId={userId}
       studyQuestions={studyQuestions}
       assets={assets}
-      header={<PrepHeader prep={prep} tokensUsed={0} costUsd={0} actions={null} />}
+      header={<PrepHeader prep={prep} tokensUsed={tokensUsed} costUsd={costUsd} actions={null} />}
       tab={parseStudyTab(searchParams.get("tab"))}
-      tabs={STUDY_TABS}
-      startAttemptButton
-      tabData={(): SharedTabData => ({
-        flashcards: questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent),
+      tabs={SHARED_TABS}
+      tabData={(onStartAttempt): SharedTabData => ({
+        flashcards: toFlashcards(questions),
         studyQuestions,
         assets,
-        generationOfQuestion: () => null,
-        generationOfFlashcard: () => null,
+        concepts,
+        generationOfQuestion: q => generationOf(q.producedByJobId, generations),
+        generationOfFlashcard: i => generationOf(flashcardQuestions[i].producedByJobId, generations),
+        onStartAttempt,
+        onOpenTab: tab => setUrlParams({ tab }),
       })}
     />
   )

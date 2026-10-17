@@ -82,7 +82,7 @@ interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attemp
 
 function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], progress = null, generations = {}, rejectedGenerations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
   return render(
-    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={progress} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} rejectedGenerations={rejectedGenerations} />,
+    <PrepPage userId="u1" prep={prep} questions={questions} attempts={attempts} assets={[]} progress={progress} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} rejectedGenerations={rejectedGenerations} />,
   )
 }
 
@@ -291,7 +291,7 @@ describe("PrepPage OCR verdicts", () => {
 
   it("shows the reason on the rejected thumbnail in the draft", async () => {
     const draft: Prep = { ...prep, isActive: false }
-    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={[ accepted, rejected("i2", REASONS[2][0]) ]} generations={{}} rejectedGenerations={{}} />)
+    render(<PrepPage userId="u1" prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={[ accepted, rejected("i2", REASONS[2][0]) ]} generations={{}} rejectedGenerations={{}} />)
     expect(await screen.findByRole("alert")).toHaveTextContent(REASONS[2][1])
   })
 })
@@ -306,7 +306,7 @@ describe("PrepPage draft", () => {
 
   function renderDraft(images: PrepImage[] = []) {
     return render(
-      <PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={images} generations={{}} rejectedGenerations={{}} />,
+      <PrepPage userId="u1" prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={images} generations={{}} rejectedGenerations={{}} />,
     )
   }
 
@@ -332,7 +332,7 @@ describe("PrepPage draft", () => {
 
   it("keeps rendering a prep with jobs as before", () => {
     const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 }
-    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
+    render(<PrepPage userId="u1" prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
   })
 

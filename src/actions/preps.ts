@@ -3,7 +3,7 @@
 import type { Prep } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
-import { requireUserId } from "@/lib/currentUser"
+import { currentUserId, requireUserId } from "@/lib/currentUser"
 import { deletePrepObjects } from "@/lib/prepPageStorage"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
@@ -49,7 +49,7 @@ export async function deletePrep(id: string): Promise<void> {
 }
 
 export async function getPrepTokens(id: string): Promise<number> {
-  return prepRepository.getPrepTokens(await requireUserId(), id)
+  return prepRepository.getPrepTokens(await currentUserId(), id)
 }
 
 export async function getTotalTokens(): Promise<number> {
@@ -57,7 +57,7 @@ export async function getTotalTokens(): Promise<number> {
 }
 
 export async function getPrepCost(id: string): Promise<number> {
-  return prepRepository.getPrepCost(await requireUserId(), id)
+  return prepRepository.getPrepCost(await currentUserId(), id)
 }
 
 export async function getTotalCost(): Promise<number> {

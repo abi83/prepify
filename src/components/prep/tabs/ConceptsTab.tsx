@@ -1,9 +1,8 @@
 import ConceptCard from "@/components/ConceptCard"
 import ConceptGenerationSummary from "@/components/ConceptGenerationSummary"
+import type { StatedConcept } from "@/repositories/prepStateRepository"
 
-import type { PrepTabProps } from "./types"
-
-export default function ConceptsTab({ concepts }: PrepTabProps) {
+export default function ConceptsTab({ concepts }: { concepts: StatedConcept[] }) {
   if (concepts.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">No concepts extracted yet.</p>
 
   const generations = [ ...new Map(concepts.map(c => [ c.generation.jobId, c.generation ])).values() ]

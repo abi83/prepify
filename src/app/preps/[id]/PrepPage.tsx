@@ -1,17 +1,16 @@
 "use client"
 
 import type { Prep, Question, Attempt, Asset, PrepImage } from "@prisma/client"
-import { useSession } from "next-auth/react"
 import { useState } from "react"
 
 import PrepHeader from "@/components/prep/PrepHeader"
 import PrepView, { PREP_MAIN_CLASS } from "@/components/prep/PrepView"
+import { generationOf, toFlashcardQuestions, toFlashcards, toStudyQuestions } from "@/components/prep/tabs/sharedTabs"
 import { describeOcrError } from "@/lib/ocrRejection"
 import { useUrlParams } from "@/lib/urlState"
 import { useSyncedState } from "@/lib/useSyncedState"
 import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 import { parsePrepTab, ocrResultSchema } from "@/types/prep"
-import type { FlashcardContent } from "@/types/questions"
 
 import DeletePrepDialog from "./DeletePrepDialog"
 import DraftPrep from "./DraftPrep"
@@ -19,12 +18,6 @@ import SharePrepDialog from "./SharePrepDialog"
 import { PREP_TAB_REGISTRY } from "./tabs/registry"
 import type { PageEntry } from "./tabs/types"
 import { usePrepMe } from "./usePrepMe"
-
-/** The generation of the job that produced an entity; null when that job is gone. */
-function generationOf(jobId: string | null, generations: Record<string, JobGeneration>): JobGeneration | null {
-  if (jobId === null) return null
-  return generations[jobId] ?? null
-}
 
 function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>, rejectedGenerations: Record<string, JobGeneration>): PageEntry | null {
   if (img.status === "failed") {
@@ -44,6 +37,7 @@ function toPages(images: PrepImage[], generations: Record<string, JobGeneration>
 }
 
 interface Props {
+  userId: string
   prep: Prep
   questions: Question[]
   attempts: Attempt[]
@@ -59,6 +53,7 @@ interface Props {
 }
 
 export default function PrepPage({
+  userId,
   prep: serverPrep,
   questions: serverQuestions,
   attempts,
@@ -72,8 +67,6 @@ export default function PrepPage({
   rejectedGenerations,
 }: Props) {
   const { searchParams, set: setUrlParams } = useUrlParams()
-  const { data: session } = useSession()
-  const userId = session?.user.id ?? null
 
   const [ prep, setPrep ] = useSyncedState(serverPrep)
   const [ questions, setQuestions ] = useSyncedState(serverQuestions)
@@ -81,8 +74,8 @@ export default function PrepPage({
   const [ deleteOpen, setDeleteOpen ] = useState(false)
   const prepMe = usePrepMe(prep.id, images.length)
 
-  const studyQuestions = questions.filter(q => q.type !== "flashcard")
-  const flashcardQuestions = questions.filter(q => q.type === "flashcard")
+  const studyQuestions = toStudyQuestions(questions)
+  const flashcardQuestions = toFlashcardQuestions(questions)
   const isOwner = prep.userId === userId
   // A run in flight keeps the draft view up: activating the prep mid-run would otherwise unmount it.
   const showDraft = (!prep.isActive && progress === null) || prepMe.phase !== null
@@ -105,6 +98,7 @@ export default function PrepPage({
   return (
     <PrepView
       prepId={prep.id}
+      userId={userId}
       studyQuestions={studyQuestions}
       assets={assets}
       header={
@@ -117,11 +111,10 @@ export default function PrepPage({
       }
       tab={parsePrepTab(searchParams.get("tab"))}
       tabs={PREP_TAB_REGISTRY}
-      startAttemptButton={false}
       tabData={onStartAttempt => ({
         prep,
         questions,
-        flashcards: flashcardQuestions.map(q => q.content as unknown as FlashcardContent),
+        flashcards: toFlashcards(questions),
         studyQuestions,
         attempts,
         assets,
