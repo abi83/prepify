@@ -9,7 +9,7 @@ import { hashPrompt } from "@/lib/sampler/promptHash"
 import { cellPrefix } from "@/lib/sampler/storedSample"
 import { testCatalog } from "@/test/modelCatalog"
 import { createDiskResultSink, createDiskSampleSource } from "@evals/diskAdapters"
-import { ocrEvaluator } from "@evals/evaluators/ocr"
+import { ocrTextEvaluator } from "@evals/evaluators/ocrText"
 import type { Experiment } from "@evals/experiment"
 import { formatSummary } from "@evals/format"
 import { runExperiment } from "@evals/run"
@@ -38,7 +38,7 @@ async function setup(sampleCount: number) {
   const experiment: Experiment = {
     cell: CELL,
     samples: { dir },
-    judge: { llm: { model: "big-judge", tier: "default" }, timeoutMs: 5000, concurrency: 2 },
+    judge: { metric: "text", llm: { model: "big-judge", tier: "default" }, timeoutMs: 5000, concurrency: 2 },
     results: { dir },
   }
   return { dir, samples, experiment }
@@ -62,16 +62,16 @@ describe("runExperiment (OCR)", () => {
 
     const summary = await runExperiment(sequentialExperiment, deps(dir, llm))
 
-    const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
-    const judgePrompt = { promptVersion: ocrEvaluator.prompt.version, promptHash }
-    expect(summary).toMatchObject({ cell: CELL, agentPromptVersion: "1.0.0", ...judgePrompt, judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
+    const promptHash = await hashPrompt(ocrTextEvaluator.prompt.text)
+    const judgePrompt = { promptVersion: ocrTextEvaluator.prompt.version, promptHash }
+    expect(summary).toMatchObject({ cell: CELL, agentPromptVersion: "1.0.0", ...judgePrompt, metric: "text", judgeModel: "big-judge", gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000, sampleCount: 2 })
     expect(summary.score).toEqual({ mean: 0.75, median: 0.75, p95: 1 })
     expect(summary.latencyMs.mean).toBe(1500)
 
     const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", promptHash)
     expect((await readdir(resultDir)).sort()).toEqual([ ...samples.map(s => `${s.executionId}.json`), "summary.json" ].sort())
     expect(JSON.parse(await readFile(path.join(resultDir, `${samples[0].executionId}.json`), "utf-8")))
-      .toEqual({ executionId: samples[0].executionId, ...judgePrompt, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
+      .toEqual({ executionId: samples[0].executionId, metric: "text", ...judgePrompt, judgeModel: "big-judge", score: 0.5, reasoning: "r1" })
     expect(JSON.parse(await readFile(path.join(resultDir, "summary.json"), "utf-8"))).toMatchObject({ gitSha: "abc123", tier: "default", temperature: 1, maxTokens: 32_000 })
 
     expect(requests[0].model).toBe("big-judge")
@@ -113,7 +113,7 @@ describe("runExperiment (OCR)", () => {
       },
     }
     await expect(runExperiment(experiment, deps(dir, llm))).rejects.toThrow(/sample\(s\) failed/)
-    const promptHash = await hashPrompt(ocrEvaluator.prompt.text)
+    const promptHash = await hashPrompt(ocrTextEvaluator.prompt.text)
     const resultDir = path.join(dir, "results", "ocr", CELL.promptHash, "org__model-x", promptHash)
     expect(await readdir(resultDir)).not.toContain("summary.json")
   })

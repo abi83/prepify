@@ -11,9 +11,11 @@ export const verdictSchema = z.object({
 
 export type Verdict = z.infer<typeof verdictSchema>
 
-/** Judges one sample of `agent`; its identity is `prompt`'s id, version and hash. */
+/** Judges one `metric` of one sample of `agent`; its identity is `prompt`'s id, version and hash. */
 export interface Evaluator {
   agent: string
+  /** What this judge measures; an agent has one evaluator per metric, each seeing only the slice of output it scores. */
+  metric: string
   prompt: Prompt
   /** What the judge sees: the sample's input and output. */
   buildJudgeInput(sample: StoredSample): AgentInput

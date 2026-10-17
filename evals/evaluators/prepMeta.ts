@@ -17,6 +17,7 @@ export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 export const prepMetaEvaluator: Evaluator = {
   agent: "PrepMeta",
+  metric: "quality",
   prompt,
   buildJudgeInput: ({ input, output }) => ({
     textContent: `Model instructions:\n${input.textContent}\n\nModel output (JSON):\n${JSON.stringify(output, null, 2)}`,

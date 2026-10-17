@@ -12,6 +12,7 @@ const YAML = `cell:
   model: gpt-5-mini
 samples: { dir: ./samples }
 judge:
+  metric: text
   llm: { model: big, tier: default }
   timeoutMs: 60000
   concurrency: 4
@@ -40,6 +41,7 @@ describe("loadExperiment", () => {
     await expect(load(YAML + "extra: 1\n")).rejects.toThrow()
     await expect(load(YAML.replace("timeoutMs: 60000", "timeoutMs: 0"))).rejects.toThrow()
     await expect(load(YAML.replace("  concurrency: 4\n", ""))).rejects.toThrow()
+    await expect(load(YAML.replace("  metric: text\n", ""))).rejects.toThrow()
     for (const bad of [ "0", "-1", "1.5", "\"2\"" ]) await expect(load(YAML.replace("concurrency: 4", `concurrency: ${bad}`))).rejects.toThrow()
     await expect(load(YAML.replace("a".repeat(64), "abc"))).rejects.toThrow()
   })

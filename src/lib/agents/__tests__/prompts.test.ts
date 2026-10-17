@@ -15,12 +15,14 @@ import { prompt as prepMeta } from "@/lib/agents/PrepMeta"
 import { prompt as questionReviewer } from "@/lib/agents/QuestionReviewer"
 import type { Prompt } from "@/lib/prompt"
 import { hashPrompt } from "@/lib/sampler/promptHash"
-import { prompt as judgeOcr } from "@evals/evaluators/ocr"
+import { prompt as judgeOcrText } from "@evals/evaluators/ocrText"
+import { prompt as judgeOcrVisualElements } from "@evals/evaluators/ocrVisualElements"
 
 const PROMPTS: Record<string, Prompt> = {
   "ocr": ocr, "concept-extractor": conceptExtractor, "concept-merger": conceptMerger, "prep-meta": prepMeta,
   "question-reviewer": questionReviewer, "single-choice": singleChoice, "multiple-choice": multipleChoice, "fill-the-gap": fillTheGap,
-  "flashcard": flashcard, "sorting": sorting, "diagram": diagram, "formula": formula, "molecule": molecule, "judge/ocr": judgeOcr,
+  "flashcard": flashcard, "sorting": sorting, "diagram": diagram, "formula": formula, "molecule": molecule, "judge/ocr-text": judgeOcrText,
+  "judge/ocr-visual-elements": judgeOcrVisualElements,
 }
 
 describe("prompt identity", () => {

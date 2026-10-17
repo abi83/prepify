@@ -43,7 +43,7 @@ describe("disk ResultSink", () => {
   it("mirrors the cell path under results/ plus the evaluator id", async () => {
     const dir = await tempDir()
     const sink = createDiskResultSink(dir)
-    const result = { executionId: "e1", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
+    const result = { executionId: "e1", metric: "text", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
     await sink.writeSampleResult(CELL, result)
     await sink.writeSummary(CELL, "ev", { n: 1 })
 

@@ -23,9 +23,13 @@
     "version": "1.0.0",
     "hash": "7e006ef2c7c2f24c5808b5fd24cf89fcc2c3dd4bc0fa136bf36407deb8f657b9"
   },
-  "judge/ocr": {
+  "judge/ocr-text": {
     "version": "1.0.0",
-    "hash": "d9c661d220057479cb49f091d4fbf17760fa6b542f81770153d0a95bdd3676e7"
+    "hash": "0b451533cb5b7914101710d493c41d5c24037379937522f3a0c21ceaac7decca"
+  },
+  "judge/ocr-visual-elements": {
+    "version": "1.0.0",
+    "hash": "c5c2613ea6958613fe0c38195cc88a68a05035de306cf795147ca3093d522f1e"
   },
   "molecule": {
     "version": "1.0.0",
