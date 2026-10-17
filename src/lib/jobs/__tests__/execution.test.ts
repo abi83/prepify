@@ -9,7 +9,7 @@ import type { PageConcepts } from "@/types/pipeline"
 import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
-const TARGET: PlanTarget = { questionCount: 3, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
+const TARGET: PlanTarget = { questionCount: 3, flashcardCount: 0, enabledTypes: [ "single_choice" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 const NOOP_LLM: Llm = { complete: () => { throw new Error("not used") } }
 const NOOP_PROGRESS: ProgressSink = { report: () => {} }
 

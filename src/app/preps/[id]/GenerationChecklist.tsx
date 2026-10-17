@@ -69,6 +69,15 @@ export function rowsFromSummary(s: PrepProgress, prepTitle: string): ChecklistRo
       terminal: s.terminalQuestions,
     },
   ]
+  if (s.totalFlashcards > 0) {
+    rows.push({
+      label: "Craft and validate flashcards",
+      status: s.completedFlashcards === s.totalFlashcards ? "done" : "pending",
+      detail: `${s.completedFlashcards}/${s.totalFlashcards}`,
+      failed: s.failedFlashcards,
+      terminal: s.terminalFlashcards,
+    })
+  }
   if (s.runState !== "running") return rows
   const current = rows.find(row => row.status === "pending")
   if (current) current.status = "running"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildDifficultyPool, buildQuestionTasks } from "@/core/lib/taskBuilder"
+import { buildDifficultyPool, buildFlashcardTasks, buildQuestionTasks } from "@/core/lib/taskBuilder"
 import type { Concept } from "@/types/pipeline"
 import type { Difficulty } from "@/types/questions"
 
@@ -42,7 +42,7 @@ describe("buildDifficultyPool", () => {
 })
 
 describe("buildQuestionTasks difficulty", () => {
-  const config = { questionCount: 10, enabledTypes: [ "flashcard" as const, "single_choice" as const ], difficultyMix: MIX }
+  const config = { questionCount: 10, enabledTypes: [ "sorting" as const, "single_choice" as const ], difficultyMix: MIX }
 
   it("assigns the requested difficulty distribution", () => {
     const tasks = buildQuestionTasks(concepts(8), config)
@@ -66,5 +66,17 @@ describe("buildQuestionTasks difficulty", () => {
 
   it("falls back to a single concept when only one exists", () => {
     for (const t of buildQuestionTasks(concepts(1), config)) expect(t.concepts).toHaveLength(1)
+  })
+})
+
+describe("buildFlashcardTasks", () => {
+  it("builds exactly flashcardCount flashcard tasks", () => {
+    const tasks = buildFlashcardTasks(concepts(8), { flashcardCount: 7, difficultyMix: MIX })
+    expect(tasks).toHaveLength(7)
+    expect(tasks.every(t => t.type === "flashcard")).toBe(true)
+  })
+
+  it("builds none for a count of 0", () => {
+    expect(buildFlashcardTasks(concepts(8), { flashcardCount: 0, difficultyMix: MIX })).toEqual([])
   })
 })

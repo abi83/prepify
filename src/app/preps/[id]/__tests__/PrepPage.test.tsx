@@ -184,6 +184,7 @@ describe("PrepPage shell", () => {
     const progress: PrepProgress = {
       runState: "idle", totalPages: 3, ocrPages: 3, rejectedPages: 0, hasConcepts: false,
       totalQuestions: 10, completedQuestions: 0, failedQuestions: 1, terminalQuestions: 0,
+      totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0,
     }
     renderPage([], { progress })
     const main = screen.getByRole("tabpanel")
@@ -318,7 +319,7 @@ describe("PrepPage draft", () => {
   })
 
   it("keeps rendering a prep with jobs as before", () => {
-    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
+    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 }
     render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
   })

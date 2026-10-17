@@ -101,37 +101,54 @@ export interface PrepProgress {
   ocrPages: number // pages with an OCR result
   rejectedPages: number // pages OCR rejected
   hasConcepts: boolean
-  totalQuestions: number // question jobs created so far, any status
+  totalQuestions: number // quiz question jobs created so far, any status
   completedQuestions: number // executed
   failedQuestions: number // failed with attempts left, until resume re-executes them
   terminalQuestions: number // failed past the attempt cap; only an explicit retry re-runs them
+  totalFlashcards: number // same four counts, for flashcard jobs
+  completedFlashcards: number
+  failedFlashcards: number
+  terminalFlashcards: number
 }
+
+interface JobCounts { total: number; executed: number; failed: number; terminal: number }
 
 /** What generation has done so far, for the UI. Null until the first job past OCR exists or a run is live — uploading alone isn't "generation started". No ownership check — callers resolve the prep first. */
 export async function getPrepProgress(prepId: string): Promise<PrepProgress | null> {
   await interruptStaleJobs({ prepId })
-  const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs, terminalQuestions ] = await Promise.all([
+  const [ images, conceptCount, questionJobs, otherJobs, runningJobs, interruptedJobs, terminalJobs ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true, status: true } }),
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
-    prisma.job.groupBy({ by: [ "status" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
+    prisma.job.groupBy({ by: [ "status", "questionType" ], where: { prepId, type: QUESTION_JOB_TYPE }, _count: true }),
     prisma.job.count({ where: { prepId, type: { notIn: [ OCR_JOB_TYPE, QUESTION_JOB_TYPE ] } } }),
     prisma.job.count({ where: { prepId, status: "running" } }),
     prisma.job.count({ where: { prepId, status: "interrupted" } }),
-    prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE, ...TERMINAL } }),
+    prisma.job.groupBy({ by: [ "questionType" ], where: { prepId, type: QUESTION_JOB_TYPE, ...TERMINAL }, _count: true }),
   ])
   const runState: RunState = runningJobs > 0 ? "running" : interruptedJobs > 0 ? "interrupted" : "idle"
   if (otherJobs === 0 && questionJobs.length === 0 && runState === "idle") return null
 
-  const countOf = (status: JobStatus) => questionJobs.find(group => group.status === status)?._count ?? 0
+  const countsFor = (isFlashcard: boolean): JobCounts => {
+    const groups = questionJobs.filter(group => (group.questionType === "flashcard") === isFlashcard)
+    const sumOf = (status: JobStatus) => groups.filter(group => group.status === status).reduce((sum, group) => sum + group._count, 0)
+    const terminal = terminalJobs.filter(group => (group.questionType === "flashcard") === isFlashcard).reduce((sum, group) => sum + group._count, 0)
+    return { total: groups.reduce((sum, group) => sum + group._count, 0), executed: sumOf("executed"), failed: sumOf("failed") - terminal, terminal }
+  }
+  const quiz = countsFor(false)
+  const flashcards = countsFor(true)
   return {
     runState,
     totalPages: images.length,
     ocrPages: images.filter(image => image.ocrResult !== null).length,
     rejectedPages: images.filter(image => image.status === "failed").length,
     hasConcepts: conceptCount > 0,
-    totalQuestions: questionJobs.reduce((sum, group) => sum + group._count, 0),
-    completedQuestions: countOf("executed"),
-    failedQuestions: countOf("failed") - terminalQuestions,
-    terminalQuestions,
+    totalQuestions: quiz.total,
+    completedQuestions: quiz.executed,
+    failedQuestions: quiz.failed,
+    terminalQuestions: quiz.terminal,
+    totalFlashcards: flashcards.total,
+    completedFlashcards: flashcards.executed,
+    failedFlashcards: flashcards.failed,
+    terminalFlashcards: flashcards.terminal,
   }
 }

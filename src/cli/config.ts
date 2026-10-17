@@ -39,7 +39,8 @@ const overridesSchema = z.strictObject({
   run: z.strictObject({ concurrency: positiveInt }).partial(),
   log: z.strictObject({ level: z.enum(LOG_LEVELS) }).partial(),
   target: z.strictObject({
-    questionCount: positiveInt,
+    questionCount: z.number().int().nonnegative(),
+    flashcardCount: z.number().int().nonnegative(),
     enabledTypes: z.array(z.enum(ALL_QUESTION_TYPES)).min(1),
     difficultyMix: z.strictObject({ easy: z.number().nonnegative(), medium: z.number().nonnegative(), hard: z.number().nonnegative() }),
   }).partial(),

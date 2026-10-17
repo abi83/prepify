@@ -10,7 +10,7 @@ const REQUEST = {
   prepId: "p1",
   model: "gpt-5-nano",
   tier: "flex",
-  target: { questionCount: 10, enabledTypes: [ "flashcard" as const ], difficultyMix: { easy: 1, medium: 1, hard: 1 } },
+  target: { questionCount: 10, flashcardCount: 0, enabledTypes: [ "single_choice" as const ], difficultyMix: { easy: 1, medium: 1, hard: 1 } },
 }
 
 const respondWith = (status: number) => vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status }))

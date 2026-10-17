@@ -126,6 +126,10 @@ export const questionTypeSchema = z.enum([
 
 export type QuestionType = z.infer<typeof questionTypeSchema>
 
+/** Question types that make up a quiz; flashcards are studied separately. */
+export const quizTypeSchema = questionTypeSchema.exclude([ "flashcard" ])
+export type QuizType = z.infer<typeof quizTypeSchema>
+
 export const difficultySchema = z.enum([ "easy", "medium", "hard" ])
 export type Difficulty = z.infer<typeof difficultySchema>
 

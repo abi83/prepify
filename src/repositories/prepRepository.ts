@@ -20,7 +20,7 @@ export async function listPublicCatalog(): Promise<CatalogEntry[]> {
   const preps = await prisma.prep.findMany({
     where: { visibility: "public", isActive: true },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { questions: true } } },
+    include: { _count: { select: { questions: { where: { type: { not: "flashcard" } } } } } },
   })
   return preps.map(({ _count, ...prep }) => ({ ...prep, questionCount: _count.questions }))
 }

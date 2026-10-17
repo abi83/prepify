@@ -1,14 +1,15 @@
-import type { Difficulty, QuestionType } from "@/types/questions"
+import type { Difficulty, QuestionType, QuizType } from "@/types/questions"
 
 const STORAGE_KEY = "prepify_gen_config"
 
-export const ALL_QUESTION_TYPES: QuestionType[] = [
-  "flashcard",
+export const ALL_QUESTION_TYPES: QuizType[] = [
   "single_choice",
   "multiple_choice",
   "fill_the_gap",
   "sorting",
 ]
+
+export const MAX_FLASHCARDS = 30
 
 export const TYPE_LABELS: Record<QuestionType, string> = {
   flashcard: "Flashcards",
@@ -22,13 +23,16 @@ export const TYPE_LABELS: Record<QuestionType, string> = {
 export type DifficultyMix = Record<Difficulty, number>
 
 export interface GenerationConfig {
+  /** Quiz questions; flashcards are counted separately. */
   questionCount: number
-  enabledTypes: QuestionType[]
+  flashcardCount: number
+  enabledTypes: QuizType[]
   difficultyMix: DifficultyMix
 }
 
 export const DEFAULT_GEN_CONFIG: GenerationConfig = {
   questionCount: 10,
+  flashcardCount: 10,
   enabledTypes: [ ...ALL_QUESTION_TYPES ],
   difficultyMix: { easy: 3, medium: 4, hard: 3 },
 }
@@ -53,13 +57,17 @@ export function getGenerationConfig(): GenerationConfig {
     if (!raw) return defaultConfig()
     const parsed = JSON.parse(raw) as Partial<GenerationConfig>
     const count = Number(parsed.questionCount)
+    const flashcards = Number(parsed.flashcardCount ?? DEFAULT_GEN_CONFIG.flashcardCount)
     const enabledTypes = Array.isArray(parsed.enabledTypes)
-      ? (parsed.enabledTypes as QuestionType[]).filter(t => ALL_QUESTION_TYPES.includes(t))
+      ? (parsed.enabledTypes as QuizType[]).filter(t => ALL_QUESTION_TYPES.includes(t))
       : [ ...DEFAULT_GEN_CONFIG.enabledTypes ]
     return {
       questionCount: Number.isFinite(count)
         ? Math.min(20, Math.max(5, count))
         : DEFAULT_GEN_CONFIG.questionCount,
+      flashcardCount: Number.isFinite(flashcards)
+        ? Math.min(MAX_FLASHCARDS, Math.max(0, flashcards))
+        : DEFAULT_GEN_CONFIG.flashcardCount,
       enabledTypes: enabledTypes.length > 0 ? enabledTypes : [ ...DEFAULT_GEN_CONFIG.enabledTypes ],
       difficultyMix: isValidMix(parsed.difficultyMix) ? parsed.difficultyMix : { ...DEFAULT_GEN_CONFIG.difficultyMix },
     }

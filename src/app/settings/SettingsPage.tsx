@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { GenerationConfig } from "@/core/lib/generationConfig"
 import {
   getGenerationConfig, setGenerationConfig,
-  ALL_QUESTION_TYPES, TYPE_LABELS,
+  ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS,
 } from "@/core/lib/generationConfig"
 import { getApiKey, setApiKey, clearApiKey, DEFAULT_MODEL, DEFAULT_TIER } from "@/lib/apiKey"
 import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
@@ -22,7 +22,7 @@ import { providerModels } from "@/lib/modelCatalog"
 import { formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
 import type { ModelCatalog } from "@/types/modelCatalog"
-import type { QuestionType } from "@/types/questions"
+import type { QuizType } from "@/types/questions"
 
 type TestState = "idle" | "testing" | "ok" | "invalid_key" | "error"
 
@@ -59,7 +59,7 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
     setExecutionModeState(mode)
   }
 
-  function toggleType(type: QuestionType) {
+  function toggleType(type: QuizType) {
     setGenConfig(prev => {
       const already = prev.enabledTypes.includes(type)
       if (already && prev.enabledTypes.length === 1) return prev // enforce at-least-1
@@ -243,6 +243,21 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
             onChange={e => setGenConfig(prev => ({
               ...prev,
               questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
+            }))}
+            className="max-w-[90px]"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Flashcards per prep</Label>
+          <Input
+            type="number"
+            min={0}
+            max={MAX_FLASHCARDS}
+            value={genConfig.flashcardCount}
+            onChange={e => setGenConfig(prev => ({
+              ...prev,
+              flashcardCount: Math.min(MAX_FLASHCARDS, Math.max(0, Number(e.target.value) || 0)),
             }))}
             className="max-w-[90px]"
           />

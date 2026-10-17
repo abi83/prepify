@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import type { GenerationConfig } from "@/core/lib/generationConfig"
-import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/core/lib/generationConfig"
+import { getGenerationConfig, ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS } from "@/core/lib/generationConfig"
 import type { PlanTarget } from "@/core/lib/planner"
 import { getApiKey } from "@/lib/apiKey"
 import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
@@ -26,7 +26,7 @@ import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { cn } from "@/lib/utils"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { QuestionType } from "@/types/questions"
+import type { QuizType } from "@/types/questions"
 
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
 import { useRunProgress } from "./useRunProgress"
@@ -38,6 +38,14 @@ interface Props {
   hasQuestions: boolean
   onTitleReady: (title: string) => void
   onComplete: (questions: Question[], freshPrep: Prep) => void
+}
+
+function countLabel(questions: number, flashcards: number): string {
+  const parts = [
+    questions > 0 ? `${questions} question${questions === 1 ? "" : "s"}` : null,
+    flashcards > 0 ? `${flashcards} flashcard${flashcards === 1 ? "" : "s"}` : null,
+  ]
+  return parts.filter(Boolean).join(" and ")
 }
 
 export default function GenerationPanel({
@@ -65,7 +73,7 @@ export default function GenerationPanel({
   const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
   const { progress: prepProgress, refresh: refreshProgress, expectRun } = useRunProgress(prepId, initialProgress, handlePollError)
 
-  function toggleLocalType(type: QuestionType) {
+  function toggleLocalType(type: QuizType) {
     setLocalConfig(prev => {
       const already = prev.enabledTypes.includes(type)
       if (already && prev.enabledTypes.length === 1) return prev
@@ -201,8 +209,9 @@ export default function GenerationPanel({
 
   const hasUnfinishedJobs = prepProgress !== null && (
     prepProgress.runState !== "idle"
-    || prepProgress.failedQuestions > 0
+    || prepProgress.failedQuestions + prepProgress.failedFlashcards > 0
     || prepProgress.completedQuestions + prepProgress.failedQuestions + prepProgress.terminalQuestions < prepProgress.totalQuestions
+    || prepProgress.completedFlashcards + prepProgress.failedFlashcards + prepProgress.terminalFlashcards < prepProgress.totalFlashcards
   )
 
   if (hasQuestions && genPhase === "idle" && !genError) {
@@ -254,15 +263,15 @@ export default function GenerationPanel({
                   </>
                 ) : (
                   <Button onClick={handleGenerate}>
-                    {hasPartialRun && (prepProgress.completedQuestions > 0 || prepProgress.failedQuestions > 0) ? "Resume generation" : "Start generation"}
+                    {hasPartialRun && (prepProgress.completedQuestions + prepProgress.completedFlashcards + prepProgress.failedQuestions + prepProgress.failedFlashcards > 0) ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
-              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions > 0 && (
+              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions + prepProgress.terminalFlashcards > 0 && (
                 <div className="flex items-center gap-2.5">
                   <Button variant="outline" onClick={handleRetryTerminal}>Retry</Button>
                   <p className="text-sm text-error">
-                    {prepProgress.terminalQuestions} question{prepProgress.terminalQuestions === 1 ? "" : "s"} failed repeatedly and won&apos;t be resumed automatically.
+                    {countLabel(prepProgress.terminalQuestions, prepProgress.terminalFlashcards)} failed repeatedly and won&apos;t be resumed automatically.
                   </p>
                 </div>
               )}
@@ -276,6 +285,8 @@ export default function GenerationPanel({
                   <button className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border border-border bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground sm:max-w-sm">
                     <span className="flex-1">
                       {localConfig.questionCount} questions
+                      {" · "}
+                      {localConfig.flashcardCount} flashcards
                       {" · "}
                       {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
                         ? "All types"
@@ -304,6 +315,22 @@ export default function GenerationPanel({
                         className="h-11 w-[84px]"
                       />
                       <span className="text-xs text-muted-foreground">5–20</span>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                      <Label className="min-w-[68px] text-xs font-semibold tracking-wide text-muted-foreground uppercase">Flashcards</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={MAX_FLASHCARDS}
+                        value={localConfig.flashcardCount}
+                        onChange={e => setLocalConfig(prev => ({
+                          ...prev,
+                          flashcardCount: Math.min(MAX_FLASHCARDS, Math.max(0, Number(e.target.value) || 0)),
+                        }))}
+                        className="h-11 w-[84px]"
+                      />
+                      <span className="text-xs text-muted-foreground">0–{MAX_FLASHCARDS}</span>
                     </div>
 
                     <div className="flex flex-col gap-2">
@@ -347,9 +374,9 @@ export default function GenerationPanel({
         </div>
       )}
 
-      {genPhase === "done" && prepProgress && prepProgress.failedQuestions > 0 && (
+      {genPhase === "done" && prepProgress && prepProgress.failedQuestions + prepProgress.failedFlashcards > 0 && (
         <div className="text-xs text-error">
-          {prepProgress.failedQuestions} question{prepProgress.failedQuestions === 1 ? "" : "s"} failed review twice and {prepProgress.failedQuestions === 1 ? "was" : "were"} skipped.
+          {countLabel(prepProgress.failedQuestions, prepProgress.failedFlashcards)} failed review twice and {prepProgress.failedQuestions + prepProgress.failedFlashcards === 1 ? "was" : "were"} skipped.
         </div>
       )}
 

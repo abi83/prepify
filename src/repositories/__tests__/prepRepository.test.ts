@@ -79,14 +79,15 @@ describe("listOwnedPreps", () => {
 })
 
 describe("listPublicCatalog", () => {
-  it("includes only active public preps, with question counts", async () => {
+  it("includes only active public preps, with quiz question counts (flashcards excluded)", async () => {
     const priv = await prepRepository.createPrep(OWNER, { title: "Private", language: "en" })
     const pub = await prepRepository.createPrep(OWNER, { title: "Public", language: "en" })
     await prepRepository.updatePrep(OWNER, pub.id, { visibility: "public" })
     await prisma.prep.update({ where: { id: pub.id }, data: { isActive: true } })
     await prisma.question.createMany({
       data: [
-        { prepId: pub.id, language: "en", type: "flashcard", content: {} },
+        { prepId: pub.id, language: "en", type: "single_choice", content: {} },
+        { prepId: pub.id, language: "en", type: "single_choice", content: {} },
         { prepId: pub.id, language: "en", type: "flashcard", content: {} },
       ],
     })

@@ -85,7 +85,7 @@ vi.mock("@/lib/jobs/questionJob", () => ({
 }))
 
 const API_KEY = "sk-secret-key-123"
-const TARGET = { questionCount: 5, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
+const TARGET = { questionCount: 5, flashcardCount: 0, enabledTypes: [ "single_choice" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 
 function post(body: unknown) {
   return POST(new NextRequest("http://test/api/preps/generate", { method: "POST", body: JSON.stringify(body) }))
