@@ -28,7 +28,7 @@ export type Concept = z.infer<typeof conceptSchema>
 /** A `Concept` as persisted: stamped with the language of the pages it was extracted from. */
 export type StoredConcept = Concept & { language: SupportedLanguage }
 
-const storedConceptSchema = conceptSchema.extend({ language: z.enum(SUPPORTED_LANGUAGES) })
+export const storedConceptSchema = conceptSchema.extend({ language: z.enum(SUPPORTED_LANGUAGES) })
 
 /** What the `concepts.extract` job found on one page. */
 export const pageConceptsSchema = z.discriminatedUnion("status", [

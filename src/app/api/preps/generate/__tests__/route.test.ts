@@ -75,13 +75,13 @@ vi.mock("@/lib/jobs/conceptsExtractJob", () => ({
   })),
 }))
 vi.mock("@/lib/jobs/conceptsJob", () => ({
-  createConceptsJobDefinition: fakeDefinition("concepts", () => [ { name: "Mitosis", description: "Cell division process", importance: 0.9, misconceptions: [], language: "en" } ]),
+  createConceptsJobDefinition: fakeDefinition("concepts", () => [ { name: "Mitosis", description: "Cell division process in eukaryotes that yields two identical cells", importance: 0.9, misconceptions: [], language: "en" } ]),
 }))
 vi.mock("@/lib/jobs/prepMetaJob", () => ({
   createPrepMetaJobDefinition: fakeDefinition("prep.meta", () => ({ title: "Biology", description: "Cells", grade: null, discipline: null })),
 }))
 vi.mock("@/lib/jobs/questionJob", () => ({
-  createQuestionJobDefinition: fakeDefinition("question", () => ({ type: "flashcard", content: { front: "f", back: "b" } })),
+  createQuestionJobDefinition: fakeDefinition("question", () => ({ type: "flashcard", content: { front: "f", back: "b", back_explanation: "e", asset_hint: { needed: false, type: null, description: null } } })),
 }))
 
 const API_KEY = "sk-secret-key-123"

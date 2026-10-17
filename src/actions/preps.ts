@@ -8,6 +8,7 @@ import { requireUserId } from "@/lib/currentUser"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import type { CatalogEntry, CreatePrepInput, UpdatePrepInput } from "@/repositories/prepRepository"
+import { createPrepInputSchema, updatePrepInputSchema } from "@/types/prep"
 
 export async function listMyPreps(): Promise<Prep[]> {
   return prepRepository.listOwnedPreps(await requireUserId())
@@ -26,13 +27,13 @@ export async function getSharedPrep(id: string): Promise<Prep> {
 }
 
 export async function createPrep(data: CreatePrepInput): Promise<Prep> {
-  const prep = await prepRepository.createPrep(await requireUserId(), data)
+  const prep = await prepRepository.createPrep(await requireUserId(), createPrepInputSchema.parse(data))
   revalidatePath("/preps")
   return prep
 }
 
 export async function updatePrep(id: string, data: UpdatePrepInput): Promise<Prep> {
-  const prep = await prepRepository.updatePrep(await requireUserId(), id, data)
+  const prep = await prepRepository.updatePrep(await requireUserId(), id, updatePrepInputSchema.parse(data))
   revalidatePath(`/preps/${id}`)
   revalidatePath("/preps")
   revalidatePath("/catalog")

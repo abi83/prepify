@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", async () => {
 
 import { prisma } from "@/lib/prisma"
 import * as attemptRepository from "@/repositories/attemptRepository"
+import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 
 const OWNER = "user-owner"
@@ -27,6 +28,19 @@ describe("insert / listForPrep", () => {
     const attempts = await attemptRepository.listForPrep(OWNER, prep.id)
     expect(attempts).toHaveLength(1)
     expect(attempts[0]).toMatchObject({ score: 4, total: 5 })
+  })
+
+  it.each([ [ 6, 5 ], [ -1, 5 ], [ 1.5, 5 ], [ 1, 5.5 ] ])("rejects score %s of total %s", async (score, total) => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+
+    await expect(attemptRepository.insert(OWNER, prep.id, score, total)).rejects.toThrow()
+    expect(await prisma.attempt.count()).toBe(0)
+  })
+
+  it("rejects an attempt on a prep the user cannot read", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+
+    await expect(attemptRepository.insert(OTHER, prep.id, 1, 1)).rejects.toThrow(ForbiddenError)
   })
 
   it("never returns another user's attempts, even for the prep owner", async () => {
