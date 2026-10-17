@@ -63,7 +63,7 @@ const call = (promptTokens: number, completionTokens: number, costUsd: number): 
   ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false, generatedAt: CREATED_AT })
 
 function gen(jobId: string, calls: GenerationCall[], overrides: Partial<JobGeneration> = {}): JobGeneration {
-  return { jobId, type: "question", status: "executed", subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls, ...overrides }
+  return { jobId, type: "question", status: "executed", failureReason: null, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls, ...overrides }
 }
 
 const flashcard = (id: string): Question =>
@@ -230,7 +230,7 @@ describe("PrepPage generation log", () => {
     const rows = within(log).getAllByRole("row")
     expect(rows).toHaveLength(4)
     expect(rows[1]).toHaveTextContent(`Question · single_choice · easyexecutedgpt-5-nano · $0.50010 in / 5 out${formatDate(CREATED_AT)}`)
-    expect(rows[2]).toHaveTextContent(`OCR · Page 2failedgpt-5-mini · $0.10020 in / 5 out${formatDate(later)}`)
+    expect(rows[2]).toHaveTextContent(`OCR · Page 2failedRetrygpt-5-mini · $0.10020 in / 5 out${formatDate(later)}`)
     expect(rows[3]).toHaveTextContent("Total$0.60030 in / 10 out")
   })
 })

@@ -3,13 +3,9 @@ import { useState } from "react"
 import { retryFailedPages } from "@/actions/jobs"
 import PageSection from "@/app/preps/[id]/PageSection"
 import RejectedPage from "@/app/preps/[id]/RejectedPage"
-import { useRunTrigger } from "@/app/preps/[id]/useRunTrigger"
+import { resumeRunRequest, useRunTrigger } from "@/app/preps/[id]/useRunTrigger"
 import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
 import { Button } from "@/components/ui/button"
-import { getGenerationConfig } from "@/core/lib/generationConfig"
-import { runGeneration } from "@/lib/jobs/client/clientExecution"
-import { consoleLogger } from "@/lib/logger"
-import { clientSampler } from "@/lib/sampler/clientSampler"
 
 import type { PrepTabProps } from "./types"
 
@@ -35,23 +31,7 @@ export default function PagesTab({ prep, pages }: PrepTabProps) {
       return
     }
     // The resumed OCR jobs run first; the run then extracts and merges the recovered pages' concepts.
-    const config = getGenerationConfig()
-    trigger.run({
-      config,
-      beforeServerRun: async () => {},
-      runInBrowser: ({ actorId, keyConfig }) => runGeneration({
-        actorId,
-        prepId: prep.id,
-        apiKey: keyConfig.key,
-        model: keyConfig.model,
-        tier: keyConfig.tier,
-        target: config,
-        signal: new AbortController().signal,
-        logger: consoleLogger,
-        sampler: clientSampler,
-        onProgress: () => {},
-      }),
-    })
+    trigger.run(resumeRunRequest(prep.id))
   }
 
   if (pages.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">No pages recognised yet.</p>

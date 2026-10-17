@@ -28,6 +28,10 @@ export async function retryTerminalJobs(prepId: string): Promise<number> {
   return jobRepository.retryTerminalJobs(await requireUserId(), prepId)
 }
 
+export async function retryJob(jobId: string): Promise<void> {
+  return jobRepository.retryJob(await requireUserId(), jobId)
+}
+
 export async function retryFailedPages(prepId: string, imageIds: string[]): Promise<number> {
   return jobRepository.retryFailedPages(await requireUserId(), prepId, imageIds)
 }

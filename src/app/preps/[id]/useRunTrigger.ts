@@ -2,10 +2,13 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useRef, useState } from "react"
 
-import type { GenerationConfig } from "@/core/lib/generationConfig"
+import { getGenerationConfig, type GenerationConfig } from "@/core/lib/generationConfig"
 import { getApiKey, type ApiKeyConfig } from "@/lib/apiKey"
 import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
+import { runGeneration } from "@/lib/jobs/client/clientExecution"
 import { awaitRunStart, requestServerRun } from "@/lib/jobs/client/serverRunClient"
+import { consoleLogger } from "@/lib/logger"
+import { clientSampler } from "@/lib/sampler/clientSampler"
 
 export interface RunRequest {
   config: GenerationConfig
@@ -13,6 +16,27 @@ export interface RunRequest {
   beforeServerRun: () => Promise<void>
   /** The browser-mode run; throws to report a failure. */
   runInBrowser: (run: { actorId: string; keyConfig: ApiKeyConfig }) => Promise<void>
+}
+
+/** A run that resumes the prep's unfinished jobs with the user's current generation settings. */
+export function resumeRunRequest(prepId: string): RunRequest {
+  const config = getGenerationConfig()
+  return {
+    config,
+    beforeServerRun: async () => {},
+    runInBrowser: ({ actorId, keyConfig }) => runGeneration({
+      actorId,
+      prepId,
+      apiKey: keyConfig.key,
+      model: keyConfig.model,
+      tier: keyConfig.tier,
+      target: config,
+      signal: new AbortController().signal,
+      logger: consoleLogger,
+      sampler: clientSampler,
+      onProgress: () => {},
+    }),
+  }
 }
 
 interface Handlers {

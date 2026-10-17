@@ -26,6 +26,7 @@ export interface JobGeneration {
   jobId: string
   type: string
   status: JobStatus
+  failureReason: string | null
   subject: string
   model: string
   tier: string
@@ -101,9 +102,9 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
   }
 }
 
-function toJobGeneration(job: { id: string; type: string; status: JobStatus; model: string; tier: string }, subject: string, metas: GenerationCall[]): JobGeneration {
+function toJobGeneration(job: { id: string; type: string; status: JobStatus; failureReason: string | null; model: string; tier: string }, subject: string, metas: GenerationCall[]): JobGeneration {
   const calls = metas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }))
-  return { jobId: job.id, type: job.type, status: job.status, subject, model: job.model, tier: job.tier, calls }
+  return { jobId: job.id, type: job.type, status: job.status, failureReason: job.failureReason, subject, model: job.model, tier: job.tier, calls }
 }
 
 /** 1-based page number of each of the prep's images, in upload order. */

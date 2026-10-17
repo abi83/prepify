@@ -54,13 +54,13 @@ const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
   runState: "idle", totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0, ...overrides,
 })
 
-function renderPanel(initialProgress: PrepProgress | null = null) {
+function renderPanel(initialProgress: PrepProgress | null = null, hasQuestions = false) {
   return render(
     <GenerationPanel
       prepId="prep-1"
       prepTitle="Prep #1"
       initialProgress={initialProgress}
-      hasQuestions={false}
+      hasQuestions={hasQuestions}
       onTitleReady={vi.fn()}
       onComplete={vi.fn()}
     />,
@@ -246,5 +246,27 @@ describe("GenerationPanel progress from the DB", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry" }))
 
     expect(mockRetryTerminal).toHaveBeenCalledWith("prep-1")
+  })
+})
+
+describe("GenerationPanel add more", () => {
+  it("stays enabled when only failed jobs remain", () => {
+    renderPanel(progress({ hasConcepts: true, totalQuestions: 3, completedQuestions: 1, failedQuestions: 1, terminalQuestions: 1 }), true)
+
+    expect(screen.getByRole("button", { name: "Add 5 more" })).toBeEnabled()
+    expect(screen.queryByText(/still in progress/)).toBeNull()
+  })
+
+  it("is disabled while jobs are not yet run", () => {
+    renderPanel(progress({ hasConcepts: true, totalQuestions: 3, completedQuestions: 1 }), true)
+
+    expect(screen.getByRole("button", { name: "Add 5 more" })).toBeDisabled()
+    expect(screen.getByText(/still in progress/)).toBeInTheDocument()
+  })
+
+  it("is disabled during a live run", () => {
+    renderPanel(progress({ runState: "running", hasConcepts: true, totalQuestions: 3, completedQuestions: 3 }), true)
+
+    expect(screen.getByRole("button", { name: "Add 5 more" })).toBeDisabled()
   })
 })

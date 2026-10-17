@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
-import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryFailedPages, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
+import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryFailedPages, retryJob, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { getPrepProgress } from "@/repositories/prepStateRepository"
@@ -145,6 +145,29 @@ describe("running and interrupted jobs", () => {
     expect(await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "interrupted", attempts: 0, failureReason: null })
     expect(await statusOf(otherOcr.id)).toBe("failed")
     expect(await statusOf(question.id)).toBe("failed")
+  })
+
+  it("retryJob resets one failed job, resumable or terminal, with a fresh budget", async () => {
+    const resumable = await makeJob("failed", null, 1)
+    const terminal = await makeJob("failed", null, MAX_JOB_ATTEMPTS)
+
+    await retryJob(USER, resumable.job.id)
+    await retryJob(USER, terminal.job.id)
+
+    for (const { job } of [ resumable, terminal ]) {
+      expect(await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "interrupted", attempts: 0, failureReason: null })
+    }
+  })
+
+  it("retryJob refuses a non-owner, a missing job and a job that isn't failed", async () => {
+    const failed = await makeJob("failed", null)
+    const created = await makeJob("created", null)
+
+    await expect(retryJob("someone-else", failed.job.id)).rejects.toThrow()
+    await expect(retryJob(USER, "missing")).rejects.toThrow()
+    await expect(retryJob(USER, created.job.id)).rejects.toThrow("not failed")
+    expect(await statusOf(failed.job.id)).toBe("failed")
+    expect(await statusOf(created.job.id)).toBe("created")
   })
 
   it("commits from `running` over the status the caller read", async () => {
