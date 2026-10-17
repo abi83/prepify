@@ -82,8 +82,8 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
         systemPrompt: evaluator.prompt.text,
         userContent: evaluator.buildJudgeInput(sample),
         schema: verdictSchema,
-        model: judge.llm.model,
-        tier: judge.llm.tier,
+        model: evaluator.llm.model,
+        tier: evaluator.llm.tier,
         signal,
         deps,
       })
@@ -91,7 +91,7 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
         executionId: sample.executionId,
         metric: judge.metric,
         ...judgePrompt,
-        judgeModel: judge.llm.model,
+        judgeModel: evaluator.llm.model,
         score: output.score,
         reasoning: output.reasoning,
       })
@@ -107,8 +107,8 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
 
   const summary: CellSummary = {
     cell, agentPromptVersion: agentVersion, metric: judge.metric, ...judgePrompt,
-    judgeModel: judge.llm.model, gitSha, ...sampling, ...summarizeCell(rows),
+    judgeModel: evaluator.llm.model, gitSha, ...sampling, ...summarizeCell(rows),
   }
-  await sink.writeSummary(cell, judgePrompt.promptHash, summary)
+  await sink.writeSummary(cell, { model: evaluator.llm.model, promptHash: judgePrompt.promptHash }, summary)
   return summary
 }

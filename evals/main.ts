@@ -52,7 +52,7 @@ const sink = artifactsBucket
 const summary = await runExperiment(experiment, {
   source,
   sink,
-  llm: new OpenAiLlm({ apiKey, baseUrl: experiment.judge.llm.baseUrl }),
+  llm: new OpenAiLlm({ apiKey, baseUrl: experiment.judge.baseUrl }),
   logger: createLogger({ transport: line => process.stderr.write(line + "\n"), minLevel: "info" }),
   catalog: await loadModelCatalog(),
   gitSha,

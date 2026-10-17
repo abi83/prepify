@@ -4,7 +4,7 @@ import path from "path"
 import { storedSampleSchema, type StoredSample } from "@/core/sampler"
 import { cellPrefix } from "@/lib/sampler/storedSample"
 
-import type { Cell, ResultSink, SampleSource } from "./ports"
+import { judgePath, type Cell, type JudgeId, type ResultSink, type SampleSource } from "./ports"
 
 /** Reads `{dir}/samples/{agent}/{promptHash}/{model}/*.json`, the layout the disk sampler writes. */
 export function createDiskSampleSource(dir: string): SampleSource {
@@ -22,10 +22,10 @@ export function createDiskSampleSource(dir: string): SampleSource {
   }
 }
 
-/** Writes `{dir}/results/{agent}/{promptHash}/{model}/{judge promptHash}/{executionId|summary}.json`. */
+/** Writes `{dir}/results/{agent}/{promptHash}/{model}/{judge model}/{judge promptHash}/{executionId|summary}.json`. */
 export function createDiskResultSink(dir: string): ResultSink {
-  const resultDir = (cell: Cell, judgeHash: string) =>
-    path.join(dir, cellPrefix(cell).replace(/^samples/, "results"), judgeHash)
+  const resultDir = (cell: Cell, judge: JudgeId) =>
+    path.join(dir, cellPrefix(cell).replace(/^samples/, "results"), judgePath(judge))
 
   async function write(file: string, content: unknown): Promise<void> {
     await mkdir(path.dirname(file), { recursive: true })
@@ -33,7 +33,7 @@ export function createDiskResultSink(dir: string): ResultSink {
   }
 
   return {
-    writeSampleResult: (cell, result) => write(path.join(resultDir(cell, result.promptHash), `${result.executionId}.json`), result),
-    writeSummary: (cell, promptHash, summary) => write(path.join(resultDir(cell, promptHash), "summary.json"), summary),
+    writeSampleResult: (cell, result) => write(path.join(resultDir(cell, { model: result.judgeModel, promptHash: result.promptHash }), `${result.executionId}.json`), result),
+    writeSummary: (cell, judge, summary) => write(path.join(resultDir(cell, judge), "summary.json"), summary),
   }
 }

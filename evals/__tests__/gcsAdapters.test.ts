@@ -55,9 +55,9 @@ describe("GCS ResultSink", () => {
     const sink = createGcsResultSink("b", storage)
     const result = { executionId: "e1", metric: "text", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
     await sink.writeSampleResult(CELL, result)
-    await sink.writeSummary(CELL, "ev", { n: 1 })
+    await sink.writeSummary(CELL, { model: "judge", promptHash: "ev" }, { n: 1 })
 
-    const prefix = `results/${CELL.agent}/${CELL.promptHash}/org__model-x/ev`
+    const prefix = `results/${CELL.agent}/${CELL.promptHash}/org__model-x/judge/ev`
     expect(Object.keys(objects).sort()).toEqual([ `${prefix}/e1.json`, `${prefix}/summary.json` ])
     expect(JSON.parse(objects[`${prefix}/e1.json`])).toEqual(result)
   })
@@ -68,10 +68,10 @@ describe("artifacts", () => {
     const { storage, objects } = fakeStorage()
     await uploadSamples("a", [ makeSample(1) ], storage, "runs/r1/")
     const sink = teeResultSinks(createGcsResultSink("a", storage, "runs/r1/"))
-    await sink.writeSummary(CELL, "ev", { n: 1 })
+    await sink.writeSummary(CELL, { model: "judge", promptHash: "ev" }, { n: 1 })
 
     expect(Object.keys(objects).sort()).toEqual([
-      `runs/r1/results/${CELL.agent}/${CELL.promptHash}/org__model-x/ev/summary.json`,
+      `runs/r1/results/${CELL.agent}/${CELL.promptHash}/org__model-x/judge/ev/summary.json`,
       `runs/r1/${key(1)}`,
     ])
   })

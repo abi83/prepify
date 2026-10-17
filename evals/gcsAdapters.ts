@@ -3,7 +3,7 @@ import { Storage } from "@google-cloud/storage"
 import { storedSampleSchema, type StoredSample } from "@/core/sampler"
 import { cellPrefix, sampleObjectKey } from "@/lib/sampler/storedSample"
 
-import type { Cell, ResultSink, SampleSource } from "./ports"
+import { judgePath, type Cell, type JudgeId, type ResultSink, type SampleSource } from "./ports"
 
 /** Reads `gs://{bucket}/samples/{agent}/{promptHash}/{model}/*.json`, the layout the GCS sampler writes. Auth via ADC. */
 export function createGcsSampleSource(bucket: string, storage = new Storage()): SampleSource {
@@ -22,17 +22,17 @@ export function createGcsSampleSource(bucket: string, storage = new Storage()): 
   }
 }
 
-/** Writes `gs://{bucket}/{keyPrefix}results/{agent}/{promptHash}/{model}/{judge promptHash}/{executionId|summary}.json`. */
+/** Writes `gs://{bucket}/{keyPrefix}results/{agent}/{promptHash}/{model}/{judge model}/{judge promptHash}/{executionId|summary}.json`. */
 export function createGcsResultSink(bucket: string, storage = new Storage(), keyPrefix = ""): ResultSink {
-  const resultKey = (cell: Cell, judgeHash: string, name: string) =>
-    `${keyPrefix}${cellPrefix(cell).replace(/^samples/, "results")}/${judgeHash}/${name}.json`
+  const resultKey = (cell: Cell, judge: JudgeId, name: string) =>
+    `${keyPrefix}${cellPrefix(cell).replace(/^samples/, "results")}/${judgePath(judge)}/${name}.json`
 
   const write = (key: string, content: unknown) =>
     storage.bucket(bucket).file(key).save(JSON.stringify(content, null, 2), { contentType: "application/json" })
 
   return {
-    writeSampleResult: (cell, result) => write(resultKey(cell, result.promptHash, result.executionId), result),
-    writeSummary: (cell, promptHash, summary) => write(resultKey(cell, promptHash, "summary"), summary),
+    writeSampleResult: (cell, result) => write(resultKey(cell, { model: result.judgeModel, promptHash: result.promptHash }, result.executionId), result),
+    writeSummary: (cell, judge, summary) => write(resultKey(cell, judge, "summary"), summary),
   }
 }
 
@@ -46,6 +46,6 @@ export async function uploadSamples(bucket: string, samples: StoredSample[], sto
 export function teeResultSinks(...sinks: ResultSink[]): ResultSink {
   return {
     writeSampleResult: async (cell, result) => { await Promise.all(sinks.map(sink => sink.writeSampleResult(cell, result))) },
-    writeSummary: async (cell, promptHash, summary) => { await Promise.all(sinks.map(sink => sink.writeSummary(cell, promptHash, summary))) },
+    writeSummary: async (cell, judge, summary) => { await Promise.all(sinks.map(sink => sink.writeSummary(cell, judge, summary))) },
   }
 }

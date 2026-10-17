@@ -18,6 +18,15 @@ export interface SampleResult {
   reasoning: string
 }
 
+/** One judge: its model and rubric hash. Both identify a result; the same rubric under another model is a different judge. */
+export interface JudgeId {
+  model: string
+  promptHash: string
+}
+
+/** `{judge model}/{judge promptHash}`, with `/` in the model id made `__` like sample paths do. */
+export const judgePath = ({ model, promptHash }: JudgeId): string => `${model.replace(/\//g, "__")}/${promptHash}`
+
 export interface SampleSource {
   /** Every sample of the cell; throws on an invalid sample. */
   readCell(cell: Cell): Promise<StoredSample[]>
@@ -25,5 +34,5 @@ export interface SampleSource {
 
 export interface ResultSink {
   writeSampleResult(cell: Cell, result: SampleResult): Promise<void>
-  writeSummary(cell: Cell, promptHash: string, summary: unknown): Promise<void>
+  writeSummary(cell: Cell, judge: JudgeId, summary: unknown): Promise<void>
 }

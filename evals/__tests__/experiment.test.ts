@@ -13,7 +13,6 @@ const YAML = `cell:
 samples: { dir: ./samples }
 judge:
   metric: text
-  llm: { model: big, tier: default }
   timeoutMs: 60000
   concurrency: 4
 results: { dir: ./out }
@@ -27,7 +26,7 @@ async function load(content: string) {
 
 describe("loadExperiment", () => {
   it("parses a valid experiment", async () => {
-    expect((await load(YAML)).judge.llm.baseUrl).toBeUndefined()
+    expect((await load(YAML)).judge.baseUrl).toBeUndefined()
   })
 
   it("accepts GCS buckets and an artifacts bucket", async () => {
@@ -39,6 +38,7 @@ describe("loadExperiment", () => {
   it("rejects unknown keys and bad values", async () => {
     await expect(load(YAML.replace("{ dir: ./out }", "{ dir: ./out, bucket: b }"))).rejects.toThrow()
     await expect(load(YAML + "extra: 1\n")).rejects.toThrow()
+    await expect(load(YAML.replace("  metric: text\n", "  metric: text\n  llm: { model: big, tier: default }\n"))).rejects.toThrow()
     await expect(load(YAML.replace("timeoutMs: 60000", "timeoutMs: 0"))).rejects.toThrow()
     await expect(load(YAML.replace("  concurrency: 4\n", ""))).rejects.toThrow()
     await expect(load(YAML.replace("  metric: text\n", ""))).rejects.toThrow()

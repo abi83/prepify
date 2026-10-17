@@ -24,12 +24,12 @@
     "hash": "7e006ef2c7c2f24c5808b5fd24cf89fcc2c3dd4bc0fa136bf36407deb8f657b9"
   },
   "judge/ocr-text": {
-    "version": "1.0.0",
-    "hash": "0b451533cb5b7914101710d493c41d5c24037379937522f3a0c21ceaac7decca"
+    "version": "1.1.0",
+    "hash": "2ae1f80f8a670fe68e192c9eaf7533635913d69e5cfb1075d5786e2b37f9a215"
   },
   "judge/ocr-visual-elements": {
-    "version": "1.0.0",
-    "hash": "c5c2613ea6958613fe0c38195cc88a68a05035de306cf795147ca3093d522f1e"
+    "version": "1.1.0",
+    "hash": "e6704ef2c3cd078a284f4e33cc9449b0a1f949db11f5e3e9e4e7733bd0536cb7"
   },
   "molecule": {
     "version": "1.0.0",
