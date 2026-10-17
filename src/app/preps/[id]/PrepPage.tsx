@@ -29,7 +29,7 @@ function generationOf(jobId: string | null, generations: Record<string, JobGener
 function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>, rejectedGenerations: Record<string, JobGeneration>): PageEntry | null {
   if (img.status === "failed") {
     if (!img.error) throw new Error(`PrepImage ${img.id} failed without an error`)
-    return { verdict: "rejected", number, gcsKey: img.gcsKey, reason: describeOcrError(img.error), generation: rejectedGenerations[img.id] ?? null }
+    return { verdict: "rejected", imageId: img.id, number, gcsKey: img.gcsKey, reason: describeOcrError(img.error), generation: rejectedGenerations[img.id] ?? null }
   }
   if (img.ocrResult === null) return null
   if (!img.language) throw new Error(`PrepImage ${img.id} has an OCR result but no language`)

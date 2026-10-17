@@ -10,7 +10,8 @@ vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: vi.fn() }))
 
 const progress = (over: Partial<PrepProgress> = {}): PrepProgress => ({
   runState: "running", totalPages: 3, ocrPages: 0, rejectedPages: 0, hasConcepts: false,
-  totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, ...over,
+  totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0,
+  totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0, ...over,
 })
 
 describe("shouldRefreshContent", () => {

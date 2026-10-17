@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
-import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
+import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryFailedPages, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { getPrepProgress } from "@/repositories/prepStateRepository"
@@ -126,6 +126,25 @@ describe("running and interrupted jobs", () => {
 
     expect(await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "interrupted", attempts: 0, failureReason: null })
     expect((await listUnfinishedJobs(USER, prep.id)).map(j => j.id)).toEqual([ job.id ])
+  })
+
+  it("retryFailedPages resets only the given pages' OCR jobs and refuses a non-owner", async () => {
+    const { prep, job } = await makeJob("failed", null, MAX_JOB_ATTEMPTS)
+    const otherImage = await prepImageRepository.createImage(USER, prep.id, `prep-pages/${prep.id}/other`)
+    const otherOcr = await prisma.job.create({
+      data: { prepId: prep.id, type: "ocr", status: "failed", attempts: MAX_JOB_ATTEMPTS, failureReason: "boom", ...CONFIG, createdBy: USER, inputs: { create: [ { entityType: "prepImage", entityId: otherImage.id } ] } },
+    })
+    const question = await prisma.job.create({
+      data: { prepId: prep.id, type: "question", status: "failed", attempts: MAX_JOB_ATTEMPTS, failureReason: "boom", ...CONFIG, createdBy: USER },
+    })
+    const imageId = (await prisma.jobInput.findFirstOrThrow({ where: { jobId: job.id } })).entityId
+
+    await expect(retryFailedPages("someone-else", prep.id, [ imageId ])).rejects.toThrow()
+    expect(await retryFailedPages(USER, prep.id, [ imageId ])).toBe(1)
+
+    expect(await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "interrupted", attempts: 0, failureReason: null })
+    expect(await statusOf(otherOcr.id)).toBe("failed")
+    expect(await statusOf(question.id)).toBe("failed")
   })
 
   it("commits from `running` over the status the caller read", async () => {
