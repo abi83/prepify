@@ -5,7 +5,8 @@ import type { PageConceptsState, PrepState } from "@/types/prepState"
 
 const TARGET: PlanTarget = {
   questionCount: 5,
-  enabledTypes: [ "flashcard", "single_choice" ],
+  flashcardCount: 0,
+  enabledTypes: [ "single_choice", "sorting" ],
   difficultyMix: { easy: 1, medium: 1, hard: 1 },
 }
 
@@ -157,12 +158,28 @@ describe("nextJobs", () => {
       expect(spec.type).toBe("question")
       expect(spec.inputIds.length).toBeGreaterThan(0)
       expect(spec.inputIds.every(id => CONCEPTS.some(c => c.id === id))).toBe(true)
-      expect(spec.question).toEqual({ questionType: expect.stringMatching(/^(flashcard|single_choice)$/), difficulty: expect.stringMatching(/^(easy|medium|hard)$/) })
+      expect(spec.question).toEqual({ questionType: expect.stringMatching(/^(single_choice|sorting)$/), difficulty: expect.stringMatching(/^(easy|medium|hard)$/) })
     }
   })
 
   it("plans nothing once question jobs exist, even with fewer questions than the target", () => {
     expect(nextJobs(state({ questionCount: 2, questionJobCount: 5 }), { ...TARGET, questionCount: 10 })).toEqual([])
+  })
+
+  describe("flashcards", () => {
+    const withConcepts = state()
+
+    it("plans flashcardCount flashcard jobs besides questionCount quiz jobs", () => {
+      const types = nextJobs(withConcepts, { ...TARGET, flashcardCount: 2 }).map(spec => spec.question?.questionType)
+      expect(types.filter(t => t === "flashcard")).toHaveLength(2)
+      expect(types.filter(t => t !== "flashcard")).toHaveLength(5)
+    })
+
+    it("plans no flashcards when flashcardCount is 0", () => {
+      const types = nextJobs(withConcepts, { ...TARGET, flashcardCount: 0 }).map(spec => spec.question?.questionType)
+      expect(types).not.toContain("flashcard")
+      expect(types).toHaveLength(5)
+    })
   })
 
   describe("additionalQuestions", () => {
@@ -175,8 +192,8 @@ describe("nextJobs", () => {
     })
 
     it("applies the config's types to the new questions", () => {
-      const specs = nextJobs(state(EXISTING), { ...TARGET, enabledTypes: [ "flashcard" ], additionalQuestions: 3 })
-      expect(specs.map(spec => spec.question?.questionType)).toEqual([ "flashcard", "flashcard", "flashcard" ])
+      const specs = nextJobs(state(EXISTING), { ...TARGET, enabledTypes: [ "sorting" ], additionalQuestions: 3 })
+      expect(specs.map(spec => spec.question?.questionType)).toEqual([ "sorting", "sorting", "sorting" ])
     })
 
     it("plans only assets while jobs are unfinished", () => {

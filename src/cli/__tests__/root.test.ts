@@ -54,7 +54,7 @@ const options = (prepDir: string, llm: Llm) => ({
   samplesRoot: samplesRootOf(prepDir),
   apiKey: "unused",
   llm,
-  config: resolveCliConfig({ llm: { model: "google/gemma-4-26b-a4b" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } }),
+  config: resolveCliConfig({ llm: { model: "google/gemma-4-26b-a4b" }, target: { questionCount: 0, flashcardCount: 1, enabledTypes: [ "single_choice" ] } }),
 })
 
 describe("CLI root", () => {
@@ -89,7 +89,7 @@ describe("CLI root", () => {
 
   it("writes no log below the configured log.level", async () => {
     const dir = await makePrepFixture()
-    const config = resolveCliConfig({ log: { level: "error" }, target: { questionCount: 1, enabledTypes: [ "flashcard" ] } })
+    const config = resolveCliConfig({ log: { level: "error" }, target: { questionCount: 0, flashcardCount: 1, enabledTypes: [ "single_choice" ] } })
 
     await runCli({ ...options(dir, fakeLlm()), config })
 

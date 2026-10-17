@@ -184,6 +184,7 @@ describe("PrepPage shell", () => {
     const progress: PrepProgress = {
       runState: "idle", totalPages: 3, ocrPages: 3, rejectedPages: 0, hasConcepts: false,
       totalQuestions: 10, completedQuestions: 0, failedQuestions: 1, terminalQuestions: 0,
+      totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0,
     }
     renderPage([], { progress })
     const main = screen.getByRole("tabpanel")
@@ -318,7 +319,7 @@ describe("PrepPage draft", () => {
   })
 
   it("keeps rendering a prep with jobs as before", () => {
-    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
+    const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 }
     render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
   })
@@ -398,8 +399,8 @@ describe("PrepPage draft", () => {
     renderDraft([ imageRow("0") ])
     expect(screen.getByText(/gpt-5-mini · flex · Server-assisted/)).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole("button", { name: /10 questions · All types/ }))
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "7" } })
+    await userEvent.click(screen.getByRole("button", { name: /10 questions · 10 flashcards · All types/ }))
+    fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "7" } })
     await userEvent.click(screen.getByRole("checkbox", { name: "Sorting" }))
     await userEvent.click(screen.getByRole("button", { name: "Done" }))
     await userEvent.click(prepMe())
@@ -407,7 +408,7 @@ describe("PrepPage draft", () => {
     await waitFor(() => expect(h.requestServerRun).toHaveBeenCalledOnce())
     expect(h.requestServerRun.mock.calls[0][0].target).toMatchObject({
       questionCount: 7,
-      enabledTypes: [ "flashcard", "single_choice", "multiple_choice", "fill_the_gap" ],
+      enabledTypes: [ "single_choice", "multiple_choice", "fill_the_gap" ],
     })
   })
 

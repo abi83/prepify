@@ -7,9 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { ALL_QUESTION_TYPES, TYPE_LABELS, type GenerationConfig } from "@/core/lib/generationConfig"
+import { ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS, type GenerationConfig } from "@/core/lib/generationConfig"
 import { cn } from "@/lib/utils"
-import type { QuestionType } from "@/types/questions"
+import type { QuizType } from "@/types/questions"
 
 interface Props {
   value: GenerationConfig
@@ -22,7 +22,7 @@ interface Props {
 export function GenerationConfigEditor({ value, onChange, editCount }: Props) {
   const [ open, setOpen ] = useState(false)
 
-  function toggleType(type: QuestionType) {
+  function toggleType(type: QuizType) {
     const already = value.enabledTypes.includes(type)
     if (already && value.enabledTypes.length === 1) return
     onChange({ ...value, enabledTypes: already ? value.enabledTypes.filter(t => t !== type) : [ ...value.enabledTypes, type ] })
@@ -37,7 +37,7 @@ export function GenerationConfigEditor({ value, onChange, editCount }: Props) {
       <SheetTrigger asChild>
         <button className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border border-border bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground sm:max-w-sm">
           <span className="flex-1">
-            {editCount && `${value.questionCount} questions · `}
+            {editCount && `${value.questionCount} questions · ${value.flashcardCount} flashcards · `}
             {typesSummary}
           </span>
           <span className="text-xs opacity-60">Edit</span>
@@ -61,6 +61,21 @@ export function GenerationConfigEditor({ value, onChange, editCount }: Props) {
                 className="h-11 w-[84px]"
               />
               <span className="text-xs text-muted-foreground">5–20</span>
+            </div>
+          )}
+
+          {editCount && (
+            <div className="flex items-center gap-2.5">
+              <Label className="min-w-[68px] text-xs font-semibold tracking-wide text-muted-foreground uppercase">Flashcards</Label>
+              <Input
+                type="number"
+                min={0}
+                max={MAX_FLASHCARDS}
+                value={value.flashcardCount}
+                onChange={e => onChange({ ...value, flashcardCount: Math.min(MAX_FLASHCARDS, Math.max(0, Number(e.target.value) || 0)) })}
+                className="h-11 w-[84px]"
+              />
+              <span className="text-xs text-muted-foreground">0–{MAX_FLASHCARDS}</span>
             </div>
           )}
 

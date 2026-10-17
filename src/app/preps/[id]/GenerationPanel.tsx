@@ -38,6 +38,14 @@ interface Props {
   onComplete: (questions: Question[], freshPrep: Prep) => void
 }
 
+function countLabel(questions: number, flashcards: number): string {
+  const parts = [
+    questions > 0 ? `${questions} question${questions === 1 ? "" : "s"}` : null,
+    flashcards > 0 ? `${flashcards} flashcard${flashcards === 1 ? "" : "s"}` : null,
+  ]
+  return parts.filter(Boolean).join(" and ")
+}
+
 export default function GenerationPanel({
   prepId,
   prepTitle,
@@ -190,8 +198,9 @@ export default function GenerationPanel({
 
   const hasUnfinishedJobs = prepProgress !== null && (
     prepProgress.runState !== "idle"
-    || prepProgress.failedQuestions > 0
+    || prepProgress.failedQuestions + prepProgress.failedFlashcards > 0
     || prepProgress.completedQuestions + prepProgress.failedQuestions + prepProgress.terminalQuestions < prepProgress.totalQuestions
+    || prepProgress.completedFlashcards + prepProgress.failedFlashcards + prepProgress.terminalFlashcards < prepProgress.totalFlashcards
   )
 
   if (hasQuestions && genPhase === "idle" && !genError) {
@@ -253,15 +262,15 @@ export default function GenerationPanel({
                   </>
                 ) : (
                   <Button onClick={handleGenerate}>
-                    {hasPartialRun && (prepProgress.completedQuestions > 0 || prepProgress.failedQuestions > 0) ? "Resume generation" : "Start generation"}
+                    {hasPartialRun && (prepProgress.completedQuestions + prepProgress.completedFlashcards + prepProgress.failedQuestions + prepProgress.failedFlashcards > 0) ? "Resume generation" : "Start generation"}
                   </Button>
                 )}
               </div>
-              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions > 0 && (
+              {!isRunning && !isServerRunning && prepProgress && prepProgress.terminalQuestions + prepProgress.terminalFlashcards > 0 && (
                 <div className="flex items-center gap-2.5">
                   <Button variant="outline" onClick={handleRetryTerminal}>Retry</Button>
                   <p className="text-sm text-error">
-                    {prepProgress.terminalQuestions} question{prepProgress.terminalQuestions === 1 ? "" : "s"} failed repeatedly and won&apos;t be resumed automatically.
+                    {countLabel(prepProgress.terminalQuestions, prepProgress.terminalFlashcards)} failed repeatedly and won&apos;t be resumed automatically.
                   </p>
                 </div>
               )}
@@ -294,9 +303,9 @@ export default function GenerationPanel({
         </div>
       )}
 
-      {genPhase === "done" && prepProgress && prepProgress.failedQuestions > 0 && (
+      {genPhase === "done" && prepProgress && prepProgress.failedQuestions + prepProgress.failedFlashcards > 0 && (
         <div className="text-xs text-error">
-          {prepProgress.failedQuestions} question{prepProgress.failedQuestions === 1 ? "" : "s"} failed review twice and {prepProgress.failedQuestions === 1 ? "was" : "were"} skipped.
+          {countLabel(prepProgress.failedQuestions, prepProgress.failedFlashcards)} failed review twice and {prepProgress.failedQuestions + prepProgress.failedFlashcards === 1 ? "was" : "were"} skipped.
         </div>
       )}
 

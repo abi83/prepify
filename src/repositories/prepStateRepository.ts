@@ -109,6 +109,10 @@ export interface PrepProgress {
   completedQuestions: number // executed
   failedQuestions: number // failed with attempts left, until resume re-executes them
   terminalQuestions: number // failed past the attempt cap; only an explicit retry re-runs them
+  totalFlashcards: number // same four counts, for flashcard jobs
+  completedFlashcards: number
+  failedFlashcards: number
+  terminalFlashcards: number
 }
 
 /** What generation has done so far, for the UI. Null until the first job past OCR exists or a run is live — uploading alone isn't "generation started". Read-only: stale `running` jobs are swept separately (`interruptStaleJobs`). No ownership check — callers resolve the prep first. */
@@ -117,19 +121,24 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
     prisma.prepImage.findMany({ where: { prepId }, select: { ocrResult: true, status: true } }),
     prisma.concept.count({ where: { producedByJob: { prepId } } }),
     // `attempts` is bounded by the cap, so grouping on it tells terminal from retryable failures.
-    prisma.job.groupBy({ by: [ "type", "status", "attempts" ], where: { prepId }, _count: true }),
+    prisma.job.groupBy({ by: [ "type", "status", "attempts", "questionType" ], where: { prepId }, _count: true }),
   ])
   const countJobs = (matches: (group: (typeof jobGroups)[number]) => boolean) => jobGroups.filter(matches).reduce((sum, group) => sum + group._count, 0)
-  const questionJobs = (status?: JobStatus) => countJobs(group => group.type === QUESTION_JOB_TYPE && (status === undefined || group.status === status))
+  const questionJobs = (isFlashcard: boolean, status?: JobStatus) =>
+    countJobs(group => group.type === QUESTION_JOB_TYPE && (group.questionType === "flashcard") === isFlashcard && (status === undefined || group.status === status))
+  const terminalJobs = (isFlashcard: boolean) =>
+    countJobs(group => group.type === QUESTION_JOB_TYPE && (group.questionType === "flashcard") === isFlashcard && group.status === "failed" && group.attempts >= MAX_JOB_ATTEMPTS)
 
   const runningJobs = countJobs(group => group.status === "running")
   const interruptedJobs = countJobs(group => group.status === "interrupted")
   const otherJobs = countJobs(group => group.type !== OCR_JOB_TYPE && group.type !== QUESTION_JOB_TYPE)
-  const totalQuestions = questionJobs()
+  const totalQuestions = questionJobs(false)
+  const totalFlashcards = questionJobs(true)
   const runState: RunState = runningJobs > 0 ? "running" : interruptedJobs > 0 ? "interrupted" : "idle"
-  if (otherJobs === 0 && totalQuestions === 0 && runState === "idle") return null
+  if (otherJobs === 0 && totalQuestions + totalFlashcards === 0 && runState === "idle") return null
 
-  const terminalQuestions = countJobs(group => group.type === QUESTION_JOB_TYPE && group.status === "failed" && group.attempts >= MAX_JOB_ATTEMPTS)
+  const terminalQuestions = terminalJobs(false)
+  const terminalFlashcards = terminalJobs(true)
   return {
     runState,
     totalPages: images.length,
@@ -137,8 +146,12 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
     rejectedPages: images.filter(image => image.status === "failed").length,
     hasConcepts: conceptCount > 0,
     totalQuestions,
-    completedQuestions: questionJobs("executed"),
-    failedQuestions: questionJobs("failed") - terminalQuestions,
+    completedQuestions: questionJobs(false, "executed"),
+    failedQuestions: questionJobs(false, "failed") - terminalQuestions,
     terminalQuestions,
+    totalFlashcards,
+    completedFlashcards: questionJobs(true, "executed"),
+    failedFlashcards: questionJobs(true, "failed") - terminalFlashcards,
+    terminalFlashcards,
   }
 }

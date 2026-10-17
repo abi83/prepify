@@ -8,11 +8,11 @@ import type { Concept } from "@/types/pipeline"
 import type { PrepState } from "@/types/prepState"
 
 import type { GenerationConfig } from "./generationConfig"
-import { buildQuestionTasks } from "./taskBuilder"
+import { buildFlashcardTasks, buildQuestionTasks } from "./taskBuilder"
 
 /**
- * `questionCount` is the total a first question plan should reach. `additionalQuestions` is a
- * one-off request to add that many questions to a prep that already has question jobs.
+ * `questionCount` and `flashcardCount` are the totals a first plan should reach. `additionalQuestions` is a
+ * one-off request to add that many quiz questions (no flashcards) to a prep that already has question jobs.
  */
 export type PlanTarget = GenerationConfig & { additionalQuestions?: number }
 
@@ -83,8 +83,9 @@ function nextStageJobs(state: PrepState, target: PlanTarget): JobSpec[] {
 
   const idByConcept = new Map<Concept, string>(state.concepts.map(concept => [ concept, concept.id ]))
   const usageByName = new Map(state.concepts.map(concept => [ concept.name, state.conceptUsage[concept.id] ?? 0 ]))
-  const config = { ...target, questionCount: requested ?? target.questionCount }
-  return buildQuestionTasks(state.concepts, config, usageByName).map(task => ({
+  const quizTasks = buildQuestionTasks(state.concepts, { ...target, questionCount: requested ?? target.questionCount }, usageByName)
+  const flashcardTasks = requested === undefined ? buildFlashcardTasks(state.concepts, target, usageByName) : []
+  return [ ...quizTasks, ...flashcardTasks ].map(task => ({
     type: QUESTION_JOB_TYPE,
     inputIds: task.concepts.map(concept => idByConcept.get(concept)!),
     question: { questionType: task.type, difficulty: task.difficulty },

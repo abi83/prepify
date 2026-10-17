@@ -3,7 +3,7 @@
  * No external dependencies — safe to unit-test in isolation.
  */
 import type { Concept, QuestionTask } from "@/types/pipeline"
-import type { Difficulty, QuestionType } from "@/types/questions"
+import type { Difficulty, QuestionType, QuizType } from "@/types/questions"
 
 import type { DifficultyMix } from "./generationConfig"
 
@@ -17,11 +17,11 @@ const CONCEPTS_PER_TIER: Record<Difficulty, number[]> = {
 }
 
 /** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
-export function buildTypePool(count: number, enabledTypes: QuestionType[]): QuestionType[] {
+export function buildTypePool(count: number, enabledTypes: QuizType[]): QuizType[] {
   if (enabledTypes.length === 0) throw new Error("At least one question type must be enabled")
   const base = Math.floor(count / enabledTypes.length)
   const extra = count % enabledTypes.length
-  const pool: QuestionType[] = []
+  const pool: QuizType[] = []
   for (let i = 0; i < enabledTypes.length; i++) {
     const n = base + (i < extra ? 1 : 0)
     for (let j = 0; j < n; j++) pool.push(enabledTypes[i])
@@ -88,15 +88,34 @@ export function weightedPick(concepts: Concept[], exclude?: Set<string>, usage?:
  */
 export function buildQuestionTasks(
   concepts: Concept[],
-  config: { questionCount: number; enabledTypes: QuestionType[]; difficultyMix: DifficultyMix },
+  config: { questionCount: number; enabledTypes: QuizType[]; difficultyMix: DifficultyMix },
   priorUsage: Map<string, number> = new Map(),
+): QuestionTask[] {
+  const types = buildTypePool(config.questionCount, config.enabledTypes)
+  return assignTasks(concepts, types, config.difficultyMix, priorUsage)
+}
+
+/** `count` flashcard tasks, assigned concepts and difficulty like quiz tasks. */
+export function buildFlashcardTasks(
+  concepts: Concept[],
+  config: { flashcardCount: number; difficultyMix: DifficultyMix },
+  priorUsage: Map<string, number> = new Map(),
+): QuestionTask[] {
+  const types = Array<QuestionType>(config.flashcardCount).fill("flashcard")
+  return assignTasks(concepts, types, config.difficultyMix, priorUsage)
+}
+
+function assignTasks(
+  concepts: Concept[],
+  typePool: QuestionType[],
+  difficultyMix: DifficultyMix,
+  priorUsage: Map<string, number>,
 ): QuestionTask[] {
   if (concepts.length === 0) throw new Error("No concepts to build tasks from")
 
-  const { questionCount: count, enabledTypes, difficultyMix } = config
-
+  const count = typePool.length
   const sorted = [ ...concepts ].sort((a, b) => b.importance - a.importance)
-  const types = shuffle(buildTypePool(count, enabledTypes))
+  const types = shuffle(typePool)
 
   const difficulties = shuffle(buildDifficultyPool(count, difficultyMix))
 

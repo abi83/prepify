@@ -1,3 +1,4 @@
+import type { JobStatus } from "@prisma/client"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/prisma", async () => {
@@ -160,7 +161,19 @@ describe("prepStateRepository", () => {
       await addJob(prep.id, "question", "failed")
       await addJob(prep.id, "question", "created")
 
-      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, rejectedPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0 })
+      expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, rejectedPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 })
+    })
+
+    it("counts flashcard jobs separately from quiz question jobs", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      const addQuestionJob = (questionType: string, status: JobStatus) => prisma.job.create({
+        data: { prepId: prep.id, type: "question", questionType, difficulty: "easy", status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, ...(status === "executed" ? { output: [] } : {}), ...(status === "failed" ? { failureReason: "boom" } : {}) },
+      })
+      await addQuestionJob("single_choice", "executed")
+      await addQuestionJob("flashcard", "executed")
+      await addQuestionJob("flashcard", "failed")
+
+      expect(await getPrepProgress(prep.id)).toMatchObject({ totalQuestions: 1, completedQuestions: 1, failedQuestions: 0, totalFlashcards: 2, completedFlashcards: 1, failedFlashcards: 1 })
     })
   })
 

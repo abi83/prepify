@@ -8,7 +8,7 @@ import { testCatalog } from "@/test/modelCatalog"
 import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
-const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
+const TARGET = { questionCount: 1, flashcardCount: 0, enabledTypes: [ "single_choice" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
 
