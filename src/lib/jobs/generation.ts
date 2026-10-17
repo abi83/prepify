@@ -9,7 +9,7 @@ import { ocrResultSchema, type Page } from "@/types/prep"
 import { createAssetJobDefinition } from "./assetJob"
 import { createConceptsExtractJobDefinition } from "./conceptsExtractJob"
 import { createConceptsJobDefinition } from "./conceptsJob"
-import { createJobs, executePrep, runJobs, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
+import { createJobs, executePrep, replacementPlanner, runJobs, runQuestionJobs, type ExecutionDeps, type PlanReplacements, type RunDeps, type RunParams } from "./execution"
 import { createOcrJobDefinition } from "./ocrJob"
 import { createPrepMetaJobDefinition } from "./prepMetaJob"
 import { createQuestionJobDefinition } from "./questionJob"
@@ -154,7 +154,8 @@ function createRunner(ports: RunnerPorts, options: RunnerOptions): Runner {
         type: definition.type,
         async run(ctx) {
           const result = await ports.trackRun(job, () => definition.run(ctx))
-          progress.report({ done: done + 1, total })
+          // Replacement jobs join a stage after it started, so the total can lag behind.
+          progress.report({ done: done + 1, total: Math.max(total, done + 1) })
           return result
         },
       }
@@ -164,14 +165,16 @@ function createRunner(ports: RunnerPorts, options: RunnerOptions): Runner {
   return { deps, params: { actorId, apiKey, signal, concurrency }, startStage }
 }
 
-/** Executes `jobs` stage by stage, so later stages see earlier outputs. */
-async function runStaged(runner: Runner, jobs: Job[]): Promise<void> {
+/** Executes `jobs` stage by stage, so later stages see earlier outputs. With `replace`, failed question jobs are replaced instead of throwing. */
+async function runStaged(runner: Runner, jobs: Job[], replace?: PlanReplacements): Promise<void> {
   for (const stage of STAGES) {
     const stageJobs = jobs.filter(job => stageOf(job.type) === stage)
     if (stageJobs.length === 0) continue
     runner.startStage(stage, stageJobs.length)
     const merges = stageJobs.filter(job => job.type === CONCEPTS_JOB_TYPE)
-    await runJobs(runner.deps, runner.params, stageJobs.filter(job => !merges.includes(job)))
+    const rest = stageJobs.filter(job => !merges.includes(job))
+    if (stage === "questions" && replace) await runQuestionJobs(runner.deps, runner.params, rest, replace)
+    else await runJobs(runner.deps, runner.params, rest)
     // Each merge reads the concepts the previous one stored, so they never overlap or skip ahead after a failure.
     for (const merge of merges) await runJobs(runner.deps, runner.params, [ merge ])
   }
@@ -237,28 +240,29 @@ export async function runOcr(ports: RunnerPorts, options: GenerationParams): Pro
 }
 
 /** Plans and runs the `additionalQuestions` new question jobs; their assets follow from the normal flow. */
-async function runAdditionalQuestions(ports: RunnerPorts, runner: Runner, options: GenerationParams): Promise<void> {
+async function runAdditionalQuestions(ports: RunnerPorts, runner: Runner, options: GenerationParams, replace: PlanReplacements): Promise<void> {
   const { actorId, prepId, config, target } = options
   const unfinished = await ports.listUnfinishedJobs(actorId, prepId)
   if (unfinished.length > 0) throw new Error(`${unfinished.length} unfinished job(s) exist (${unfinished.map(job => job.id).join(", ")}); resume them first`)
   const specs = nextJobs(await ports.data.loadState(prepId), target)
   const jobs = await createJobs(ports.store, actorId, config, specs)
-  await runStaged(runner, jobs)
+  await runStaged(runner, jobs, replace)
 }
 
 /**
  * Re-executes the prep's `created`/`failed` jobs, then plans and runs whatever is still
- * missing to reach `target`. With `target.additionalQuestions`, resumes nothing: it adds that
+ * missing to reach `target`. Failed question jobs are replaced with fresh tasks, up to 2x the requested jobs per class. With `target.additionalQuestions`, resumes nothing: it adds that
  * many questions (throwing while jobs are unfinished) and finishes their assets.
  */
 export async function runGeneration(ports: RunnerPorts, options: GenerationParams): Promise<void> {
   const { config, target: requested, ...rest } = options
   const { additionalQuestions, ...target } = requested
   const runner = createRunner(ports, rest)
+  const replace = replacementPlanner({ store: ports.store, loadState: prepId => ports.data.loadState(prepId) }, { actorId: options.actorId, prepId: options.prepId, config, target })
   if (additionalQuestions === undefined) {
-    await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId))
+    await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId), replace)
   } else {
-    await runAdditionalQuestions(ports, runner, options)
+    await runAdditionalQuestions(ports, runner, options, replace)
   }
 
   const deps: ExecutionDeps = {

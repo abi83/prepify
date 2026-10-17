@@ -179,7 +179,7 @@ export interface PrepProgress {
   ocrPages: number // pages with an OCR result
   rejectedPages: number // pages OCR rejected
   hasConcepts: boolean
-  totalQuestions: number // question jobs created so far, any status
+  totalQuestions: number // question jobs created so far, any status but superseded
   completedQuestions: number // executed
   failedQuestions: number // failed with attempts left, until resume re-executes them
   terminalQuestions: number // failed past the attempt cap; only an explicit retry re-runs them
@@ -199,7 +199,7 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
   ])
   const countJobs = (matches: (group: (typeof jobGroups)[number]) => boolean) => jobGroups.filter(matches).reduce((sum, group) => sum + group._count, 0)
   const questionJobs = (isFlashcard: boolean, status?: JobStatus) =>
-    countJobs(group => group.type === QUESTION_JOB_TYPE && (group.questionType === "flashcard") === isFlashcard && (status === undefined || group.status === status))
+    countJobs(group => group.type === QUESTION_JOB_TYPE && (group.questionType === "flashcard") === isFlashcard && (status === undefined ? group.status !== "superseded" : group.status === status))
   const terminalJobs = (isFlashcard: boolean) =>
     countJobs(group => group.type === QUESTION_JOB_TYPE && (group.questionType === "flashcard") === isFlashcard && group.status === "failed" && group.attempts >= MAX_JOB_ATTEMPTS)
 

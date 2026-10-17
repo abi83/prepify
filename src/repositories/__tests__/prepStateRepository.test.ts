@@ -197,6 +197,18 @@ describe("prepStateRepository", () => {
       expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, rejectedPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 })
     })
 
+    it("leaves superseded question jobs out of every count", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+      const addQuestionJob = (questionType: string, status: JobStatus) => prisma.job.create({
+        data: { prepId: prep.id, type: "question", questionType, difficulty: "easy", status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, ...(status === "executed" ? { output: [] } : {}), ...(status === "superseded" ? { failureReason: "boom" } : {}) },
+      })
+      await addQuestionJob("single_choice", "executed")
+      await addQuestionJob("single_choice", "superseded")
+      await addQuestionJob("flashcard", "superseded")
+
+      expect(await getPrepProgress(prep.id)).toMatchObject({ totalQuestions: 1, completedQuestions: 1, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, failedFlashcards: 0 })
+    })
+
     it("counts flashcard jobs separately from quiz question jobs", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
       const addQuestionJob = (questionType: string, status: JobStatus) => prisma.job.create({

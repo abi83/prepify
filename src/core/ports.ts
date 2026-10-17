@@ -39,6 +39,9 @@ export interface Store {
     fromStatus: JobStatus,
     outcome: JobOutcome<TOutput>,
   ): Promise<boolean>
+
+  /** Moves a `failed` job to `superseded`: the run replaced it with a new task, so it no longer counts toward the prep. Throws if the job isn't `failed`. */
+  supersedeJob(actorId: string, jobId: string): Promise<void>
 }
 
 export interface AgentImage {

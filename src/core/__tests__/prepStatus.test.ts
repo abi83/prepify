@@ -26,6 +26,11 @@ describe("derivePrepStatus", () => {
     expect(derivePrepStatus([ job(type, "failed", MAX), job("question", "created") ], MAX)).toBe("failed")
   })
 
+  it("ignores superseded jobs, even blocking ones", () => {
+    expect(derivePrepStatus([ job("question", "superseded", MAX), job("question", "executed") ], MAX)).toBe("ready")
+    expect(derivePrepStatus([ job("question", "superseded") ], MAX)).toBe("draft")
+  })
+
   it("ignores a terminal non-blocking failure", () => {
     expect(derivePrepStatus([ job("ocr", "executed"), job("question", "failed", MAX) ], MAX)).toBe("ready")
   })

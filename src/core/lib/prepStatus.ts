@@ -1,3 +1,4 @@
+import type { JobStatus } from "@/core/job"
 import { CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE } from "@/types/jobTypes"
 import type { PrepStatus } from "@/types/prep"
 
@@ -8,12 +9,13 @@ const PIPELINE_BLOCKING_TYPES: ReadonlySet<string> = new Set([
 
 export interface StatusJob {
   type: string
-  status: "created" | "running" | "interrupted" | "executed" | "failed"
+  status: JobStatus
   attempts: number
 }
 
-/** A prep's status from its jobs. Mirrored by the backfill in the `prep_status` migration. */
-export function derivePrepStatus(jobs: StatusJob[], maxAttempts: number): PrepStatus {
+/** A prep's status from its jobs; `superseded` ones don't count. Mirrored by the backfill in the `prep_status` migration. */
+export function derivePrepStatus(allJobs: StatusJob[], maxAttempts: number): PrepStatus {
+  const jobs = allJobs.filter(job => job.status !== "superseded")
   if (jobs.length === 0) return "draft"
   const isTerminal = (job: StatusJob) => job.status === "failed" && job.attempts >= maxAttempts
 

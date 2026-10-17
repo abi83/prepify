@@ -10,12 +10,14 @@ import { QUESTION_JOB_TYPE } from "@/types/jobTypes"
 import type { QuestionTask, StoredConcept } from "@/types/pipeline"
 import { difficultySchema, questionTypeSchema, type GeneratedQuestion } from "@/types/questions"
 
+const MAX_REASON_COMMENT_CHARS = 300
+
 /**
  * One job per task — `inputIds` are the `Concept` ids the task covers, its type/difficulty
  * come from `ctx.job.question`. `concepts` must already be fetched by the caller. Runs the
  * build → review → rewrite loop for at most `maxRetries + 1` attempts; each rejected or
  * errored attempt's calls travel as `wastedMetas` (on failure, inside a `JobRunError`), the
- * passing attempt's calls as `metas`. Exhausting the attempts fails the job.
+ * passing attempt's calls as `metas`. Exhausting the attempts fails the job, with the last rejection's comment as the reason.
  */
 export function createQuestionJobDefinition(concepts: StoredConcept[], deps: JobDeps): JobDefinition<GeneratedQuestion> {
   const language = resolveLanguage(concepts)
@@ -34,6 +36,7 @@ export function createQuestionJobDefinition(concepts: StoredConcept[], deps: Job
       const maxAttempts = maxRetries + 1
       const wastedMetas: AgentMeta[] = []
       let rewrite: RewriteInput | undefined
+      let lastRejection = ""
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const attemptMetas: AgentMeta[] = []
         let built: GeneratedQuestion
@@ -51,10 +54,11 @@ export function createQuestionJobDefinition(concepts: StoredConcept[], deps: Job
         if (review.output.passed) return { output: built, metas: attemptMetas, wastedMetas }
 
         wastedMetas.push(...attemptMetas)
+        lastRejection = review.output.review.comment.slice(0, MAX_REASON_COMMENT_CHARS)
         rewrite = { question: built, feedback: reviewFeedback(review.output.review) }
       }
 
-      throw new JobRunError(wastedMetas, new Error(`No passing review after ${maxAttempts} attempt(s)`))
+      throw new JobRunError(wastedMetas, new Error(`No passing review after ${maxAttempts} attempt(s): ${lastRejection}`))
     },
   }
 }

@@ -59,6 +59,24 @@ describe.each(Object.entries(factories))("Store contract: %s", (_name, makeStore
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "executed", output: { text: "x" }, failureReason: null })
   })
 
+  it("supersedes a failed job, keeping its reason", async () => {
+    const store = await makeStore()
+    const job = await store.createJob(ACTOR, "question", [ "c" ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
+    await store.commitJob(ACTOR, job.id, "created", { status: "failed", failureReason: "boom", wastedMetas: [] })
+
+    await store.supersedeJob(ACTOR, job.id)
+
+    expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "superseded", output: null, failureReason: "boom", question: { questionType: "flashcard" } })
+  })
+
+  it("refuses to supersede a job that isn't failed, or doesn't exist", async () => {
+    const store = await makeStore()
+    const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
+    await expect(store.supersedeJob(ACTOR, job.id)).rejects.toThrow()
+    await expect(store.supersedeJob(ACTOR, "missing")).rejects.toThrow()
+    expect((await store.getJob(ACTOR, job.id))?.status).toBe("created")
+  })
+
   it("commits a failed outcome from the expected status", async () => {
     const store = await makeStore()
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)

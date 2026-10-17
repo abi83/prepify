@@ -177,6 +177,7 @@ enum JobStatus {
   interrupted
   executed
   failed
+  superseded
 }
 
 model Job {

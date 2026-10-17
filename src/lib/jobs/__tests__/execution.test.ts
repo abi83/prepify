@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { createInMemoryStore } from "@/core/inMemoryStore"
-import type { ExecutionConfig } from "@/core/job"
+import type { ExecutionConfig, Job } from "@/core/job"
 import type { PlanTarget } from "@/core/lib/planner"
 import type { Llm, ProgressSink } from "@/core/ports"
 import { executePrep, type ExecutionDeps, type ExecutionParams } from "@/lib/jobs/execution"
@@ -18,9 +18,10 @@ const concept = { id: "c1", name: "Mitosis", description: "Cell division process
 const FOUND: PageConcepts = { status: "found", concepts: [ concept ] }
 
 /** Simulates each job type's persisted effect on the state the planner sees. */
-function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds = [ "i1" ]) {
+function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds = [ "i1" ], failJob: (job: Job) => boolean = () => false) {
   const state: PrepState = { images: pageIds.map(id => ({ id, ocrDone: false, concepts: { status: "pending" as const }, merge: "none" as const })), concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
   const ran: string[] = []
+  const seen: Job[] = []
   let inFlight = 0
   let maxInFlight = 0
 
@@ -33,12 +34,14 @@ function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds =
     definitionFor: async job => ({
       type: job.type,
       async run() {
+        seen.push(job)
+        if (job.type === "question") state.questionJobCount++
         inFlight++
         maxInFlight = Math.max(maxInFlight, inFlight)
         await new Promise(resolve => setTimeout(resolve, 1))
         inFlight--
         if (job.type === "asset") state.assetQuestionIds = []
-        if (job.type === failType) throw new Error("boom")
+        if (job.type === failType || failJob(job)) throw new Error("boom")
         ran.push(job.type)
         const update = (patch: Partial<PrepState["images"][number]>) => {
           state.images = state.images.map(image => job.inputIds.includes(image.id) ? { ...image, ...patch } : image)
@@ -50,12 +53,13 @@ function fakeDeps(failType?: string, extraction: PageConcepts = FOUND, pageIds =
           state.concepts = [ concept ]
         }
         if (job.type === "prep.meta") state.prepMetaDone = true
-        if (job.type === "question") { state.questionCount++; state.questionJobCount++; state.assetQuestionIds = [ "q1" ] }
+        if (job.type === "question") { state.questionCount++; state.assetQuestionIds = [ "q1" ] }
         return { output: null, metas: [], wastedMetas: [] }
       },
     }),
   }
-  return { deps, ran, maxInFlight: () => maxInFlight }
+  const statuses = async () => Promise.all(seen.filter(job => job.type === "question").map(async job => (await deps.store.getJob("user-1", job.id))!))
+  return { deps, ran, maxInFlight: () => maxInFlight, questionJobs: statuses }
 }
 
 const params = (concurrency: number): ExecutionParams => ({
@@ -104,5 +108,63 @@ describe("executePrep", () => {
     const { deps, ran } = fakeDeps(undefined, { status: "empty", reason: "not_educational" })
     await expect(executePrep(deps, params(2))).rejects.toThrow("No concepts found in any page (not_educational)")
     expect(ran).toEqual([ "ocr", "concepts.extract", "prep.meta" ])
+  })
+
+  describe("replacing failed question jobs", () => {
+    const withFlashcards: PlanTarget = { ...TARGET, questionCount: 2, flashcardCount: 2 }
+    const countBy = (jobs: Job[], status: Job["status"], flashcard: boolean) =>
+      jobs.filter(job => job.status === status && (job.question?.questionType === "flashcard") === flashcard).length
+
+    it("supersedes a failed job and runs a fresh task in its place", async () => {
+      let failures = 2
+      const { deps, ran, questionJobs } = fakeDeps(undefined, FOUND, [ "i1" ], job => job.type === "question" && failures-- > 0)
+      await executePrep(deps, params(1))
+
+      const jobs = await questionJobs()
+      expect(jobs).toHaveLength(5)
+      expect(jobs.filter(job => job.status === "superseded")).toHaveLength(2)
+      expect(jobs.filter(job => job.status === "executed")).toHaveLength(3)
+      expect(ran.filter(type => type === "question")).toHaveLength(3)
+    })
+
+    it("stops at twice the requested jobs, leaving the rest failed without throwing", async () => {
+      const { deps, ran, questionJobs } = fakeDeps(undefined, FOUND, [ "i1" ], job => job.type === "question")
+      await expect(executePrep(deps, params(2))).resolves.toBeUndefined()
+
+      const jobs = await questionJobs()
+      expect(jobs).toHaveLength(6)
+      expect(jobs.filter(job => job.status === "superseded")).toHaveLength(3)
+      expect(jobs.filter(job => job.status === "failed")).toHaveLength(3)
+      expect(ran).not.toContain("asset")
+    })
+
+    it("budgets quiz questions and flashcards separately and keeps each in its class", async () => {
+      const { deps, questionJobs } = fakeDeps(undefined, FOUND, [ "i1" ], job => job.question?.questionType === "flashcard")
+      await executePrep(deps, { ...params(2), target: withFlashcards })
+
+      const jobs = await questionJobs()
+      expect(countBy(jobs, "executed", false)).toBe(2)
+      expect(countBy(jobs, "superseded", false)).toBe(0)
+      expect(countBy(jobs, "superseded", true)).toBe(2)
+      expect(countBy(jobs, "failed", true)).toBe(2)
+      expect(jobs.filter(job => job.question?.questionType !== "flashcard").every(job => job.question?.questionType === "single_choice")).toBe(true)
+    })
+
+    it("replaces a failed job once per requested job, even when the replacement fails too", async () => {
+      let failures = 3
+      const { deps, questionJobs } = fakeDeps(undefined, FOUND, [ "i1" ], job => job.type === "question" && failures-- > 0)
+      await executePrep(deps, { ...params(5), target: { ...TARGET, questionCount: 1 } })
+
+      const jobs = await questionJobs()
+      expect(jobs).toHaveLength(2)
+      expect(countBy(jobs, "superseded", false)).toBe(1)
+      expect(countBy(jobs, "failed", false)).toBe(1)
+    })
+
+    it("still throws when a question job throws outside the job (lost commit race)", async () => {
+      const { deps } = fakeDeps()
+      const lost = { ...deps, store: { ...deps.store, commitJob: async () => false } }
+      await expect(executePrep(lost, params(2))).rejects.toThrow(/lost the commit race/)
+    })
   })
 })

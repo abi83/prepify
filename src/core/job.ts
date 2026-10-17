@@ -5,7 +5,7 @@
 
 import type { AgentMeta } from "./sampler"
 
-export type JobStatus = "created" | "running" | "interrupted" | "executed" | "failed"
+export type JobStatus = "created" | "running" | "interrupted" | "executed" | "failed" | "superseded"
 
 /** Statuses of a job with no outcome yet. `running` has a live runner; `interrupted` lost it. */
 export type PendingJobStatus = "created" | "running" | "interrupted"
@@ -27,13 +27,14 @@ export interface QuestionSpec {
   difficulty: string
 }
 
-/** `created`, `interrupted` and `failed` are re-executable; `running` belongs to a live runner; `executed` is terminal.
- *  A discriminated union so only `executed` carries `output` and only `failed` carries
+/** `created`, `interrupted` and `failed` are re-executable; `running` belongs to a live runner; `executed` and `superseded` (a failed job the run replaced with a new task) are terminal.
+ *  A discriminated union so only `executed` carries `output` and `failed` and `superseded` carry
  *  `failureReason` — no reachable state where either is present on the wrong status. */
 export type Job<TOutput = unknown> =
   | { id: string; type: string; status: PendingJobStatus; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: null }
   | { id: string; type: string; status: "executed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: TOutput; failureReason: null }
   | { id: string; type: string; status: "failed"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string; terminal: boolean }
+  | { id: string; type: string; status: "superseded"; inputIds: string[]; config: ExecutionConfig; question: QuestionSpec | null; output: null; failureReason: string }
 
 /** What a job's `run` returns: its output plus the LLM calls behind it. `wastedMetas` are
  *  calls whose result was discarded (rejected attempts). */

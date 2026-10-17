@@ -130,6 +130,10 @@ function toJob<TOutput>(row: JobRow & { inputs: { entityId: string }[] }): Job<T
     if (row.failureReason === null) throw new Error(`Job ${row.id} is failed but has no failureReason`)
     return { ...base, status: "failed", output: null, failureReason: row.failureReason, terminal: row.attempts >= MAX_JOB_ATTEMPTS }
   }
+  if (row.status === "superseded") {
+    if (row.failureReason === null) throw new Error(`Job ${row.id} is superseded but has no failureReason`)
+    return { ...base, status: "superseded", output: null, failureReason: row.failureReason }
+  }
   if (row.output !== null || row.failureReason !== null) {
     throw new Error(`Job ${row.id} is ${row.status} but already has output or a failureReason`)
   }
@@ -213,6 +217,15 @@ export function createPrismaStore(): Store {
         await writeDomainRows(tx, job, checked)
         await syncPrepStatus(tx, job.prepId)
         return true
+      })
+    },
+
+    async supersedeJob(actorId: string, jobId: string): Promise<void> {
+      const job = await assertOwnsJob(actorId, jobId)
+      await prisma.$transaction(async tx => {
+        const result = await tx.job.updateMany({ where: { id: jobId, status: "failed" }, data: { status: "superseded" } })
+        if (result.count !== 1) throw new Error(`Job ${jobId} is not failed`)
+        await syncPrepStatus(tx, job.prepId)
       })
     },
   }
