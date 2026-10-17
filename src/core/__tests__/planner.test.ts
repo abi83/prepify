@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { assertConceptsFound, nextJobs, type PlanTarget } from "@/lib/planner"
+import { assertConceptsFound, nextJobs, type PlanTarget } from "@/core/lib/planner"
 import type { PageConceptsState, PrepState } from "@/types/prepState"
 
 const TARGET: PlanTarget = {

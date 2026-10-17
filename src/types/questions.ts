@@ -11,6 +11,7 @@ export const assetHintSchema = z.object({
   description: z.string().nullable(),
 })
 export type AssetHint = z.infer<typeof assetHintSchema>
+export type ActiveAssetHint = AssetHint & { needed: true; type: AssetType; description: string }
 
 // --- Content schemas ---
 

@@ -5,7 +5,7 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import type { PlanTarget } from "@/lib/planner"
+import type { PlanTarget } from "@/core/lib/planner"
 import { prisma } from "@/lib/prisma"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"

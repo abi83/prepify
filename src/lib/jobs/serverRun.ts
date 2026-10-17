@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { DEFAULT_GEN_CONFIG } from "@/lib/generationConfig"
+import { DEFAULT_GEN_CONFIG } from "@/core/lib/generationConfig"
 import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"

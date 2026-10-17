@@ -1,11 +1,10 @@
 import type { JobRunResult } from "@/core/job"
+import { CONCEPTS_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
+import { resolveLanguage } from "@/core/lib/language"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptMerger } from "@/lib/agents/ConceptMerger"
-import { resolveLanguage } from "@/lib/language"
 import type { StoredConcept } from "@/types/pipeline"
-
-import { CONCEPTS_JOB_TYPE } from "./jobTypes"
 
 /**
  * One job per page — `inputIds[0]` is the `PrepImage` id. `incoming` holds that page's extracted

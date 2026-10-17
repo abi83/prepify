@@ -3,8 +3,8 @@ import { readFile } from "fs/promises"
 import { parse } from "yaml"
 import { z } from "zod"
 
+import { ALL_QUESTION_TYPES, DEFAULT_GEN_CONFIG, type GenerationConfig } from "@/core/lib/generationConfig"
 import type { LogLevel } from "@/core/logger"
-import { ALL_QUESTION_TYPES, DEFAULT_GEN_CONFIG, type GenerationConfig } from "@/lib/generationConfig"
 import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS } from "@/lib/jobs/generation"
 
 export interface CliConfig {

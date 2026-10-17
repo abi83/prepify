@@ -1,5 +1,4 @@
-import type { ActiveAssetHint } from "@/lib/agents/assets/assetRouter"
-import { assetHintSchema } from "@/types/questions"
+import { assetHintSchema, type ActiveAssetHint } from "@/types/questions"
 
 /** The question content's asset hint when it asks for an asset (needed, with a type and a description); null otherwise, including content that predates hints. */
 export function activeAssetHint(content: unknown): ActiveAssetHint | null {

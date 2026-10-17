@@ -1,10 +1,9 @@
 import type { JobRunResult } from "@/core/job"
+import { activeAssetHint } from "@/core/lib/assetHint"
+import { ASSET_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import type { JobDeps, QuestionRef } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { routeAsset, type AssetOutput } from "@/lib/agents/assets/assetRouter"
-import { activeAssetHint } from "@/lib/assetHint"
-
-import { ASSET_JOB_TYPE } from "./jobTypes"
 
 /** One job per question — `inputIds` is `[questionId]`. Generates the asset its `asset_hint` asks for; `table`/`svg` hints yield an empty blob, which is not persisted. */
 export function createAssetJobDefinition(question: QuestionRef, deps: JobDeps): JobDefinition<AssetOutput> {

@@ -1,7 +1,7 @@
 import { Language } from "@prisma/client"
 import { describe, expect, it } from "vitest"
 
-import { resolveLanguage } from "@/lib/language"
+import { resolveLanguage } from "@/core/lib/language"
 import { SUPPORTED_LANGUAGES } from "@/types/language"
 
 describe("resolveLanguage", () => {
