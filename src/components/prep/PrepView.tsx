@@ -2,7 +2,6 @@
 
 import type { Asset, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
 import { useState, type ReactNode } from "react"
 
 import AttemptFlow from "@/components/attempt/AttemptFlow"
@@ -16,6 +15,8 @@ export const PREP_MAIN_CLASS = "mx-auto flex w-full max-w-[700px] flex-1 flex-co
 
 interface Props<D extends object> {
   prepId: string
+  /** The signed-in user, resolved on the server; null for an anonymous visitor. */
+  userId: string | null
   studyQuestions: Question[]
   assets: Asset[]
   header: ReactNode
@@ -23,20 +24,16 @@ interface Props<D extends object> {
   tabs: PrepTabEntry<D>[]
   /** Builds the tab data; the view supplies the attempt starter. */
   tabData: (onStartAttempt: () => void) => D
-  /** Renders a standalone "Start attempt" button above the tabs, for views without a Main tab. */
-  startAttemptButton: boolean
   /** Dialogs and other owner-only overlays; hidden while an attempt runs. */
   children?: ReactNode
 }
 
 /** The prep screen shared by the owner and read-only routes: header, tabs, and the attempt flow. Differences are props. */
 export default function PrepView<D extends object>({
-  prepId, studyQuestions, assets, header, tab, tabs, tabData, startAttemptButton, children,
+  prepId, userId, studyQuestions, assets, header, tab, tabs, tabData, children,
 }: Props<D>) {
   const router = useRouter()
   const { set: setUrlParams } = useUrlParams()
-  const { data: session } = useSession()
-  const userId = session?.user.id ?? null
   const [ activeAttempt, setActiveAttempt ] = useState(false)
 
   function handleExitAttempt() {
@@ -63,11 +60,6 @@ export default function PrepView<D extends object>({
   return (
     <main className={PREP_MAIN_CLASS}>
       {header}
-      {startAttemptButton && (
-        <div>
-          <Button className="h-11" onClick={startAttempt} disabled={studyQuestions.length === 0}>Start attempt</Button>
-        </div>
-      )}
       <PrepTabs tab={tab} onTabChange={next => setUrlParams({ tab: next })} tabs={tabs} data={tabData(startAttempt)} />
       {children}
     </main>

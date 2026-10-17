@@ -7,9 +7,10 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
+import { ForbiddenError } from "@/repositories/errors"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { getPrepProgress, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
+import { getPrepProgress, listConcepts, listJobGenerations, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
 
@@ -114,6 +115,37 @@ describe("prepStateRepository", () => {
     const { concepts } = await loadPrepState(prep.id)
 
     expect(concepts[0].generation.calls).toEqual([])
+  })
+
+  describe("access-checked reads", () => {
+    async function generatedPrep() {
+      const prep = await prepRepository.createPrep(OWNER, { title: "Generated", language: "en" })
+      const job = await prisma.job.create({
+        data: { prepId: prep.id, type: "concepts", status: "executed", model: "gpt-5-nano", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, output: [] },
+      })
+      await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: job.id } })
+      await addMeta(job.id)
+      return { prep, job }
+    }
+
+    it("reads a private prep's concepts and generations for its owner", async () => {
+      const { prep, job } = await generatedPrep()
+      expect(await listConcepts(OWNER, prep.id)).toHaveLength(1)
+      expect(Object.keys(await listJobGenerations(OWNER, prep.id))).toEqual([ job.id ])
+    })
+
+    it.each([ [ "an anonymous visitor", null ], [ "another user", "user-other" ] ])("refuses a private prep's concepts and generations to %s", async (_who, userId) => {
+      const { prep } = await generatedPrep()
+      await expect(listConcepts(userId, prep.id)).rejects.toThrow(ForbiddenError)
+      await expect(listJobGenerations(userId, prep.id)).rejects.toThrow(ForbiddenError)
+    })
+
+    it("reads a shared prep's concepts and generations for an anonymous visitor", async () => {
+      const { prep, job } = await generatedPrep()
+      await prepRepository.updatePrep(OWNER, prep.id, { visibility: "link" })
+      expect(await listConcepts(null, prep.id)).toHaveLength(1)
+      expect(Object.keys(await listJobGenerations(null, prep.id))).toEqual([ job.id ])
+    })
   })
 
   describe("getPrepProgress", () => {

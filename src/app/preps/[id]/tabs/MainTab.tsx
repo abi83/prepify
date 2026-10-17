@@ -1,40 +1,14 @@
 import type { Attempt } from "@prisma/client"
-import type { ReactNode } from "react"
 
-import { Button } from "@/components/ui/button"
+import PrepOverview, { Section, StatTile } from "@/components/prep/tabs/PrepOverview"
 import { summarizeAttempts, attemptPct } from "@/lib/attemptStats"
 import { formatDate } from "@/lib/format"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { PrepTab } from "@/types/prep"
 
 import ScoreSparkline from "./ScoreSparkline"
 import type { PrepTabProps } from "./types"
 
 const RECENT_ATTEMPTS = 5
-const CONCEPT_CHIPS = 12
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-bold tracking-wide text-muted-foreground uppercase">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-function StatTile({ label, value, status, onClick }: { label: string; value: number; status?: string | null; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-11 flex-col gap-0.5 rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary"
-    >
-      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-      <span className="text-2xl font-bold">{value}</span>
-      {status && <span className="text-xs text-muted-foreground">{status}</span>}
-    </button>
-  )
-}
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -90,37 +64,21 @@ function Progress({ attempts }: { attempts: Attempt[] }) {
   )
 }
 
-export default function MainTab({ flashcards, studyQuestions, concepts, pages, attempts, progress, onStartAttempt, onOpenTab }: PrepTabProps) {
-  const open = (tab: PrepTab) => () => onOpenTab(tab)
-  const shownConcepts = concepts.slice(0, CONCEPT_CHIPS)
+export default function MainTab({ pages, attempts, progress, ...shared }: PrepTabProps) {
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button className="h-11" onClick={onStartAttempt} disabled={studyQuestions.length === 0}>Start attempt</Button>
-        {studyQuestions.length === 0 && <span className="text-sm text-muted-foreground">Available once questions are generated.</span>}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Flashcards" value={flashcards.length} onClick={open("flashcards")} />
-        <StatTile label="Questions" value={studyQuestions.length} status={questionsStatus(progress)} onClick={open("questions")} />
-        <StatTile label="Concepts" value={concepts.length} status={conceptsStatus(progress, concepts.length)} onClick={open("concepts")} />
-        <StatTile label="Pages" value={pages.filter(entry => entry.verdict === "accepted").length} status={pagesStatus(progress)} onClick={open("pages")} />
-      </div>
-
-      <Section title="Progress"><Progress attempts={attempts} /></Section>
-
-      {concepts.length > 0 && (
-        <Section title="Concepts">
-          <ul aria-label="Concept names" className="flex flex-wrap gap-1.5">
-            {shownConcepts.map(c => (
-              <li key={c.id} className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold">{c.name}</li>
-            ))}
-          </ul>
-          {concepts.length > CONCEPT_CHIPS && (
-            <Button variant="link" className="h-11 self-start p-0" onClick={open("concepts")}>All {concepts.length} concepts →</Button>
-          )}
-        </Section>
-      )}
-    </div>
+    <PrepOverview
+      {...shared}
+      questionsStatus={questionsStatus(progress)}
+      conceptsStatus={conceptsStatus(progress, shared.concepts.length)}
+      extraTiles={
+        <StatTile
+          label="Pages"
+          value={pages.filter(entry => entry.verdict === "accepted").length}
+          status={pagesStatus(progress)}
+          onClick={() => shared.onOpenTab("pages")}
+        />
+      }
+      progress={<Section title="Progress"><Progress attempts={attempts} /></Section>}
+    />
   )
 }

@@ -1,10 +1,8 @@
 import type { Prep, Question } from "@prisma/client"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import type { ComponentProps } from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
-
-vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: null, status: "unauthenticated" }),
-}))
 
 vi.mock("next/navigation", async () => {
   const { createNavigationMock } = await import("@/testUtils/navigationMock")
@@ -16,6 +14,7 @@ vi.mock("@/actions/attempts", () => ({
 }))
 
 import StudyPage from "@/app/study/[id]/StudyPage"
+import type { StatedConcept } from "@/repositories/prepStateRepository"
 
 function prep(overrides: Partial<Prep> = {}): Prep {
   return {
@@ -38,6 +37,18 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const call = { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false }
+const concept: StatedConcept = {
+  id: "c1", name: "Mitosis", description: "Cell division.", importance: 0.9, misconceptions: [], language: "en", createdAt: new Date(0),
+  generation: { jobId: "j1", model: "gpt-5-nano", tier: "flex", calls: [ call ] },
+}
+
+function renderStudy(questions: Question[], overrides: Partial<ComponentProps<typeof StudyPage>> = {}) {
+  return render(
+    <StudyPage userId={null} prep={prep()} questions={questions} assets={[]} concepts={[ concept ]} generations={{ j1: concept.generation }} tokensUsed={120} costUsd={0.01} {...overrides} />,
+  )
+}
+
 describe("StudyPage — loaded with questions", () => {
   const questions: Question[] = [
     {
@@ -57,18 +68,31 @@ describe("StudyPage — loaded with questions", () => {
   ]
 
   it("renders the prep title", () => {
-    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
+    renderStudy(questions)
     expect(screen.getByText("Biology Basics")).toBeInTheDocument()
   })
 
-  it("renders the Flashcards and Questions tabs", () => {
-    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    expect(screen.getByRole("tab", { name: /^Flashcards/ })).toBeInTheDocument()
-    expect(screen.getByRole("tab", { name: /^Questions/ })).toBeInTheDocument()
+  it("renders the shared tabs and no owner-only ones", () => {
+    renderStudy(questions)
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent?.replace(/\d+$/, ""))).toEqual([ "Main", "Flashcards", "Questions", "Concepts", "Audio", "Video" ])
   })
 
-  it("shows the start attempt button", () => {
-    render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    expect(screen.getByRole("button", { name: /start attempt/i })).toBeInTheDocument()
+  it("opens on Main with the start attempt button and concept chips", () => {
+    renderStudy(questions)
+    expect(screen.getByRole("button", { name: /start attempt/i })).toBeEnabled()
+    expect(screen.getByRole("list", { name: "Concept names" })).toHaveTextContent("Mitosis")
+  })
+
+  it("shows generation usage in the header and on concepts", async () => {
+    renderStudy(questions)
+    await userEvent.click(screen.getByRole("tab", { name: /^Concepts/ }))
+    expect(screen.getByText("120 tokens · $0.010", { selector: "header span" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Concept generation" })).toBeInTheDocument()
+  })
+
+  it("shows a question's generation cost", () => {
+    const generated = questions.map(q => ({ ...q, producedByJobId: "j1" }))
+    renderStudy(generated)
+    expect(screen.getAllByText(/gpt-5-nano/).length).toBeGreaterThan(0)
   })
 })

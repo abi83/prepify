@@ -1,7 +1,13 @@
 import { auth } from "./auth"
 
-export async function requireUserId(): Promise<string> {
+/** The signed-in user's id, or null for an anonymous visitor. */
+export async function currentUserId(): Promise<string | null> {
   const session = await auth()
-  if (!session?.user.id) throw new Error("Not authenticated")
-  return session.user.id
+  return session?.user.id ?? null
+}
+
+export async function requireUserId(): Promise<string> {
+  const userId = await currentUserId()
+  if (!userId) throw new Error("Not authenticated")
+  return userId
 }

@@ -36,18 +36,6 @@ export const updatePrepInputSchema = z.strictObject({
   isActive: z.boolean(),
 }).partial()
 
-export const STUDY_TABS = [ "flashcards", "questions" ] as const
-export type StudyTab = (typeof STUDY_TABS)[number]
-
-export function isStudyTab(value: string): value is StudyTab {
-  return STUDY_TABS.some(tab => tab === value)
-}
-
-/** Reads the `tab` query param, falling back to the default for anything absent or invalid. */
-export function parseStudyTab(value: string | null): StudyTab {
-  return value !== null && isStudyTab(value) ? value : "flashcards"
-}
-
 export const PREP_TABS = [ "main", "flashcards", "questions", "concepts", "pages", "audio", "video", "generation" ] as const
 export type PrepTab = (typeof PREP_TABS)[number]
 
@@ -58,6 +46,19 @@ export function isPrepTab(value: string): value is PrepTab {
 /** Reads the prep page's `tab` query param, falling back to Main for anything absent or invalid. */
 export function parsePrepTab(value: string | null): PrepTab {
   return value !== null && isPrepTab(value) ? value : "main"
+}
+
+/** Tabs only the owner sees. */
+export const OWNER_ONLY_TABS = [ "pages", "generation" ] as const
+export type StudyTab = Exclude<PrepTab, (typeof OWNER_ONLY_TABS)[number]>
+
+export function isStudyTab(value: string): value is StudyTab {
+  return isPrepTab(value) && !OWNER_ONLY_TABS.some(tab => tab === value)
+}
+
+/** Reads the read-only view's `tab` query param, falling back to Main for anything absent, invalid or owner-only. */
+export function parseStudyTab(value: string | null): StudyTab {
+  return value !== null && isStudyTab(value) ? value : "main"
 }
 
 export type VisualElementType = "diagram" | "formula" | "table" | "chart" | "molecule" | "image"
