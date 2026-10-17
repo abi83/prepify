@@ -1,3 +1,4 @@
+import type { PrepImage } from "@prisma/client"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -20,6 +21,8 @@ vi.mock("@/lib/executionMode", async importActual => ({
   isExecutionModeSet: () => true,
 }))
 vi.mock("@/lib/jobs/client/serverRunClient", () => ({ requestServerRun: mockRequestServerRun, awaitRunStart: vi.fn() }))
+vi.mock("@/lib/prepImageUpload", () => ({ validateNewFiles: vi.fn() }))
+vi.mock("@/lib/uploadQueue", () => ({ enqueueUploads: vi.fn(), pruneUploaded: vi.fn(), useUploads: () => [] }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
 vi.mock("@/lib/jobs/client/clientExecution", () => ({ runGeneration: vi.fn() }))
 vi.mock("@/app/preps/[id]/PageCard", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }))
@@ -28,9 +31,33 @@ vi.mock("@/app/preps/[id]/PageSection", () => ({ default: () => <div>accepted</d
 const rejected = (n: number): PageEntry => ({ verdict: "rejected", imageId: `img${n}`, number: n, gcsKey: `k${n}`, reason: "boom", generation: null })
 const accepted: PageEntry = { verdict: "accepted", generation: null, page: { page: 1, gcsKey: "k1", language: "en", title: "T", text: "x", visual_elements: [] } }
 
-const renderTab = (pages: PageEntry[]) => render(<PagesTab {...{ prep: { id: "p1" }, pages, expectRun: vi.fn() } as unknown as PrepTabProps} />)
+const renderTab = (pages: PageEntry[], images: Partial<PrepImage>[] = []) => render(<PagesTab {...{ prep: { id: "p1" }, pages, images, expectRun: vi.fn() } as unknown as PrepTabProps} />)
 
 beforeEach(() => vi.clearAllMocks())
+
+describe("PagesTab adding pages", () => {
+  it("counts existing pages against the limit and offers the picker below it", () => {
+    renderTab([ accepted ], [ { id: "img1", status: "done" as PrepImage["status"], ocrResult: {} } ])
+
+    expect(screen.getByText("1 / 10 pages")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "+ Add files" })).toBeTruthy()
+  })
+
+  it("runs the resume after the user processes uploaded, unrecognised pages", async () => {
+    renderTab([ accepted ], [ { id: "img1", status: "pending", ocrResult: {} }, { id: "img2", status: "pending", ocrResult: null } ])
+
+    await userEvent.click(screen.getByRole("button", { name: "Process 1 new page" }))
+
+    await waitFor(() => expect(mockRequestServerRun).toHaveBeenCalledTimes(1))
+    expect(mockRetryFailedPages).not.toHaveBeenCalled()
+  })
+
+  it("hides the process button without unrecognised pages", () => {
+    renderTab([ accepted ], [ { id: "img1", status: "pending", ocrResult: {} } ])
+
+    expect(screen.queryByRole("button", { name: /^Process/ })).toBeNull()
+  })
+})
 
 describe("PagesTab retry", () => {
   it("retries one rejected page, then triggers a run and refreshes", async () => {

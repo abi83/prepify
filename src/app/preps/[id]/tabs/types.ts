@@ -1,4 +1,4 @@
-import type { Prep, Question, Attempt } from "@prisma/client"
+import type { Prep, PrepImage, Question, Attempt } from "@prisma/client"
 
 import type { SharedTabData } from "@/components/prep/tabs/sharedTabs"
 import type { JobGeneration, PrepProgress } from "@/repositories/prepStateRepository"
@@ -19,6 +19,7 @@ export interface PrepTabProps extends SharedTabData {
   refreshProgress: () => Promise<void>
   expectRun: () => void
   pages: PageEntry[]
+  images: PrepImage[]
   generations: Record<string, JobGeneration>
   onTitleReady: (title: string) => void
   onGenerated: (questions: Question[], prep: Prep) => void
