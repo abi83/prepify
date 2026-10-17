@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button"
 import type { JobGeneration } from "@/repositories/prepStateRepository"
 
 import PageCard from "./PageCard"
@@ -9,9 +10,11 @@ interface Props {
   reason: string
   /** The page's wasted OCR calls; null when none were billed. */
   generation: JobGeneration | null
+  retrying: boolean
+  onRetry: () => void
 }
 
-export default function RejectedPage({ prepId, gcsKey, number, reason, generation }: Props) {
+export default function RejectedPage({ prepId, gcsKey, number, reason, generation, retrying, onRetry }: Props) {
   return (
     <PageCard
       prepId={prepId}
@@ -21,7 +24,10 @@ export default function RejectedPage({ prepId, gcsKey, number, reason, generatio
       generation={generation}
       costLabel="Wasted"
     >
-      <p role="alert" className="p-5 text-sm text-error">{reason}</p>
+      <div className="flex flex-col items-start gap-3 p-5">
+        <p role="alert" className="text-sm text-error">{reason}</p>
+        <Button variant="outline" size="sm" disabled={retrying} onClick={onRetry} aria-label={`Retry page ${number}`}>Retry</Button>
+      </div>
     </PageCard>
   )
 }

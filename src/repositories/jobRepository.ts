@@ -264,6 +264,19 @@ export async function retryTerminalJobs(actorId: string, prepId: string): Promis
   })
 }
 
+/** Explicit user retry of failed pages: hands the OCR jobs of `imageIds` back to resume with a fresh attempt budget. Other jobs are untouched. Returns how many were reset. */
+export async function retryFailedPages(actorId: string, prepId: string, imageIds: string[]): Promise<number> {
+  await assertOwnsPrep(actorId, prepId)
+  return prisma.$transaction(async tx => {
+    const result = await tx.job.updateMany({
+      where: { prepId, type: OCR_JOB_TYPE, status: "failed", inputs: { some: { entityId: { in: imageIds } } } },
+      data: { status: "interrupted", attempts: 0, failureReason: null },
+    })
+    if (result.count > 0) await syncPrepStatus(tx, prepId)
+    return result.count
+  })
+}
+
 export async function touchHeartbeat(jobId: string): Promise<void> {
   await prisma.job.updateMany({ where: { id: jobId, status: "running" }, data: { heartbeatAt: new Date() } })
 }

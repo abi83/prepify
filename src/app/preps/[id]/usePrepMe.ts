@@ -1,132 +1,80 @@
-import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
 import { useRef, useState } from "react"
 
 import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
 import { BYOK_TEXT_HARD_LIMIT } from "@/core/lib/config"
 import { getGenerationConfig, type GenerationConfig } from "@/core/lib/generationConfig"
-import { getApiKey, type ApiKeyConfig } from "@/lib/apiKey"
-import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
 import { runOcr } from "@/lib/jobs/client/clientExecution"
-import { awaitRunStart, requestServerRun } from "@/lib/jobs/client/serverRunClient"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
 import { ocrResultSchema } from "@/types/prep"
 
+import { useRunTrigger, type RunRequest } from "./useRunTrigger"
+
 type Phase = "ocr" | "starting" | "saving" | "error"
 
-/** The "Prep me" flow of a draft prep: execution mode → key/session checks → OCR or server run → activate. */
+/** The "Prep me" flow of a draft prep: run trigger with OCR → activate. */
 export function usePrepMe(prepId: string, imageCount: number) {
-  const router = useRouter()
-  const { data: session } = useSession()
   const abortRef = useRef<AbortController | null>(null)
 
   const [ phase, setPhase ] = useState<Phase | null>(null)
   const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
-  const [ modeDialogOpen, setModeDialogOpen ] = useState(false)
   const [ config, setConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
 
-  function fail(message: string) {
-    setPhase("error")
-    setErrorMsg(message)
-  }
+  const trigger = useRunTrigger(prepId, {
+    onError: message => {
+      setPhase("error")
+      setErrorMsg(message)
+    },
+    onFinished: () => setPhase(null),
+  })
 
-  function done() {
-    setPhase(null)
-    router.refresh()
-  }
-
-  async function runOnServer(keyConfig: ApiKeyConfig) {
-    setPhase("starting")
-    try {
-      await updatePrep(prepId, { isActive: true })
-      await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target: config })
-      await awaitRunStart(prepId)
-    } catch (e) {
-      fail(e instanceof Error ? e.message : "Failed to start the server run")
-      return
-    }
-    done()
-  }
-
-  async function proceedWithRecognise() {
-    const keyConfig = getApiKey()
-    if (!keyConfig) {
-      fail("No API key configured. Please set one in Settings.")
-      return
-    }
-    const actorId = session?.user.id
-    if (!actorId) {
-      fail("You are not signed in.")
-      return
-    }
-
-    if (getExecutionMode() === "server") {
-      await runOnServer(keyConfig)
-      return
-    }
-
+  async function recogniseInBrowser({ actorId, keyConfig }: Parameters<RunRequest["runInBrowser"]>[0]) {
     abortRef.current = new AbortController()
     setPhase("ocr")
     setOcrProgress({ done: 0, total: imageCount })
 
-    try {
-      await runOcr({
-        actorId,
-        prepId,
-        apiKey: keyConfig.key,
-        model: keyConfig.model,
-        tier: keyConfig.tier,
-        target: config,
-        signal: abortRef.current.signal,
-        logger: consoleLogger,
-        sampler: clientSampler,
-        onProgress: event => {
-          if (event.stage === "ocr") setOcrProgress({ done: event.done, total: event.total })
-        },
-      })
-    } catch (e) {
-      fail(e instanceof Error ? e.message : "OCR failed")
-      return
-    }
+    await runOcr({
+      actorId,
+      prepId,
+      apiKey: keyConfig.key,
+      model: keyConfig.model,
+      tier: keyConfig.tier,
+      target: config,
+      signal: abortRef.current.signal,
+      logger: consoleLogger,
+      sampler: clientSampler,
+      onProgress: event => {
+        if (event.stage === "ocr") setOcrProgress({ done: event.done, total: event.total })
+      },
+    })
 
     const images = await listMyPrepImages(prepId)
     const combinedText = images.map(image => ocrResultSchema.parse(image.ocrResult).text).join("\n\n")
 
-    if (!combinedText.trim()) {
-      fail("No text detected in any image. Please try clearer photos.")
-      return
-    }
-
+    if (!combinedText.trim()) throw new Error("No text detected in any image. Please try clearer photos.")
     if (combinedText.length > BYOK_TEXT_HARD_LIMIT) {
-      fail(`Extracted text exceeds the ${(BYOK_TEXT_HARD_LIMIT / 1000).toFixed(0)} 000 character limit. Please use fewer pages.`)
-      return
+      throw new Error(`Extracted text exceeds the ${(BYOK_TEXT_HARD_LIMIT / 1000).toFixed(0)} 000 character limit. Please use fewer pages.`)
     }
 
     setPhase("saving")
-
     try {
       await updatePrep(prepId, { isActive: true })
     } catch {
-      fail("Failed to save. Please try again.")
-      return
+      throw new Error("Failed to save. Please try again.")
     }
-    done()
   }
 
   function start() {
-    if (!isExecutionModeSet()) {
-      setModeDialogOpen(true)
-      return
-    }
-    void proceedWithRecognise()
-  }
-
-  function confirmMode() {
-    setModeDialogOpen(false)
-    void proceedWithRecognise()
+    trigger.run({
+      config,
+      beforeServerRun: async () => {
+        setPhase("starting")
+        await updatePrep(prepId, { isActive: true })
+      },
+      runInBrowser: recogniseInBrowser,
+    })
   }
 
   function retry() {
@@ -134,5 +82,5 @@ export function usePrepMe(prepId: string, imageCount: number) {
     setErrorMsg("")
   }
 
-  return { phase, ocrProgress, errorMsg, modeDialogOpen, config, setConfig, start, confirmMode, retry }
+  return { phase, ocrProgress, errorMsg, modeDialogOpen: trigger.modeDialogOpen, config, setConfig, start, confirmMode: trigger.confirmMode, retry }
 }
