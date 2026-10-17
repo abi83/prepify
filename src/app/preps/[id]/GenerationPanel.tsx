@@ -10,13 +10,13 @@ import { retryTerminalJobs } from "@/actions/jobs"
 import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
 import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
+import { GenerationConfigEditor } from "@/components/GenerationConfigEditor"
+import { RunSettingsHint } from "@/components/RunSettingsHint"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import type { GenerationConfig } from "@/core/lib/generationConfig"
-import { getGenerationConfig, ALL_QUESTION_TYPES, TYPE_LABELS } from "@/core/lib/generationConfig"
+import { getGenerationConfig } from "@/core/lib/generationConfig"
 import type { PlanTarget } from "@/core/lib/planner"
 import { getApiKey } from "@/lib/apiKey"
 import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
@@ -24,9 +24,7 @@ import { runGeneration as runJobGeneration, type GenerationProgress } from "@/li
 import { requestServerRun } from "@/lib/jobs/client/serverRunClient"
 import { consoleLogger } from "@/lib/logger"
 import { clientSampler } from "@/lib/sampler/clientSampler"
-import { cn } from "@/lib/utils"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
-import type { QuestionType } from "@/types/questions"
 
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
 import { useRunProgress } from "./useRunProgress"
@@ -53,7 +51,6 @@ export default function GenerationPanel({
   const [ genPhase, setGenPhase ] = useState<GenPhase>("idle")
   const [ progress, setProgress ] = useState<GenerationProgress | null>(null)
   const [ localConfig, setLocalConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
-  const [ genConfigOpen, setGenConfigOpen ] = useState(false)
   const [ genMs, setGenMs ] = useState(0)
   const [ totalTokens, setTotalTokens ] = useState(0)
   const [ addCount, setAddCount ] = useState(5)
@@ -64,14 +61,6 @@ export default function GenerationPanel({
   const pendingActionRef = useRef<(() => Promise<void>) | null>(null)
   const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
   const { progress: prepProgress, refresh: refreshProgress, expectRun } = useRunProgress(prepId, initialProgress, handlePollError)
-
-  function toggleLocalType(type: QuestionType) {
-    setLocalConfig(prev => {
-      const already = prev.enabledTypes.includes(type)
-      if (already && prev.enabledTypes.length === 1) return prev
-      return { ...prev, enabledTypes: already ? prev.enabledTypes.filter(t => t !== type) : [ ...prev.enabledTypes, type ] }
-    })
-  }
 
   async function runOnServer(target: PlanTarget = localConfig) {
     const keyConfig = getApiKey()!
@@ -209,19 +198,23 @@ export default function GenerationPanel({
     return (
       <>
         <ExecutionModeDialog open={modeDialogOpen} onConfirm={handleModeConfirm} />
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Add more</Label>
-          <Input
-            type="number"
-            min={1}
-            max={20}
-            value={addCount}
-            onChange={e => setAddCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
-            className="h-11 w-[84px]"
-            aria-label="Number of questions to add"
-          />
-          <Button className="h-11" disabled={hasUnfinishedJobs} onClick={handleAddMore}>Add {addCount} more</Button>
-          {hasUnfinishedJobs && <p className="text-sm text-muted-foreground">Resume the unfinished jobs first.</p>}
+        <div className="flex flex-col gap-2.5">
+          <GenerationConfigEditor value={localConfig} onChange={setLocalConfig} editCount={false} />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Add more</Label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={addCount}
+              onChange={e => setAddCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
+              className="h-11 w-[84px]"
+              aria-label="Number of questions to add"
+            />
+            <Button className="h-11" disabled={hasUnfinishedJobs} onClick={handleAddMore}>Add {addCount} more</Button>
+            {hasUnfinishedJobs && <p className="text-sm text-muted-foreground">Resume the unfinished jobs first.</p>}
+          </div>
+          <RunSettingsHint returnTo={`/preps/${prepId}`} />
         </div>
       </>
     )
@@ -242,6 +235,12 @@ export default function GenerationPanel({
               <div className="flex flex-col gap-2.5">
                 {checklistRows.map(row => <ChecklistRow key={row.label} row={row} />)}
               </div>
+              {!isRunning && !isServerRunning && (
+                <>
+                  <GenerationConfigEditor value={localConfig} onChange={setLocalConfig} editCount />
+                  <RunSettingsHint returnTo={`/preps/${prepId}`} />
+                </>
+              )}
               <div className="mt-4 flex items-center gap-2.5">
                 {isRunning ? (
                   <Button variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button>
@@ -271,62 +270,10 @@ export default function GenerationPanel({
             <>
               <p className="text-sm text-muted-foreground">Generate study questions from this material.</p>
 
-              <Sheet open={genConfigOpen} onOpenChange={setGenConfigOpen}>
-                <SheetTrigger asChild>
-                  <button className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border border-border bg-background px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground sm:max-w-sm">
-                    <span className="flex-1">
-                      {localConfig.questionCount} questions
-                      {" · "}
-                      {localConfig.enabledTypes.length === ALL_QUESTION_TYPES.length
-                        ? "All types"
-                        : localConfig.enabledTypes.map(t => TYPE_LABELS[t]).join(", ")}
-                    </span>
-                    <span className="text-xs opacity-60">Edit</span>
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-lg p-5">
-                  <SheetHeader className="p-0">
-                    <SheetTitle>Generation settings</SheetTitle>
-                    <SheetDescription className="sr-only">Choose how many questions to generate and which types.</SheetDescription>
-                  </SheetHeader>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2.5">
-                      <Label className="min-w-[68px] text-xs font-semibold tracking-wide text-muted-foreground uppercase">Questions</Label>
-                      <Input
-                        type="number"
-                        min={5}
-                        max={20}
-                        value={localConfig.questionCount}
-                        onChange={e => setLocalConfig(prev => ({
-                          ...prev,
-                          questionCount: Math.min(20, Math.max(5, Number(e.target.value) || 10)),
-                        }))}
-                        className="h-11 w-[84px]"
-                      />
-                      <span className="text-xs text-muted-foreground">5–20</span>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Types</Label>
-                      <div className="flex flex-col gap-1">
-                        {ALL_QUESTION_TYPES.map(type => {
-                          const checked = localConfig.enabledTypes.includes(type)
-                          const isOnly = checked && localConfig.enabledTypes.length === 1
-                          return (
-                            <Label key={type} className={cn("min-h-11 gap-2 text-sm font-normal", isOnly && "cursor-not-allowed opacity-50")}>
-                              <Checkbox checked={checked} disabled={isOnly} onCheckedChange={() => toggleLocalType(type)} />
-                              {TYPE_LABELS[type]}
-                            </Label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    <Button className="h-11" onClick={() => setGenConfigOpen(false)}>Done</Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <GenerationConfigEditor value={localConfig} onChange={setLocalConfig} editCount />
 
               <Button className="h-11 self-start" onClick={handleGenerate}>Generate questions</Button>
+              <RunSettingsHint returnTo={`/preps/${prepId}`} />
             </>
           )}
         </div>
