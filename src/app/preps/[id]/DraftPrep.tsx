@@ -7,6 +7,8 @@ import { deleteMyPrepImage } from "@/actions/prepImages"
 import { getReadSignedUrl } from "@/actions/uploads"
 import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
 import { FilePicker } from "@/components/FilePicker"
+import { GenerationConfigEditor } from "@/components/GenerationConfigEditor"
+import { RunSettingsHint } from "@/components/RunSettingsHint"
 import { Button } from "@/components/ui/button"
 import { MAX_IMAGES } from "@/core/lib/config"
 import { describeOcrError } from "@/lib/ocrRejection"
@@ -179,7 +181,11 @@ export default function DraftPrep({ prepId, images, prepMe }: Props) {
       )}
 
       {!isWorking && prepMe.phase !== "error" && (
-        <Button className="w-full" onClick={prepMe.start} disabled={!canPrepMe}>Prep me</Button>
+        <div className="flex flex-col gap-2">
+          <GenerationConfigEditor value={prepMe.config} onChange={prepMe.setConfig} editCount />
+          <Button className="w-full" onClick={prepMe.start} disabled={!canPrepMe}>Prep me</Button>
+          <RunSettingsHint returnTo={`/preps/${prepId}`} />
+        </div>
       )}
     </section>
   )
