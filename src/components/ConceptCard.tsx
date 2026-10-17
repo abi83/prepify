@@ -1,4 +1,3 @@
-import GenerationCost from "@/components/GenerationCost"
 import { CardBadge, CardBadges, CardFooter, CardStatic, CardTitle } from "@/components/ui/card"
 import { formatDate } from "@/lib/format"
 import type { StatedConcept } from "@/repositories/prepStateRepository"
@@ -31,7 +30,6 @@ export default function ConceptCard({ concept }: { concept: StatedConcept }) {
       )}
       <CardFooter>
         <span className="text-xs text-muted-foreground">{formatDate(concept.createdAt)}</span>
-        <GenerationCost generations={[ concept.generation ]} />
       </CardFooter>
     </CardStatic>
   )

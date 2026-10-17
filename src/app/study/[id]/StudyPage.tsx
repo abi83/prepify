@@ -36,6 +36,7 @@ export default function StudyPage({ prep, questions, assets }: Props) {
         studyQuestions,
         assets,
         generationOfQuestion: () => null,
+        generationOfFlashcard: () => null,
       })}
     />
   )

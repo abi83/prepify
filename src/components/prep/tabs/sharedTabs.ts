@@ -13,6 +13,7 @@ export interface SharedTabData {
   studyQuestions: Question[]
   assets: Asset[]
   generationOfQuestion: (question: Question) => JobGeneration | null
+  generationOfFlashcard: (index: number) => JobGeneration | null
 }
 
 export const FLASHCARDS_TAB: PrepTabEntry<SharedTabData> = {

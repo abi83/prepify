@@ -22,6 +22,7 @@ export interface PrepTabProps {
   pages: PageEntry[]
   generations: Record<string, JobGeneration>
   generationOfQuestion: (question: Question) => JobGeneration | null
+  generationOfFlashcard: (index: number) => JobGeneration | null
   onTitleReady: (title: string) => void
   onGenerated: (questions: Question[], prep: Prep) => void
   onStartAttempt: () => void

@@ -47,7 +47,7 @@ export default function PageCard({ prepId, gcsKey, title, badge, generation, cos
       </div>
       {generation && (
         <div className="border-b border-border px-5 py-2">
-          <GenerationCost generations={[ generation ]} label={costLabel} />
+          <GenerationCost generation={generation} label={costLabel} />
         </div>
       )}
       {open && (

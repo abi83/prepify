@@ -24,6 +24,7 @@ const data: SharedTabData = {
   studyQuestions: [],
   assets: [],
   generationOfQuestion: () => null,
+  generationOfFlashcard: () => null,
 }
 
 function renderView(mode: "owner" | "readOnly") {

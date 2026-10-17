@@ -82,6 +82,7 @@ export default function PrepPage({
   const prepMe = usePrepMe(prep.id, images.length)
 
   const studyQuestions = questions.filter(q => q.type !== "flashcard")
+  const flashcardQuestions = questions.filter(q => q.type === "flashcard")
   const isOwner = prep.userId === userId
   // A run in flight keeps the draft view up: activating the prep mid-run would otherwise unmount it.
   const showDraft = (!prep.isActive && progress === null) || prepMe.phase !== null
@@ -120,7 +121,7 @@ export default function PrepPage({
       tabData={onStartAttempt => ({
         prep,
         questions,
-        flashcards: questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent),
+        flashcards: flashcardQuestions.map(q => q.content as unknown as FlashcardContent),
         studyQuestions,
         attempts,
         assets,
@@ -129,6 +130,7 @@ export default function PrepPage({
         pages: toPages(images, generations, rejectedGenerations),
         generations,
         generationOfQuestion: q => generationOf(q.producedByJobId, generations),
+        generationOfFlashcard: i => generationOf(flashcardQuestions[i].producedByJobId, generations),
         onTitleReady: title => setPrep(p => ({ ...p, title })),
         onGenerated: (savedQuestions, freshPrep) => {
           setQuestions(savedQuestions)

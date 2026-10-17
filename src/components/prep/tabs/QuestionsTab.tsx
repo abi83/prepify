@@ -17,7 +17,7 @@ export default function QuestionsTab({ studyQuestions, assets, generationOfQuest
       assets={assets}
       questionFooter={question => {
         const generation = generationOfQuestion(question)
-        return generation && <div className="mt-3"><GenerationCost generations={[ generation ]} /></div>
+        return generation && <div className="mt-3"><GenerationCost generation={generation} /></div>
       }}
     />
   )
