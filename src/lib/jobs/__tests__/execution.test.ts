@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
+import type { PlanTarget } from "@/core/lib/planner"
 import type { Llm, ProgressSink } from "@/core/ports"
 import { executePrep, type ExecutionDeps, type ExecutionParams } from "@/lib/jobs/execution"
-import type { PlanTarget } from "@/lib/planner"
 import type { PageConcepts } from "@/types/pipeline"
 import type { PrepState } from "@/types/prepState"
 

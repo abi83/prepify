@@ -1,7 +1,7 @@
 import type { AgentDeps } from "@/core/ports"
 import type { AgentResult } from "@/lib/agent"
 import { EMPTY_AGENT_META } from "@/lib/agent"
-import type { AssetHint, AssetType } from "@/types/questions"
+import type { ActiveAssetHint, AssetType } from "@/types/questions"
 
 import { runDiagramAgent } from "./DiagramAgent"
 import { runFormulaAgent } from "./FormulaAgent"
@@ -11,8 +11,6 @@ export interface AssetOutput {
   type: AssetType
   blob: string
 }
-
-export type ActiveAssetHint = AssetHint & { needed: true; type: AssetType; description: string }
 
 export async function routeAsset(
   hint: ActiveAssetHint,

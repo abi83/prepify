@@ -3,8 +3,7 @@ import type { JobDeps } from "@/core/ports"
 import type { AgentImage } from "@/core/ports"
 import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
 import { OcrRejectedError, runOcrAgent, type OcrOutput } from "@/lib/agents/OcrAgent"
-
-import { OCR_JOB_TYPE } from "./jobTypes"
+import { OCR_JOB_TYPE } from "@/types/jobTypes"
 
 /**
  * One job per `PrepImage` row — `inputIds[0]` is that row's id. `images` must already be

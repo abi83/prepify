@@ -2,10 +2,9 @@ import type { JobRunResult } from "@/core/job"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptExtractor } from "@/lib/agents/ConceptExtractor"
+import { CONCEPTS_EXTRACT_JOB_TYPE } from "@/types/jobTypes"
 import type { PageConcepts } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
-
-import { CONCEPTS_EXTRACT_JOB_TYPE } from "./jobTypes"
 
 /**
  * One job per `PrepImage` row — `inputIds[0]` is that row's id. `page` must already be

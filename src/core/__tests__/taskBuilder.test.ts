@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildDifficultyPool, buildQuestionTasks } from "@/lib/taskBuilder"
+import { buildDifficultyPool, buildQuestionTasks } from "@/core/lib/taskBuilder"
 import type { Concept } from "@/types/pipeline"
 import type { Difficulty } from "@/types/questions"
 

@@ -3,11 +3,11 @@
  * isolation, like `taskBuilder.ts`.
  */
 import type { QuestionSpec } from "@/core/job"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/types/jobTypes"
 import type { Concept } from "@/types/pipeline"
 import type { PrepState } from "@/types/prepState"
 
 import type { GenerationConfig } from "./generationConfig"
-import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
 import { buildQuestionTasks } from "./taskBuilder"
 
 /**

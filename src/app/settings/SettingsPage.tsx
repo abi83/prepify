@@ -10,13 +10,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getApiKey, setApiKey, clearApiKey, DEFAULT_MODEL, DEFAULT_TIER } from "@/lib/apiKey"
-import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
-import type { GenerationConfig } from "@/lib/generationConfig"
+import type { GenerationConfig } from "@/core/lib/generationConfig"
 import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, TYPE_LABELS,
-} from "@/lib/generationConfig"
+} from "@/core/lib/generationConfig"
+import { getApiKey, setApiKey, clearApiKey, DEFAULT_MODEL, DEFAULT_TIER } from "@/lib/apiKey"
+import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 import { providerModels } from "@/lib/modelCatalog"
 import { formatCost } from "@/lib/pricing"
