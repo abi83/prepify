@@ -20,8 +20,10 @@ vi.mock("@/lib/env", () => ({ config: { GCS_BUCKET_NAME: "test-bucket" } }))
 vi.mock("@/lib/currentUser", () => ({ requireUserId: vi.fn() }))
 vi.mock("@/repositories/prepRepository", () => ({ getPrep: vi.fn() }))
 
-import { deletePrepObjects, getReadSignedUrl } from "@/actions/uploads"
+import { getReadSignedUrl, getUploadSignedUrl } from "@/actions/uploads"
+import { MAX_IMAGES } from "@/lib/config"
 import { requireUserId } from "@/lib/currentUser"
+import { deletePrepObjects } from "@/lib/prepPageStorage"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 
@@ -66,11 +68,44 @@ describe("getReadSignedUrl", () => {
   })
 })
 
+describe("getReadSignedUrl key validation", () => {
+  it("rejects a key under another prep without signing", async () => {
+    requireUserIdMock.mockResolvedValue("owner")
+    getPrepMock.mockResolvedValue(prep())
+
+    await expect(getReadSignedUrl("prep-1", "prep-pages/victim/page-0.jpg")).rejects.toThrow(/not a page key/)
+    expect(getSignedUrlMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("getUploadSignedUrl", () => {
+  beforeEach(() => {
+    requireUserIdMock.mockResolvedValue("owner")
+    getPrepMock.mockResolvedValue(prep())
+  })
+
+  it("derives the key from prepId, pageIndex and mime type", async () => {
+    const { key } = await getUploadSignedUrl("prep-1", 3, "image/png")
+
+    expect(key).toBe("prep-pages/prep-1/page-3.png")
+  })
+
+  it.each([ -1, 1.5, MAX_IMAGES, Number.NaN ])("rejects pageIndex %s", async pageIndex => {
+    await expect(getUploadSignedUrl("prep-1", pageIndex, "image/png")).rejects.toThrow(/pageIndex/)
+    expect(getSignedUrlMock).not.toHaveBeenCalled()
+  })
+})
+
 describe("deletePrepObjects", () => {
   it("deletes every given GCS key, ignoring ones already gone", async () => {
-    await deletePrepObjects([ "prep-pages/prep-1/page-0.jpg", "prep-pages/prep-1/page-1.jpg" ])
+    await deletePrepObjects("prep-1", [ "prep-pages/prep-1/page-0.jpg", "prep-pages/prep-1/page-1.jpg" ])
 
     expect(deleteMock).toHaveBeenCalledTimes(2)
     expect(deleteMock).toHaveBeenCalledWith({ ignoreNotFound: true })
+  })
+
+  it("rejects the whole batch if any key is outside the prep", async () => {
+    await expect(deletePrepObjects("prep-1", [ "prep-pages/prep-1/page-0.jpg", "prep-pages/victim/page-0.jpg" ])).rejects.toThrow(/not a page key/)
+    expect(deleteMock).not.toHaveBeenCalled()
   })
 })

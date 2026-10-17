@@ -1,5 +1,7 @@
 import type { Prisma, PrepImage } from "@prisma/client"
 
+import { MAX_IMAGES } from "@/lib/config"
+import { assertPrepPageKey } from "@/lib/prepPageStorage"
 import { prisma } from "@/lib/prisma"
 import { ocrResultSchema, type OcrResult } from "@/types/prep"
 
@@ -20,6 +22,9 @@ async function assertOwnsImage(userId: string, imageId: string): Promise<PrepIma
 
 export async function createImage(userId: string, prepId: string, gcsKey: string): Promise<PrepImage> {
   await assertOwnsPrep(userId, prepId)
+  assertPrepPageKey(prepId, gcsKey)
+  const count = await prisma.prepImage.count({ where: { prepId } })
+  if (count >= MAX_IMAGES) throw new Error(`Prep ${prepId} already has the maximum of ${MAX_IMAGES} images`)
   return prisma.prepImage.create({ data: { prepId, gcsKey } })
 }
 
