@@ -99,6 +99,7 @@ export default function GenerationTab({ prep, questions, progress, refreshProgre
       setError(message)
     },
     onFinished: () => setRetrying(false),
+    onServerRunStarted: expectRun,
   })
 
   async function retry(jobId: string) {

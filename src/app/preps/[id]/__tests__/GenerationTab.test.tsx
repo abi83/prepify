@@ -30,7 +30,7 @@ const gen = (jobId: string, status: JobGeneration["status"], failureReason: stri
   ({ jobId, type: "question", status, failureReason, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls: [ call ] })
 
 const renderTab = (generations: Record<string, JobGeneration>) =>
-  render(<GenerationTab {...{ prep: { id: "p1" }, questions: [], progress: null, generations } as unknown as PrepTabProps} />)
+  render(<GenerationTab {...{ prep: { id: "p1" }, questions: [], progress: null, generations, expectRun: vi.fn() } as unknown as PrepTabProps} />)
 
 beforeEach(() => vi.clearAllMocks())
 
