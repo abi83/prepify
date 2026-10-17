@@ -177,7 +177,7 @@ describe("prepStateRepository", () => {
 
   it("keys a rejected page's wasted OCR calls by image id, one job accumulating retries", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
-    const [ rejected, clean ] = await Promise.all([ "a", "b" ].map(key => prepImageRepository.createImage(OWNER, prep.id, key)))
+    const [ rejected, clean ] = await Promise.all([ "a", "b" ].map(key => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/${key}`)))
     const ocrJob = (imageId: string) => prisma.job.create({
       data: { prepId: prep.id, type: "ocr", status: "failed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, inputs: { create: [ { entityType: "prepImage", entityId: imageId } ] } },
     })

@@ -76,7 +76,7 @@ describe("ocr job", () => {
 
   it("records the rejected call as a wasted GenerationMeta on the failed job", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
     const meta = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 1000, promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
     runOcrAgent.mockRejectedValue(new OcrRejectedError(meta, new Error("low_confidence:0.2")))
 
