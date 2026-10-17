@@ -5,7 +5,8 @@ import type { Logger } from "@/core/logger"
 import type { Store } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
 import * as generation from "@/lib/jobs/generation"
-import { OpenAiLlm } from "@/lib/llm/openAiLlm"
+import { createLlm } from "@/lib/llm/createLlm"
+import { providerOf } from "@/lib/llm/provider"
 
 import { browserPrepData } from "./browserPrepData"
 
@@ -33,13 +34,14 @@ function runnerOptions<T extends Pick<GenerationParams, "model" | "tier">>(optio
 }
 
 /** Browser composition root: server-action persistence and data, the BYOK key for the model. */
-async function browserPorts({ apiKey, logger, sampler }: Pick<GenerationParams, "apiKey" | "logger" | "sampler">): Promise<generation.RunnerPorts> {
+async function browserPorts({ apiKey, model, logger, sampler }: Pick<GenerationParams, "apiKey" | "model" | "logger" | "sampler">): Promise<generation.RunnerPorts> {
+  const catalog = await getModelCatalog()
   return {
     store: actionStore,
-    llm: new OpenAiLlm({ apiKey }),
+    llm: createLlm(providerOf(catalog, model), apiKey),
     logger,
     sampler,
-    catalog: await getModelCatalog(),
+    catalog,
     data: browserPrepData,
     listUnfinishedJobs: (_actorId, prepId) => jobActions.listUnfinishedJobs(prepId),
     trackRun: generation.untracked,

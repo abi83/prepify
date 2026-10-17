@@ -1,10 +1,9 @@
+import { isProvider, PROVIDER_INFO, type Provider } from "@/lib/llm/provider"
+
 const STORAGE_KEY = "prepify_api_key"
 
-export const DEFAULT_MODEL = "gpt-5-nano"
-export const DEFAULT_TIER = "flex"
-
 export interface ApiKeyConfig {
-  provider: "openai"
+  provider: Provider
   model: string
   tier: string
   key: string
@@ -16,10 +15,13 @@ export function getApiKey(): ApiKeyConfig | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<ApiKeyConfig>
     if (!parsed.key) return null
+    // Configs saved before Gemini support have no provider.
+    const provider = parsed.provider ?? "openai"
+    if (!isProvider(provider)) return null
     return {
-      provider: "openai",
-      model: parsed.model ?? DEFAULT_MODEL,
-      tier: parsed.tier ?? DEFAULT_TIER,
+      provider,
+      model: parsed.model ?? PROVIDER_INFO[provider].defaultModel,
+      tier: parsed.tier ?? PROVIDER_INFO[provider].defaultTier,
       key: parsed.key,
     }
   } catch {
@@ -27,8 +29,7 @@ export function getApiKey(): ApiKeyConfig | null {
   }
 }
 
-export function setApiKey(key: string, model = DEFAULT_MODEL, tier = DEFAULT_TIER): void {
-  const config: ApiKeyConfig = { provider: "openai", model, tier, key }
+export function setApiKey(config: ApiKeyConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
 }
 

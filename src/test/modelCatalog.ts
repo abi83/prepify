@@ -16,6 +16,15 @@ export const testCatalog = parseModelCatalog({
       "big-judge": { label: "big-judge", input: 0.05, cachedInput: 0.005, output: 0.40 },
     },
   },
+  gemini: {
+    tiers: {
+      flex: { label: "Flex", multiplier: 0.5 },
+      default: { label: "Standard", multiplier: 1 },
+    },
+    models: {
+      "gemini-3.1-flash-lite": { label: "Gemini 3.1 Flash-Lite", input: 0.25, cachedInput: 0.025, output: 1.50 },
+    },
+  },
   local: {
     models: {
       "local-model": { label: "local-model", input: 0, cachedInput: 0, output: 0 },

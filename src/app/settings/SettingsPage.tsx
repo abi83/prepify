@@ -15,9 +15,10 @@ import {
   getGenerationConfig, setGenerationConfig,
   ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS,
 } from "@/core/lib/generationConfig"
-import { getApiKey, setApiKey, clearApiKey, DEFAULT_MODEL, DEFAULT_TIER } from "@/lib/apiKey"
+import { getApiKey, setApiKey, clearApiKey } from "@/lib/apiKey"
 import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
-import { OpenAiLlm } from "@/lib/llm/openAiLlm"
+import { createLlm } from "@/lib/llm/createLlm"
+import { PROVIDERS, PROVIDER_INFO, type Provider } from "@/lib/llm/provider"
 import { providerModels } from "@/lib/modelCatalog"
 import { formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
@@ -31,9 +32,10 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
   const searchParams = useSearchParams()
   const returnTo = searchParams.get("returnTo") ?? "/preps"
 
+  const [ provider, setProvider ] = useState<Provider>(() => getApiKey()?.provider ?? "openai")
   const [ keyValue, setKeyValue ] = useState(() => getApiKey()?.key ?? "")
-  const [ model, setModel ] = useState(() => getApiKey()?.model ?? DEFAULT_MODEL)
-  const [ tier, setTier ] = useState(() => getApiKey()?.tier ?? DEFAULT_TIER)
+  const [ model, setModel ] = useState(() => getApiKey()?.model ?? PROVIDER_INFO[provider].defaultModel)
+  const [ tier, setTier ] = useState(() => getApiKey()?.tier ?? PROVIDER_INFO[provider].defaultTier)
   const [ saved, setSaved ] = useState(false)
   const [ testState, setTestState ] = useState<TestState>("idle")
   const [ totalTokens, setTotalTokens ] = useState(0)
@@ -74,7 +76,7 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
 
   function handleSave() {
     if (!keyValue.trim()) return
-    setApiKey(keyValue.trim(), model, tier)
+    setApiKey({ provider, key: keyValue.trim(), model, tier })
     setSaved(true)
     setTestState("idle")
     setTimeout(() => {
@@ -86,8 +88,18 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
   function handleClear() {
     clearApiKey()
     setKeyValue("")
-    setModel(DEFAULT_MODEL)
-    setTier(DEFAULT_TIER)
+    setModel(PROVIDER_INFO[provider].defaultModel)
+    setTier(PROVIDER_INFO[provider].defaultTier)
+    setSaved(false)
+    setTestState("idle")
+  }
+
+  function handleProviderChange(next: Provider) {
+    const stored = getApiKey()
+    setProvider(next)
+    setKeyValue(stored?.provider === next ? stored.key : "")
+    setModel(stored?.provider === next ? stored.model : PROVIDER_INFO[next].defaultModel)
+    setTier(stored?.provider === next ? stored.tier : PROVIDER_INFO[next].defaultTier)
     setSaved(false)
     setTestState("idle")
   }
@@ -96,7 +108,7 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
     if (!keyValue.trim()) return
     setTestState("testing")
     try {
-      const valid = await new OpenAiLlm({ apiKey: keyValue.trim() }).isKeyValid()
+      const valid = await createLlm(provider, keyValue.trim()).isKeyValid()
       setTestState(valid ? "ok" : "invalid_key")
     } catch {
       setTestState("error")
@@ -104,7 +116,7 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
   }
 
   const hasKey = !!getApiKey()
-  const models = providerModels(catalog, "openai")
+  const models = providerModels(catalog, provider)
   const selected = models.find(m => m.id === model)
   const selectionError = !selected
     ? `Saved model "${model}" is no longer available.`
@@ -117,8 +129,8 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
   }
 
   function handleResetSelection() {
-    setModel(DEFAULT_MODEL)
-    setTier(DEFAULT_TIER)
+    setModel(PROVIDER_INFO[provider].defaultModel)
+    setTier(PROVIDER_INFO[provider].defaultTier)
     setSaved(false)
   }
 
@@ -130,11 +142,11 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
       <h1 className="font-highlight text-2xl font-bold tracking-tight">Settings</h1>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-base font-bold tracking-tight">OpenAI API Key</h2>
+        <h2 className="text-base font-bold tracking-tight">{PROVIDER_INFO[provider].label} API Key</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
             Your key is stored only in this browser and never sent to our servers.{" "}
           <a
-            href="https://platform.openai.com/api-keys"
+            href={PROVIDER_INFO[provider].keyUrl}
             target="_blank"
             rel="noreferrer"
             className="text-primary hover:underline"
@@ -144,10 +156,24 @@ export default function SettingsPage({ catalog }: { catalog: ModelCatalog }) {
         </p>
 
         <div className="flex flex-col gap-1.5">
+          <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Provider</Label>
+          <Select value={provider} onValueChange={v => handleProviderChange(v as Provider)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PROVIDERS.map(p => (
+                <SelectItem key={p} value={p}>{PROVIDER_INFO[p].label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">API Key</Label>
           <Input
             type="password"
-            placeholder="sk-..."
+            placeholder={PROVIDER_INFO[provider].keyPlaceholder}
             value={keyValue}
             onChange={e => { setKeyValue(e.target.value); setSaved(false); setTestState("idle") }}
             onKeyDown={e => e.key === "Enter" && handleSave()}

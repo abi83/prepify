@@ -26,7 +26,7 @@ export async function acquirePrepRun(prepId: string): Promise<void> {
 /** Runs the prep's job graph with the caller's key, then frees its run lease. The key lives only in this call's closure. */
 export async function runServerGeneration(userId: string, { apiKey, prepId, model, tier, target }: ServerRunRequest): Promise<void> {
   try {
-    await holdRunLease(prepId, async () => runGeneration(await serverPorts(apiKey, serverPrepData(userId)), {
+    await holdRunLease(prepId, async () => runGeneration(await serverPorts(apiKey, model, serverPrepData(userId)), {
       actorId: userId,
       prepId,
       apiKey,
