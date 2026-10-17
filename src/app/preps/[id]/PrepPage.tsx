@@ -127,6 +127,7 @@ export default function PrepPage({
         refreshProgress,
         expectRun,
         concepts,
+        images,
         pages: toPages(images, generations, rejectedGenerations),
         generations,
         generationOfQuestion: q => generationOf(q.producedByJobId, generations),

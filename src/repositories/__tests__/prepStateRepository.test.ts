@@ -52,6 +52,22 @@ describe("prepStateRepository", () => {
     expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1, images: [ { id: image.id, merge: "merged" } ] })
   })
 
+  it("marks prep meta undone when a page was added after the latest meta job", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Extended", language: "en" })
+    const first = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-0.jpg`)
+    await prisma.job.create({
+      data: {
+        prepId: prep.id, type: "prep.meta", status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
+        inputs: { create: [ { entityType: "prepImage", entityId: first.id } ] },
+      },
+    })
+    expect((await loadPrepState(prep.id)).prepMetaDone).toBe(true)
+
+    await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-1.jpg`)
+
+    expect((await loadPrepState(prep.id)).prepMetaDone).toBe(false)
+  })
+
   it("derives each page's merge state from its concepts jobs: none, planned or merged", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Merges", language: "en" })
     const [ none, planned, merged ] = await Promise.all([ "k1", "k2", "k3" ].map(key => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/${key}`)))

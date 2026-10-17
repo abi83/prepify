@@ -66,7 +66,7 @@ export async function listJobGenerations(userId: string | null, prepId: string):
 
 /** The planner's view of a prep: completed outputs only. No ownership check — callers resolve the prep first. */
 export async function loadPrepState(prepId: string): Promise<GeneratedPrepState> {
-  const [ images, concepts, extractJobs, mergeJobs, prepMetaJobs, questionCount, assetHintQuestions, questionJobCount, unfinishedJobCount, questionConceptInputs, assets, assetJobInputs ] = await Promise.all([
+  const [ images, concepts, extractJobs, mergeJobs, latestMetaJob, questionCount, assetHintQuestions, questionJobCount, unfinishedJobCount, questionConceptInputs, assets, assetJobInputs ] = await Promise.all([
     prisma.prepImage.findMany({ where: { prepId }, select: { id: true, ocrResult: true }, orderBy: { createdAt: "asc" } }),
     loadConcepts(prepId),
     prisma.job.findMany({
@@ -75,7 +75,7 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
       orderBy: { createdAt: "asc" },
     }),
     prisma.job.findMany({ where: { prepId, type: CONCEPTS_JOB_TYPE }, select: { status: true, inputs: { select: { entityId: true } } } }),
-    prisma.job.count({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" } }),
+    prisma.job.findFirst({ where: { prepId, type: PREP_META_JOB_TYPE, status: "executed" }, select: { inputs: { select: { entityId: true } } }, orderBy: { createdAt: "desc" } }),
     prisma.question.count({ where: { prepId } }),
     prisma.question.findMany({ where: { prepId, content: { path: [ "asset_hint", "needed" ], equals: true } }, select: { id: true, content: true } }),
     prisma.job.count({ where: { prepId, type: QUESTION_JOB_TYPE } }),
@@ -90,10 +90,13 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
 
   const pageConcepts = indexPageConcepts(extractJobs.map(job => ({ inputIds: job.inputs.map(input => input.entityId), output: job.output })))
   const merges = indexMerges(mergeJobs.map(job => ({ status: job.status, inputIds: job.inputs.map(input => input.entityId) })))
+  // Pages added after the latest meta job make its title and summary stale.
+  const metaCovered = new Set(latestMetaJob?.inputs.map(input => input.entityId))
+  const prepMetaDone = latestMetaJob !== null && images.every(image => metaCovered.has(image.id))
   return {
     images: images.map(image => ({ id: image.id, ocrDone: image.ocrResult !== null, concepts: pageConcepts.get(image.id) ?? { status: "pending" }, merge: merges.get(image.id) ?? "none" })),
     concepts,
-    prepMetaDone: prepMetaJobs > 0,
+    prepMetaDone,
     questionCount,
     questionJobCount,
     unfinishedJobCount,
