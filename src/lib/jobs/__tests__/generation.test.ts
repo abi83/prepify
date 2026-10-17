@@ -4,8 +4,8 @@ import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm } from "@/core/ports"
 import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, createNextJobs, runCreatedJobs, runGeneration, runOcr, untracked, type GenerationParams, type RunnerPorts } from "@/lib/jobs/generation"
-import type { PrepState } from "@/lib/planner"
 import { testCatalog } from "@/test/modelCatalog"
+import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]

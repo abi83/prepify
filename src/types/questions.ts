@@ -141,3 +141,10 @@ export type QuestionContent =
   | FillTheGapContent
   | SortingContent
 
+/** A user's in-progress answer to a question; only the field matching the question type is used. */
+export interface AnswerState {
+  single: string | null
+  multi: string[]
+  fill: string[]
+  sort: string[]
+}

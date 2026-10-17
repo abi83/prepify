@@ -1,7 +1,7 @@
 import type { JobRunResult } from "@/core/job"
 import type { JobDeps } from "@/core/ports"
+import type { AgentImage } from "@/core/ports"
 import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
-import type { AgentImage } from "@/lib/agent"
 import { OcrRejectedError, runOcrAgent, type OcrOutput } from "@/lib/agents/OcrAgent"
 
 import { OCR_JOB_TYPE } from "./jobTypes"

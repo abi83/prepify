@@ -1,7 +1,7 @@
-import type { AgentMeta } from "@/lib/agent"
 
 import type { ExecutionConfig, JobOutcome, JobRunResult, QuestionSpec } from "./job"
 import type { Llm, ProgressSink, Store } from "./ports"
+import type { AgentMeta } from "./sampler"
 
 export class JobNotFoundError extends Error {
   constructor(public readonly jobId: string) {

@@ -4,8 +4,9 @@ import { createInMemoryStore } from "@/core/inMemoryStore"
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm, ProgressSink } from "@/core/ports"
 import { executePrep, type ExecutionDeps, type ExecutionParams } from "@/lib/jobs/execution"
-import type { PlanTarget, PrepState } from "@/lib/planner"
+import type { PlanTarget } from "@/lib/planner"
 import type { PageConcepts } from "@/types/pipeline"
+import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET: PlanTarget = { questionCount: 3, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }

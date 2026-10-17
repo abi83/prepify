@@ -3,7 +3,9 @@ import path from "path"
 
 import { parse } from "yaml"
 
-import { parseModelCatalog, type ModelCatalog } from "./modelCatalog"
+import type { ModelCatalog } from "@/types/modelCatalog"
+
+import { parseModelCatalog } from "./modelCatalog"
 
 const CATALOG_FILE = path.join(process.cwd(), "config", "models.yml")
 

@@ -1,13 +1,13 @@
 import { z } from "zod"
 
 import type { Logger } from "@/core/logger"
-import type { AgentDeps } from "@/core/ports"
+import type { AgentDeps, AgentImage } from "@/core/ports"
 import { runAgent, truncateForLog, AgentResult } from "@/lib/agent"
-import type { AgentImage, AgentMeta } from "@/lib/agent"
-import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from "@/lib/config"
-import type { SupportedLanguage } from "@/lib/config"
+import type { AgentMeta } from "@/lib/agent"
+import { LANGUAGE_LABELS } from "@/lib/config"
 import { serializeError } from "@/lib/logger"
 import type { Prompt } from "@/lib/prompt"
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/types/language"
 
 const visualElementSchema = z.object({
   type: z.enum([ "diagram", "formula", "table", "chart", "molecule", "image" ]),
