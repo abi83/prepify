@@ -46,7 +46,7 @@ export const POST = withHandler(async req => {
   try {
     after(() => runServerGeneration(userId, body.data))
   } catch (e) {
-    releasePrepRun(prepId)
+    await releasePrepRun(prepId)
     throw e
   }
   return NextResponse.json({ status: "triggered" }, { status: 202 })

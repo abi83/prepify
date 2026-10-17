@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
-import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryFailedPages, retryJob, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
+import { acquireRunLease, claimJob, createPrismaStore, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, releaseRunLease, renewRunLease, retryFailedPages, retryJob, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { getPrepProgress } from "@/repositories/prepStateRepository"
@@ -195,12 +195,29 @@ describe("running and interrupted jobs", () => {
     expect(await statusOf(job.id)).toBe("failed")
   })
 
-  it("hasActiveRun is true only for a fresh heartbeat", async () => {
-    const fresh = await makeJob("running", new Date())
-    const stale = await makeJob("running", ago(STALE_HEARTBEAT_MS + 1000))
+  it("a run lease is exclusive until released or stale, even with no running job", async () => {
+    const { prep } = await makeJob("created", null)
 
-    expect(await hasActiveRun(fresh.prep.id)).toBe(true)
-    expect(await hasActiveRun(stale.prep.id)).toBe(false)
+    expect(await acquireRunLease(prep.id)).toBe(true)
+    expect(await acquireRunLease(prep.id)).toBe(false)
+
+    await releaseRunLease(prep.id)
+    expect(await acquireRunLease(prep.id)).toBe(true)
+
+    await prisma.prep.update({ where: { id: prep.id }, data: { runHeartbeatAt: ago(STALE_HEARTBEAT_MS + 1000) } })
+    expect(await acquireRunLease(prep.id)).toBe(true)
+  })
+
+  it("renewing keeps the lease fresh but doesn't resurrect a released one", async () => {
+    const { prep } = await makeJob("created", null)
+    await prisma.prep.update({ where: { id: prep.id }, data: { runHeartbeatAt: ago(STALE_HEARTBEAT_MS - 1000) } })
+
+    await renewRunLease(prep.id)
+    expect(await acquireRunLease(prep.id)).toBe(false)
+
+    await releaseRunLease(prep.id)
+    await renewRunLease(prep.id)
+    expect((await prisma.prep.findUniqueOrThrow({ where: { id: prep.id } })).runHeartbeatAt).toBeNull()
   })
 
   it("markInterrupted only touches `running` jobs", async () => {

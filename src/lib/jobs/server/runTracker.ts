@@ -5,14 +5,15 @@ import * as jobRepository from "@/repositories/jobRepository"
 
 export const HEARTBEAT_INTERVAL_MS = 30_000
 
-/** Jobs this process is running — what its SIGTERM handler marks `interrupted`. */
+/** Jobs and preps this process is running — what its SIGTERM handler marks `interrupted` and releases. */
 const activeJobIds = new Set<string>()
+const leasedPrepIds = new Set<string>()
 let sigtermHandlerInstalled = false
 
-/** Marks this process's still-`running` jobs `interrupted`. */
+/** Marks this process's still-`running` jobs `interrupted` and frees its run leases, so Resume isn't blocked until they expire. */
 export async function interruptActiveJobs(): Promise<void> {
-  if (activeJobIds.size === 0) return
-  await jobRepository.markInterrupted([ ...activeJobIds ])
+  if (activeJobIds.size > 0) await jobRepository.markInterrupted([ ...activeJobIds ])
+  await Promise.all([ ...leasedPrepIds ].map(jobRepository.releaseRunLease))
 }
 
 function installSigtermHandler(): void {
@@ -43,5 +44,21 @@ export const trackServerRun: TrackRun = async (job, run) => {
   } finally {
     clearInterval(heartbeat)
     activeJobIds.delete(job.id)
+  }
+}
+
+/** Renews the prep's run lease (taken by `acquirePrepRun`) while `run` executes, then releases it. */
+export async function holdRunLease<T>(prepId: string, run: () => Promise<T>): Promise<T> {
+  installSigtermHandler()
+  leasedPrepIds.add(prepId)
+  const heartbeat = setInterval(() => {
+    jobRepository.renewRunLease(prepId).catch(error => serverLogger.error("Run lease heartbeat failed", { prepId, error: serializeError(error) }))
+  }, HEARTBEAT_INTERVAL_MS).unref()
+  try {
+    return await run()
+  } finally {
+    clearInterval(heartbeat)
+    leasedPrepIds.delete(prepId)
+    await jobRepository.releaseRunLease(prepId)
   }
 }

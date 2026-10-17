@@ -32,6 +32,7 @@ function entry(overrides: Partial<PrepEntry>): PrepEntry {
     language: null,
     description: "",
     isActive: true,
+    runHeartbeatAt: null,
     status: "ready",
     questionCount: 0,
     flashcardCount: 0,
