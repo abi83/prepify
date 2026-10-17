@@ -8,11 +8,12 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 const runOcrAgent = vi.fn()
-vi.mock("@/lib/agents/OcrAgent", () => ({ runOcrAgent: (...args: unknown[]) => runOcrAgent(...args) }))
+vi.mock("@/lib/agents/OcrAgent", async importActual => ({ ...await importActual<typeof import("@/lib/agents/OcrAgent")>(), runOcrAgent: (...args: unknown[]) => runOcrAgent(...args) }))
 
 import type { ExecutionConfig } from "@/core/job"
 import type { Llm, ProgressSink } from "@/core/ports"
 import { runJob } from "@/core/runJob"
+import { OcrRejectedError } from "@/lib/agents/OcrAgent"
 import { createOcrJobDefinition } from "@/lib/jobs/ocrJob"
 import { consoleLogger } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
@@ -71,5 +72,26 @@ describe("ocr job", () => {
     const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
     expect(metas).toHaveLength(1)
     expect(metas[0]).toMatchObject({ jobId: job.id, promptTokens: 10, completionTokens: 5 })
+  })
+
+  it("records the rejected call as a wasted GenerationMeta on the failed job", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const meta = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 1000, promptTokens: 10, cachedTokens: 0, completionTokens: 5, totalTokens: 15, costUsd: 0.001, toolCalls: 0, executionMs: 123 }
+    runOcrAgent.mockRejectedValue(new OcrRejectedError(meta, new Error("low_confidence:0.2")))
+
+    const store = createPrismaStore()
+    const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+
+    const definition = createOcrJobDefinition([ { base64: "ZmFrZQ==", mimeType: "image/jpeg" } ], { llm: NOOP_LLM, logger: consoleLogger, sampler: noopSampler, catalog: testCatalog })
+    const result = await runJob(
+      definition,
+      { store, llm: NOOP_LLM, progress: NOOP_PROGRESS },
+      { actorId: OWNER, jobId: job.id, apiKey: "sk-test", signal: new AbortController().signal },
+    )
+
+    expect(result).toMatchObject({ committed: true, status: "failed", failureReason: "low_confidence:0.2" })
+    const metas = await prisma.generationMeta.findMany({ where: { jobId: job.id } })
+    expect(metas).toMatchObject([ { promptTokens: 10, completionTokens: 5, wasted: true } ])
   })
 })

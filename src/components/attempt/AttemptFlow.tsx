@@ -2,10 +2,11 @@ import type { Question, Asset } from "@prisma/client"
 import { useState } from "react"
 
 import { insertAttempt } from "@/actions/attempts"
-import { emptyAnswer, type AnswerState } from "@/components/questions/QuestionBody"
+import { emptyAnswer } from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { isAnswerCorrect } from "@/lib/scoring"
+import type { AnswerState } from "@/types/questions"
 
 import { isAnswerValid, prepareQuestions } from "./questionUtils"
 import QuestionView from "./QuestionView"

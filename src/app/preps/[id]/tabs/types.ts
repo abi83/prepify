@@ -7,7 +7,7 @@ import type { FlashcardContent } from "@/types/questions"
 /** A page's OCR verdict: recognised, or rejected with a plain-language reason. */
 export type PageEntry =
   | { verdict: "accepted"; page: Page; generation: JobGeneration | null }
-  | { verdict: "rejected"; number: number; gcsKey: string; reason: string }
+  | { verdict: "rejected"; number: number; gcsKey: string; reason: string; generation: JobGeneration | null }
 
 /** Everything a tab may render; each tab component picks what it needs. */
 export interface PrepTabProps {

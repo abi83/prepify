@@ -9,7 +9,7 @@ import type { PlanTarget } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { getPrepProgress, listUnfinishedPreps, loadPrepState } from "@/repositories/prepStateRepository"
+import { getPrepProgress, listUnfinishedPreps, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
 const OTHER = "user-other"
@@ -173,5 +173,21 @@ describe("prepStateRepository", () => {
 
       expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, rejectedPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0 })
     })
+  })
+
+  it("keys a rejected page's wasted OCR calls by image id, one job accumulating retries", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
+    const [ rejected, clean ] = await Promise.all([ "a", "b" ].map(key => prepImageRepository.createImage(OWNER, prep.id, key)))
+    const ocrJob = (imageId: string) => prisma.job.create({
+      data: { prepId: prep.id, type: "ocr", status: "failed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, inputs: { create: [ { entityType: "prepImage", entityId: imageId } ] } },
+    })
+    const wastedJob = await ocrJob(rejected.id)
+    await addMeta(wastedJob.id, true)
+    await addMeta(wastedJob.id, true)
+    await addMeta((await ocrJob(clean.id)).id)
+
+    const generations = await loadRejectedPageGenerations(prep.id)
+    expect(Object.keys(generations)).toEqual([ rejected.id ])
+    expect(generations[rejected.id]).toMatchObject({ jobId: wastedJob.id, calls: [ { wasted: true }, { wasted: true } ] })
   })
 })

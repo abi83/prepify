@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import { assertConceptsFound, nextJobs, type PageConceptsState, type PlanTarget, type PrepState } from "@/lib/planner"
+import { assertConceptsFound, nextJobs, type PlanTarget } from "@/lib/planner"
+import type { PageConceptsState, PrepState } from "@/types/prepState"
 
 const TARGET: PlanTarget = {
   questionCount: 5,

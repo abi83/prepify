@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { ExecutionConfig, Job, JobOutcome } from "@/core/job"
 import { runGeneration, runOcr, type GenerationParams, type GenerationProgress } from "@/lib/jobs/clientExecution"
-import type { PrepState } from "@/lib/planner"
+import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
 const TARGET = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } } as GenerationParams["target"]

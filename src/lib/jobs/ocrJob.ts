@@ -1,8 +1,8 @@
 import type { JobRunResult } from "@/core/job"
 import type { JobDeps } from "@/core/ports"
-import type { JobDefinition, JobRunContext } from "@/core/runJob"
-import type { AgentImage } from "@/lib/agent"
-import { runOcrAgent, type OcrOutput } from "@/lib/agents/OcrAgent"
+import type { AgentImage } from "@/core/ports"
+import { JobRunError, type JobDefinition, type JobRunContext } from "@/core/runJob"
+import { OcrRejectedError, runOcrAgent, type OcrOutput } from "@/lib/agents/OcrAgent"
 
 import { OCR_JOB_TYPE } from "./jobTypes"
 
@@ -14,8 +14,13 @@ export function createOcrJobDefinition(images: AgentImage[], deps: JobDeps): Job
   return {
     type: OCR_JOB_TYPE,
     async run(ctx: JobRunContext): Promise<JobRunResult<OcrOutput>> {
-      const { output, meta } = await runOcrAgent(images, ctx.job.config.model, ctx.job.config.tier, ctx.signal, { ...deps, timeoutMs: ctx.job.config.timeoutMs })
-      return { output, metas: [ meta ], wastedMetas: [] }
+      try {
+        const { output, meta } = await runOcrAgent(images, ctx.job.config.model, ctx.job.config.tier, ctx.signal, { ...deps, timeoutMs: ctx.job.config.timeoutMs })
+        return { output, metas: [ meta ], wastedMetas: [] }
+      } catch (e) {
+        if (e instanceof OcrRejectedError) throw new JobRunError([ e.meta ], e.cause)
+        throw e
+      }
     },
   }
 }

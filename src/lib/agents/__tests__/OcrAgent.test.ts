@@ -3,7 +3,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest"
 const runAgent = vi.fn()
 vi.mock("@/lib/agent", async importActual => ({ ...await importActual<typeof import("@/lib/agent")>(), runAgent: (...args: unknown[]) => runAgent(...args) }))
 
-import { assertReadableText, runOcrAgent } from "@/lib/agents/OcrAgent"
+import { assertReadableText, OcrRejectedError, runOcrAgent } from "@/lib/agents/OcrAgent"
 
 const DEPS = {} as Parameters<typeof runOcrAgent>[4]
 
@@ -23,6 +23,16 @@ describe("runOcrAgent readability gate", () => {
       text: rejectedOutput.text,
       error: expect.objectContaining({ message: expect.stringMatching(/^ocr_text_not_letters:/) }),
     }))
+  })
+
+  it("carries the wasted call's meta on the thrown error", async () => {
+    const meta = { promptTokens: 7 }
+    runAgent.mockResolvedValue({ output: rejectedOutput, meta })
+
+    const error = await runOcrAgent([], "m", "flex", new AbortController().signal, { logger: { warn: vi.fn() } } as unknown as Parameters<typeof runOcrAgent>[4]).catch(e => e)
+
+    expect(error).toBeInstanceOf(OcrRejectedError)
+    expect(error.meta).toBe(meta)
   })
 
   it("truncates a long rejected text in the warn", async () => {

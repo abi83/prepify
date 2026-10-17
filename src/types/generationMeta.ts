@@ -1,4 +1,4 @@
-import type { AgentMeta } from "@/lib/agent"
+import type { AgentMeta } from "@/core/sampler"
 
 /** One row of `GenerationMeta` — the per-call usage/cost record for a job. */
 export interface GenerationMetaRecord {

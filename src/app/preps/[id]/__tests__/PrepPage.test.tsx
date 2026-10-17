@@ -77,11 +77,11 @@ const question = (id: string, producedByJobId: string): Question =>
     },
   })
 
-interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attempts?: Attempt[]; progress?: PrepProgress | null; generations?: Record<string, JobGeneration>; tokensUsed?: number; costUsd?: number }
+interface RenderOverrides { images?: PrepImage[]; questions?: Question[]; attempts?: Attempt[]; progress?: PrepProgress | null; generations?: Record<string, JobGeneration>; rejectedGenerations?: Record<string, JobGeneration>; tokensUsed?: number; costUsd?: number }
 
-function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], progress = null, generations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
+function renderPage(concepts: StatedConcept[], { images = [], questions = [], attempts = [], progress = null, generations = {}, rejectedGenerations = {}, tokensUsed = 0, costUsd = 0 }: RenderOverrides = {}) {
   return render(
-    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={progress} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} />,
+    <PrepPage prep={prep} questions={questions} attempts={attempts} assets={[]} progress={progress} tokensUsed={tokensUsed} costUsd={costUsd} concepts={concepts} images={images} generations={generations} rejectedGenerations={rejectedGenerations} />,
   )
 }
 
@@ -241,12 +241,30 @@ describe("PrepPage OCR verdicts", () => {
     renderPage([], { images: [ accepted, rejected("i2", REASONS[0][0]) ] })
     await openTab(/^Pages/)
     expect(screen.getByText("Zellteilung")).toBeInTheDocument()
-    expect(within(screen.getByRole("alert")).getByText("Page 2")).toBeInTheDocument()
+    expect(screen.getByText("Page 2")).toBeInTheDocument()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("expands a rejected page to its photo and reason", async () => {
+    renderPage([], { images: [ accepted, rejected("i2", REASONS[2][0]) ] })
+    await openTab(/^Pages/)
+    await userEvent.click(screen.getAllByRole("button", { name: "Expand" })[1])
+    expect(await screen.findByAltText("Page 2 original")).toHaveAttribute("src", "https://gcs/signed")
+    expect(screen.getByRole("alert")).toHaveTextContent(REASONS[2][1])
+  })
+
+  it("labels a rejected page's cost wasted, and shows none without wasted calls", async () => {
+    const wasted = { jobId: "o2", model: "gpt-5-nano", tier: "flex", calls: [ { ...call(100, 20, 0.01), wasted: true } ] }
+    renderPage([], { images: [ rejected("i2", REASONS[0][0]), rejected("i3", REASONS[0][0]) ], rejectedGenerations: { i2: wasted } })
+    await openTab(/^Pages/)
+    expect(screen.getAllByText(/tokens ·/)).toHaveLength(1)
+    expect(screen.getByText("Wasted: 120 tokens · $0.010")).toBeInTheDocument()
   })
 
   it.each(REASONS)("explains %s in plain words", async (error, message) => {
     renderPage([], { images: [ accepted, rejected("i2", error) ] })
     await openTab(/^Pages/)
+    await userEvent.click(screen.getAllByRole("button", { name: "Expand" })[1])
     expect(screen.getByRole("alert")).toHaveTextContent(message)
     expect(screen.getByRole("alert")).not.toHaveTextContent(error.split(":")[0])
   })
@@ -254,12 +272,13 @@ describe("PrepPage OCR verdicts", () => {
   it("falls back to a generic message with the raw code for an unknown error", async () => {
     renderPage([], { images: [ accepted, rejected("i2", "weird_code:1") ] })
     await openTab(/^Pages/)
+    await userEvent.click(screen.getAllByRole("button", { name: "Expand" })[1])
     expect(screen.getByRole("alert")).toHaveTextContent("This page couldn't be read (weird_code).")
   })
 
   it("shows the reason on the rejected thumbnail in the draft", async () => {
     const draft: Prep = { ...prep, isActive: false }
-    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={[ accepted, rejected("i2", REASONS[2][0]) ]} generations={{}} />)
+    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={[ accepted, rejected("i2", REASONS[2][0]) ]} generations={{}} rejectedGenerations={{}} />)
     expect(await screen.findByRole("alert")).toHaveTextContent(REASONS[2][1])
   })
 })
@@ -274,7 +293,7 @@ describe("PrepPage draft", () => {
 
   function renderDraft(images: PrepImage[] = []) {
     return render(
-      <PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={images} generations={{}} />,
+      <PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={null} tokensUsed={0} costUsd={0} concepts={[]} images={images} generations={{}} rejectedGenerations={{}} />,
     )
   }
 
@@ -300,7 +319,7 @@ describe("PrepPage draft", () => {
 
   it("keeps rendering a prep with jobs as before", () => {
     const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0 }
-    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} />)
+    render(<PrepPage prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
   })
 

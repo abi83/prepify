@@ -1,4 +1,6 @@
-import { rateFor, type ModelCatalog } from "./modelCatalog"
+import type { ModelCatalog } from "@/types/modelCatalog"
+
+import { rateFor } from "./modelCatalog"
 
 /** Formats a USD cost value for display, e.g. "$0.0023" or "< $0.01". */
 export function formatCost(usd: number): string {

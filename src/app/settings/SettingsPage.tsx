@@ -18,9 +18,10 @@ import {
   ALL_QUESTION_TYPES, TYPE_LABELS,
 } from "@/lib/generationConfig"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
-import { providerModels, type ModelCatalog } from "@/lib/modelCatalog"
+import { providerModels } from "@/lib/modelCatalog"
 import { formatCost } from "@/lib/pricing"
 import { cn } from "@/lib/utils"
+import type { ModelCatalog } from "@/types/modelCatalog"
 import type { QuestionType } from "@/types/questions"
 
 type TestState = "idle" | "testing" | "ok" | "invalid_key" | "error"

@@ -3,33 +3,12 @@
  * isolation, like `taskBuilder.ts`.
  */
 import type { QuestionSpec } from "@/core/job"
-import type { Concept, PageConcepts, StoredConcept } from "@/types/pipeline"
+import type { Concept } from "@/types/pipeline"
+import type { PrepState } from "@/types/prepState"
 
 import type { GenerationConfig } from "./generationConfig"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "./jobs/jobTypes"
 import { buildQuestionTasks } from "./taskBuilder"
-
-/** A page's concept extraction: not run yet, or its outcome. */
-export type PageConceptsState = PageConcepts | { status: "pending" }
-
-/** A page's merge into the prep's stored concepts: no `concepts` job yet, one that hasn't executed, or an executed one. */
-export type PageMergeState = "none" | "planned" | "merged"
-
-/** What a prep already has — completed outputs only, not jobs that exist but haven't run. */
-export interface PrepState {
-  images: { id: string; ocrDone: boolean; concepts: PageConceptsState; merge: PageMergeState }[]
-  concepts: (StoredConcept & { id: string })[]
-  prepMetaDone: boolean
-  questionCount: number
-  /** `question` jobs in any status — once any exist, they are the question plan. */
-  questionJobCount: number
-  /** Jobs that are not executed and can still be resumed. */
-  unfinishedJobCount: number
-  /** Existing questions per concept id; concepts without questions are absent. */
-  conceptUsage: Record<string, number>
-  /** Questions whose `asset_hint` asks for an asset and that have neither an asset nor an `asset` job (any status). */
-  assetQuestionIds: string[]
-}
 
 /**
  * `questionCount` is the total a first question plan should reach. `additionalQuestions` is a

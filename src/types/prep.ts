@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import type { SupportedLanguage } from "@/lib/config"
+import type { SupportedLanguage } from "./language"
 
 /** Identifier-safe discipline values stored on `Prep.discipline`; mirrors the Prisma `PrepDiscipline` enum. */
 export type PrepDisciplineId =
