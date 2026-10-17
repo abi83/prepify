@@ -1,21 +1,29 @@
 import { auth } from "@/lib/auth"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
+import { interruptStaleJobs } from "@/repositories/jobRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import * as prepStateRepository from "@/repositories/prepStateRepository"
 
 // Must match Cloud Run request timeout — SSE stream stays open for the duration of a run.
 export const maxDuration = 3600
 
-const POLL_MS = 1_000
-/** Polls before seeing a running job before giving up (15 s grace after trigger). */
-const GRACE_POLLS = 15
+const POLL_MS = 4_000
+/** Polls before seeing a running job before giving up (~16 s grace after trigger). */
+const GRACE_POLLS = 4
+/** How often an open stream flips dead-heartbeat `running` jobs to `interrupted`. */
+const SWEEP_MS = 30_000
 
 /** Streams progress until the run finishes or the grace period expires, then sends `done` once so EventSource doesn't reconnect. */
 async function streamProgress(prepId: string, send: (chunk: string) => void, isCancelled: () => boolean) {
   let seenRunning = false
   let idlePolls = 0
+  let lastSweep = 0
 
   while (!isCancelled()) {
+    if (Date.now() - lastSweep >= SWEEP_MS) {
+      await interruptStaleJobs({ prepId })
+      lastSweep = Date.now()
+    }
     const progress = await prepStateRepository.getPrepProgress(prepId)
     if (progress) send(`data: ${JSON.stringify(progress)}\n\n`)
 
