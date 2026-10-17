@@ -2,7 +2,7 @@ import type { PrepImage } from "@prisma/client"
 
 import { createPrepImage } from "@/actions/prepImages"
 import { getUploadSignedUrl } from "@/actions/uploads"
-import { MAX_IMAGES } from "@/lib/config"
+import { MAX_IMAGES } from "@/core/lib/config"
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 

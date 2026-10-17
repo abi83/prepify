@@ -21,7 +21,7 @@ vi.mock("@/lib/currentUser", () => ({ requireUserId: vi.fn() }))
 vi.mock("@/repositories/prepRepository", () => ({ getPrep: vi.fn() }))
 
 import { getReadSignedUrl, getUploadSignedUrl } from "@/actions/uploads"
-import { MAX_IMAGES } from "@/lib/config"
+import { MAX_IMAGES } from "@/core/lib/config"
 import { requireUserId } from "@/lib/currentUser"
 import { deletePrepObjects } from "@/lib/prepPageStorage"
 import { ForbiddenError } from "@/repositories/errors"

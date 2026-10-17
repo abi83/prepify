@@ -1,7 +1,7 @@
 import type { Prisma, PrepImage } from "@prisma/client"
 
-import { MAX_IMAGES } from "@/lib/config"
-import { assertPrepPageKey } from "@/lib/prepPageStorage"
+import { MAX_IMAGES } from "@/core/lib/config"
+import { assertPrepPageKey } from "@/core/lib/prepPageKey"
 import { prisma } from "@/lib/prisma"
 import { ocrResultSchema, type OcrResult } from "@/types/prep"
 
