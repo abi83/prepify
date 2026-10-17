@@ -1,7 +1,6 @@
 import { z } from "zod"
 
-import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/lib/config"
-
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "./language"
 import type { Difficulty, QuestionType } from "./questions"
 
 export const conceptSchema = z.object({

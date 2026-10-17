@@ -1,8 +1,8 @@
 import { z } from "zod"
 
-import { SUPPORTED_LANGUAGES } from "@/lib/config"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 
+import { SUPPORTED_LANGUAGES } from "./language"
 import { pageConceptsSchema, storedConceptSchema } from "./pipeline"
 import { ocrResultSchema, prepDisciplineSchema } from "./prep"
 import { assetTypeSchema, generatedQuestionSchema } from "./questions"

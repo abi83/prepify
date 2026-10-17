@@ -1,7 +1,8 @@
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, type AgentResult } from "@/lib/agent"
-import { MAX_PAGE_CHARS, type SupportedLanguage } from "@/lib/config"
+import { MAX_PAGE_CHARS } from "@/lib/config"
 import type { Prompt } from "@/lib/prompt"
+import type { SupportedLanguage } from "@/types/language"
 import { conceptsResponseSchema, type PageConcepts } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 

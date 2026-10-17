@@ -1,10 +1,10 @@
 import type { Question, Asset } from "@prisma/client"
 
-import type { AnswerState } from "@/components/questions/QuestionBody"
 import QuestionBody from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
 import { isAnswerCorrect } from "@/lib/scoring"
 import { cn } from "@/lib/utils"
+import type { AnswerState } from "@/types/questions"
 
 interface Props {
   score: number

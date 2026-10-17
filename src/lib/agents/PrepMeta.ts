@@ -2,8 +2,8 @@ import { z } from "zod"
 
 import type { AgentDeps } from "@/core/ports"
 import { runAgent, type AgentResult } from "@/lib/agent"
-import type { SupportedLanguage } from "@/lib/config"
 import type { Prompt } from "@/lib/prompt"
+import type { SupportedLanguage } from "@/types/language"
 
 export const DISCIPLINES = [
   "History",

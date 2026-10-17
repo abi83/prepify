@@ -9,7 +9,7 @@ export default function PagesTab({ prep, pages }: PrepTabProps) {
     <div className="flex flex-col gap-3">
       {pages.map(entry => entry.verdict === "accepted"
         ? <PageSection key={entry.page.page} prepId={prep.id} page={entry.page} generation={entry.generation} />
-        : <RejectedPage key={entry.number} number={entry.number} reason={entry.reason} />,
+        : <RejectedPage key={entry.number} prepId={prep.id} gcsKey={entry.gcsKey} number={entry.number} reason={entry.reason} generation={entry.generation} />,
       )}
     </div>
   )

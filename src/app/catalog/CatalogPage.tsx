@@ -3,11 +3,12 @@
 import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepMeta"
-import { LANGUAGE_LABELS, type SupportedLanguage } from "@/lib/config"
+import { LANGUAGE_LABELS } from "@/lib/config"
 import { disciplineFromEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
 import { useUrlParams } from "@/lib/urlState"
 import type { CatalogEntry } from "@/repositories/prepRepository"
+import type { SupportedLanguage } from "@/types/language"
 
 const ALL_GRADES = Array.from({ length: 13 }, (_, i) => i + 1)
 const ALL_GRADES_VALUE = "all-grades"

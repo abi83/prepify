@@ -1,6 +1,7 @@
 import type { Question, Asset } from "@prisma/client"
 
-import QuestionBody, { type AnswerState } from "@/components/questions/QuestionBody"
+import QuestionBody from "@/components/questions/QuestionBody"
+import type { AnswerState } from "@/types/questions"
 
 interface Props {
   question: Question

@@ -1,9 +1,8 @@
 import type { ZodType } from "zod"
 
-import type { AgentImage } from "@/lib/agent"
-import type { SupportedLanguage } from "@/lib/config"
-import type { ModelCatalog } from "@/lib/modelCatalog"
-import type { PrepState } from "@/lib/planner"
+import type { SupportedLanguage } from "@/types/language"
+import type { ModelCatalog } from "@/types/modelCatalog"
+import type { PrepState } from "@/types/prepState"
 
 import type { Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Logger } from "./logger"
@@ -40,6 +39,11 @@ export interface Store {
     fromStatus: JobStatus,
     outcome: JobOutcome<TOutput>,
   ): Promise<boolean>
+}
+
+export interface AgentImage {
+  base64: string
+  mimeType: string
 }
 
 export type LlmContentPart =

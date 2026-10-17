@@ -93,7 +93,7 @@ function post(body: unknown) {
 
 async function makePrep(userId = "u1") {
   const prep = await prepRepository.createPrep(userId, { title: "Prep", language: "en" })
-  const image = await prepImageRepository.createImage(userId, prep.id, "prep-pages/p/page-0.png")
+  const image = await prepImageRepository.createImage(userId, prep.id, `prep-pages/${prep.id}/page-0.png`)
   return { prep, image }
 }
 
@@ -136,7 +136,7 @@ describe("POST /api/preps/generate", () => {
 
     expect(serverPorts).toHaveBeenCalledTimes(1)
     expect(vi.mocked(serverPorts).mock.calls[0][0]).toBe(API_KEY)
-    expect(h.downloads).toEqual([ "prep-pages/p/page-0.png" ])
+    expect(h.downloads).toEqual([ `prep-pages/${prep.id}/page-0.png` ])
     expect(h.ran.slice(0, 4)).toEqual([ "ocr", "concepts.extract", "prep.meta", "concepts" ])
     expect(await prisma.question.count({ where: { prepId: prep.id } })).toBe(5)
     expect(await prisma.job.count({ where: { prepId: prep.id, status: { not: "executed" } } })).toBe(0)
@@ -158,7 +158,10 @@ describe("POST /api/preps/generate", () => {
 
   it("rejects a prep with more than MAX_IMAGES pages", async () => {
     const { prep } = await makePrep()
-    for (let i = 1; i <= MAX_IMAGES; i++) await prepImageRepository.createImage("u1", prep.id, `prep-pages/p/page-${i}.png`)
+    // Bypasses `createImage`, which enforces the cap itself.
+    await prisma.prepImage.createMany({
+      data: Array.from({ length: MAX_IMAGES }, (_, i) => ({ prepId: prep.id, gcsKey: `prep-pages/${prep.id}/page-${i + 1}.png` })),
+    })
 
     const response = await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })
 

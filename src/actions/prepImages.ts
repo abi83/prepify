@@ -3,8 +3,8 @@
 import type { PrepImage } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
-import { deletePrepObjects } from "@/actions/uploads"
 import { requireUserId } from "@/lib/currentUser"
+import { deletePrepObjects } from "@/lib/prepPageStorage"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import type { OcrResult } from "@/types/prep"
 
@@ -16,7 +16,7 @@ export async function createPrepImage(prepId: string, gcsKey: string): Promise<P
 
 export async function deleteMyPrepImage(imageId: string): Promise<void> {
   const image = await prepImageRepository.deleteImage(await requireUserId(), imageId)
-  await deletePrepObjects([ image.gcsKey ])
+  await deletePrepObjects(image.prepId, [ image.gcsKey ])
   revalidatePath(`/preps/${image.prepId}`)
 }
 

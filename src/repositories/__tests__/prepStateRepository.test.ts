@@ -5,15 +5,12 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import type { PlanTarget } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { getPrepProgress, listUnfinishedPreps, loadPrepState } from "@/repositories/prepStateRepository"
+import { getPrepProgress, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
-const OTHER = "user-other"
-const TARGET: PlanTarget = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 
 const addMeta = (jobId: string, wasted = false) => prisma.generationMeta.create({
   data: { jobId, model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, costUsd: 0.001, toolCalls: 0, executionMs: 100, wasted },
@@ -31,12 +28,9 @@ beforeEach(async () => {
 })
 
 describe("prepStateRepository", () => {
-  it("lists owned preps that still need jobs, skipping finished and other users' preps", async () => {
-    const unfinished = await prepRepository.createPrep(OWNER, { title: "Unfinished", language: "en" })
-    await prepImageRepository.createImage(OWNER, unfinished.id, "key")
-
+  it("loads the state of a fully generated prep", async () => {
     const finished = await prepRepository.createPrep(OWNER, { title: "Finished", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, finished.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, finished.id, `prep-pages/${finished.id}/key`)
     await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
     const job = (type: string, output: object = []) => prisma.job.create({
       data: {
@@ -53,17 +47,12 @@ describe("prepStateRepository", () => {
     await job("question")
     await prisma.question.create({ data: { prepId: finished.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 
-    const other = await prepRepository.createPrep(OTHER, { title: "Other", language: "en" })
-    await prepImageRepository.createImage(OTHER, other.id, "key")
-
-    const preps = await listUnfinishedPreps(OWNER, TARGET)
-    expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
     expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1, images: [ { id: image.id, merge: "merged" } ] })
   })
 
   it("derives each page's merge state from its concepts jobs: none, planned or merged", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Merges", language: "en" })
-    const [ none, planned, merged ] = await Promise.all([ "k1", "k2", "k3" ].map(key => prepImageRepository.createImage(OWNER, prep.id, key)))
+    const [ none, planned, merged ] = await Promise.all([ "k1", "k2", "k3" ].map(key => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/${key}`)))
     const mergeJob = (status: "created" | "executed", imageId: string) => prisma.job.create({
       data: {
         prepId: prep.id, type: "concepts", status, model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
@@ -153,8 +142,8 @@ describe("prepStateRepository", () => {
 
     it("counts pages with an OCR result while OCR is running", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-      const first = await prepImageRepository.createImage(OWNER, prep.id, "k1")
-      await prepImageRepository.createImage(OWNER, prep.id, "k2")
+      const first = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/k1`)
+      await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/k2`)
       await prisma.prepImage.update({ where: { id: first.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
       const job = await addJob(prep.id, "ocr", "running")
       await prisma.job.update({ where: { id: job.id }, data: { heartbeatAt: new Date() } })
@@ -173,5 +162,21 @@ describe("prepStateRepository", () => {
 
       expect(await getPrepProgress(prep.id)).toEqual({ runState: "idle", totalPages: 0, ocrPages: 0, rejectedPages: 0, hasConcepts: true, totalQuestions: 4, completedQuestions: 2, failedQuestions: 1, terminalQuestions: 0 })
     })
+  })
+
+  it("keys a rejected page's wasted OCR calls by image id, one job accumulating retries", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
+    const [ rejected, clean ] = await Promise.all([ "a", "b" ].map(key => prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/${key}`)))
+    const ocrJob = (imageId: string) => prisma.job.create({
+      data: { prepId: prep.id, type: "ocr", status: "failed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER, inputs: { create: [ { entityType: "prepImage", entityId: imageId } ] } },
+    })
+    const wastedJob = await ocrJob(rejected.id)
+    await addMeta(wastedJob.id, true)
+    await addMeta(wastedJob.id, true)
+    await addMeta((await ocrJob(clean.id)).id)
+
+    const generations = await loadRejectedPageGenerations(prep.id)
+    expect(Object.keys(generations)).toEqual([ rejected.id ])
+    expect(generations[rejected.id]).toMatchObject({ jobId: wastedJob.id, calls: [ { wasted: true }, { wasted: true } ] })
   })
 })

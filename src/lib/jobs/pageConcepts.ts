@@ -1,5 +1,5 @@
-import type { PageMergeState } from "@/lib/planner"
 import { pageConceptsSchema, type PageConcepts } from "@/types/pipeline"
+import type { PageMergeState } from "@/types/prepState"
 
 /** Each image's extraction outcome from its executed `concepts.extract` jobs (the latest wins). */
 export function indexPageConcepts(jobs: { inputIds: string[]; output: unknown }[]): Map<string, PageConcepts> {

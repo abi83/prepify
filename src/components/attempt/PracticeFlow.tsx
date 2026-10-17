@@ -1,10 +1,11 @@
 import type { Question, Asset } from "@prisma/client"
 import { useState, type ReactNode } from "react"
 
-import { emptyAnswer, type AnswerState } from "@/components/questions/QuestionBody"
+import { emptyAnswer } from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
 import { isAnswerCorrect } from "@/lib/scoring"
 import { cn } from "@/lib/utils"
+import type { AnswerState } from "@/types/questions"
 
 import { isAnswerValid, prepareQuestions } from "./questionUtils"
 import QuestionView from "./QuestionView"

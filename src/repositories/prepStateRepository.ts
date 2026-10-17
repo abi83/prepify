@@ -1,10 +1,11 @@
-import type { JobStatus, Prep } from "@prisma/client"
+import type { JobStatus } from "@prisma/client"
 
 import { activeAssetHint } from "@/lib/assetHint"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexMerges, indexPageConcepts } from "@/lib/jobs/pageConcepts"
-import { countConceptUsage, nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
+import { countConceptUsage } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
+import type { PrepState } from "@/types/prepState"
 
 import { interruptStaleJobs, RESUMABLE, TERMINAL } from "./jobRepository"
 
@@ -80,6 +81,18 @@ export async function loadJobGenerations(prepId: string): Promise<Record<string,
   }))
 }
 
+/** Wasted OCR calls of pages the prep rejected, keyed by image id. A rejected page has no `producedByJobId`, so its job is found by input; retries accumulate metas on that one job. Pages without wasted calls are absent. */
+export async function loadRejectedPageGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
+  const jobs = await prisma.job.findMany({
+    where: { prepId, type: OCR_JOB_TYPE, generationMetas: { some: { wasted: true } } },
+    include: { generationMetas: { where: { wasted: true } }, inputs: { select: { entityId: true } } },
+  })
+  return Object.fromEntries(jobs.map(job => {
+    const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
+    return [ job.inputs[0].entityId, { jobId: job.id, model: job.model, tier: job.tier, calls } ]
+  }))
+}
+
 export type RunState ="idle" | "running" | "interrupted"
 
 export interface PrepProgress {
@@ -121,11 +134,4 @@ export async function getPrepProgress(prepId: string): Promise<PrepProgress | nu
     failedQuestions: countOf("failed") - terminalQuestions,
     terminalQuestions,
   }
-}
-
-/** Preps owned by `userId` that still need jobs to reach `target`. Unlike `listOwnedPreps`, includes inactive preps — those are the unfinished ones. */
-export async function listUnfinishedPreps(userId: string, target: PlanTarget): Promise<Prep[]> {
-  const preps = await prisma.prep.findMany({ where: { userId }, orderBy: { createdAt: "desc" } })
-  const states = await Promise.all(preps.map(prep => loadPrepState(prep.id)))
-  return preps.filter((_, i) => nextJobs(states[i], target).length > 0)
 }

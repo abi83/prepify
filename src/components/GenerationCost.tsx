@@ -10,12 +10,12 @@ export function formatUsage(tokens: number, costUsd: number): string {
   return `${tokens.toLocaleString()} tokens · ${formatCost(costUsd)}`
 }
 
-/** Cost of `generations`, wasted calls included: a summary line that expands to model · tier · in/out tokens · cost per job. */
-export default function GenerationCost({ generations }: { generations: JobGeneration[] }) {
+/** Cost of `generations`, wasted calls included: a summary line that expands to model · tier · in/out tokens · cost per job. A `label` prefixes the summary. */
+export default function GenerationCost({ generations, label }: { generations: JobGeneration[]; label?: string }) {
   const calls = generations.flatMap(g => g.calls)
   return (
     <details className="text-xs text-muted-foreground">
-      <summary className="cursor-pointer">{formatUsage(sum(calls, "promptTokens") + sum(calls, "completionTokens"), sum(calls, "costUsd"))}</summary>
+      <summary className="cursor-pointer">{label && `${label}: `}{formatUsage(sum(calls, "promptTokens") + sum(calls, "completionTokens"), sum(calls, "costUsd"))}</summary>
       <ul className="mt-1 flex flex-col gap-0.5">
         {generations.map(g => (
           <li key={g.jobId}>

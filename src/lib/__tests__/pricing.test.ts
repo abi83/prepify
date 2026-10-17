@@ -2,9 +2,9 @@ import path from "path"
 
 import { beforeAll, describe, expect, it } from "vitest"
 
-import type { ModelCatalog } from "@/lib/modelCatalog"
 import { readModelCatalog } from "@/lib/modelCatalogFile"
 import { computeCost } from "@/lib/pricing"
+import type { ModelCatalog } from "@/types/modelCatalog"
 
 let catalog: ModelCatalog
 

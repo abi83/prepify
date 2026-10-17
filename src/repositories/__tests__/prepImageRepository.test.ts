@@ -5,6 +5,7 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
+import { MAX_IMAGES } from "@/lib/config"
 import { prisma } from "@/lib/prisma"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
@@ -21,29 +22,51 @@ beforeEach(async () => {
 describe("createImage / listImages", () => {
   it("creates pending rows for the owner and lists them in creation order", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    await prepImageRepository.createImage(OWNER, prep.id, "prep-pages/p/page-0.jpg")
-    await prepImageRepository.createImage(OWNER, prep.id, "prep-pages/p/page-1.jpg")
+    await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-0.jpg`)
+    await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-1.jpg`)
 
     const images = await prepImageRepository.listImages(OWNER, prep.id)
-    expect(images.map(i => i.gcsKey)).toEqual([ "prep-pages/p/page-0.jpg", "prep-pages/p/page-1.jpg" ])
+    expect(images.map(i => i.gcsKey)).toEqual([ `prep-pages/${prep.id}/page-0.jpg`, `prep-pages/${prep.id}/page-1.jpg` ])
     expect(images.every(i => i.status === "pending")).toBe(true)
   })
 
   it("rejects a non-owner, even for listing", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    await expect(prepImageRepository.createImage(OTHER, prep.id, "key")).rejects.toThrow(ForbiddenError)
+    await expect(prepImageRepository.createImage(OTHER, prep.id, `prep-pages/${prep.id}/key`)).rejects.toThrow(ForbiddenError)
     await expect(prepImageRepository.listImages(OTHER, prep.id)).rejects.toThrow(ForbiddenError)
   })
 
   it("throws NotFoundError for a missing prep", async () => {
-    await expect(prepImageRepository.createImage(OWNER, "does-not-exist", "key")).rejects.toThrow(NotFoundError)
+    await expect(prepImageRepository.createImage(OWNER, "does-not-exist", "prep-pages/does-not-exist/key")).rejects.toThrow(NotFoundError)
+  })
+
+  it.each([
+    [ "another prep's key", "prep-pages/victim-prep/page-0.jpg" ],
+    [ "a key outside prep-pages", "secrets/page-0.jpg" ],
+    [ "a bare prefix", "PREFIX" ],
+    [ "a nested path", "PREFIX/../victim-prep/page-0.jpg" ],
+    [ "a traversal name", "PREFIX.." ],
+  ])("rejects %s", async (_label, template) => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    const key = template.replace("PREFIX", `prep-pages/${prep.id}`)
+
+    await expect(prepImageRepository.createImage(OWNER, prep.id, key)).rejects.toThrow(/not a page key/)
+    expect(await prepImageRepository.listImages(OWNER, prep.id)).toEqual([])
+  })
+
+  it("rejects an image beyond MAX_IMAGES", async () => {
+    const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
+    for (let i = 0; i < MAX_IMAGES; i++) await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-${i}.jpg`)
+
+    await expect(prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/extra.jpg`)).rejects.toThrow(/maximum/)
+    expect(await prepImageRepository.listImages(OWNER, prep.id)).toHaveLength(MAX_IMAGES)
   })
 })
 
 describe("status transitions", () => {
   it("moves pending → processing → done, writing the ocr result", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await prepImageRepository.startProcessing(OWNER, image.id)
     const ocrResult = { title: "T", text: "hello", visual_elements: [] }
@@ -56,7 +79,7 @@ describe("status transitions", () => {
 
   it("moves pending → processing → failed, writing the error and leaving it retryable", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await prepImageRepository.startProcessing(OWNER, image.id)
     await prepImageRepository.failImage(OWNER, image.id, "low_confidence: too blurry")
@@ -74,7 +97,7 @@ describe("status transitions", () => {
 
   it("rejects finishing or failing a row that isn't processing", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await expect(prepImageRepository.finishImage(OWNER, image.id, { title: "T", text: "x", visual_elements: [] })).rejects.toThrow()
     await expect(prepImageRepository.failImage(OWNER, image.id, "err")).rejects.toThrow()
@@ -82,7 +105,7 @@ describe("status transitions", () => {
 
   it("rejects starting processing on a row that's already processing or done", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
     await prepImageRepository.startProcessing(OWNER, image.id)
 
     await expect(prepImageRepository.startProcessing(OWNER, image.id)).rejects.toThrow()
@@ -93,7 +116,7 @@ describe("status transitions", () => {
 
   it("rejects a non-owner driving another user's image through a transition", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await expect(prepImageRepository.startProcessing(OTHER, image.id)).rejects.toThrow(ForbiddenError)
   })
@@ -102,7 +125,7 @@ describe("status transitions", () => {
 describe("cascade delete", () => {
   it("removes a prep's images when the prep is deleted", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    await prepImageRepository.createImage(OWNER, prep.id, "key")
+    await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await prepRepository.deletePrep(OWNER, prep.id)
 
@@ -113,17 +136,17 @@ describe("cascade delete", () => {
 describe("deleteImage", () => {
   it("deletes a draft's image row and returns it", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "prep-pages/p/page-0.jpg")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/page-0.jpg`)
 
     const deleted = await prepImageRepository.deleteImage(OWNER, image.id)
 
-    expect(deleted.gcsKey).toBe("prep-pages/p/page-0.jpg")
+    expect(deleted.gcsKey).toBe(`prep-pages/${prep.id}/page-0.jpg`)
     expect(await prepImageRepository.listImages(OWNER, prep.id)).toEqual([])
   })
 
   it("rejects a non-owner and leaves the row", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
 
     await expect(prepImageRepository.deleteImage(OTHER, image.id)).rejects.toThrow(ForbiddenError)
     expect(await prepImageRepository.listImages(OWNER, prep.id)).toHaveLength(1)
@@ -131,7 +154,7 @@ describe("deleteImage", () => {
 
   it("rejects removing an image from an active prep", async () => {
     const prep = await prepRepository.createPrep(OWNER, { title: "Prep", language: "en" })
-    const image = await prepImageRepository.createImage(OWNER, prep.id, "key")
+    const image = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/key`)
     await prepRepository.updatePrep(OWNER, prep.id, { isActive: true })
 
     await expect(prepImageRepository.deleteImage(OWNER, image.id)).rejects.toThrow(/active prep/)
