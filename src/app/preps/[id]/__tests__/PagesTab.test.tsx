@@ -28,7 +28,7 @@ vi.mock("@/app/preps/[id]/PageSection", () => ({ default: () => <div>accepted</d
 const rejected = (n: number): PageEntry => ({ verdict: "rejected", imageId: `img${n}`, number: n, gcsKey: `k${n}`, reason: "boom", generation: null })
 const accepted: PageEntry = { verdict: "accepted", generation: null, page: { page: 1, gcsKey: "k1", language: "en", title: "T", text: "x", visual_elements: [] } }
 
-const renderTab = (pages: PageEntry[]) => render(<PagesTab {...{ prep: { id: "p1" }, pages } as unknown as PrepTabProps} />)
+const renderTab = (pages: PageEntry[]) => render(<PagesTab {...{ prep: { id: "p1" }, pages, expectRun: vi.fn() } as unknown as PrepTabProps} />)
 
 beforeEach(() => vi.clearAllMocks())
 

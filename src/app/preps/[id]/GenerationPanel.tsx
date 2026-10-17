@@ -3,7 +3,7 @@
 import type { Prep, Question } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { useCallback, useState, useRef } from "react"
+import { useState, useRef } from "react"
 import { toast } from "sonner"
 
 import { retryTerminalJobs } from "@/actions/jobs"
@@ -28,12 +28,13 @@ import { clientSampler } from "@/lib/sampler/clientSampler"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
 
 import { type GenPhase, rowsFromProgress, rowsFromSummary, ChecklistRow } from "./GenerationChecklist"
-import { useRunProgress } from "./useRunProgress"
 
 interface Props {
   prepId: string
   prepTitle: string
-  initialProgress: PrepProgress | null
+  progress: PrepProgress | null
+  refreshProgress: () => Promise<void>
+  expectRun: () => void
   hasQuestions: boolean
   onTitleReady: (title: string) => void
   onComplete: (questions: Question[], freshPrep: Prep) => void
@@ -50,7 +51,9 @@ function countLabel(questions: number, flashcards: number): string {
 export default function GenerationPanel({
   prepId,
   prepTitle,
-  initialProgress,
+  progress: prepProgress,
+  refreshProgress,
+  expectRun,
   hasQuestions,
   onTitleReady,
   onComplete,
@@ -68,8 +71,6 @@ export default function GenerationPanel({
   const abortRef = useRef<AbortController | null>(null)
   const genStartRef = useRef(0)
   const pendingActionRef = useRef<(() => Promise<void>) | null>(null)
-  const handlePollError = useCallback((e: Error) => setGenError(e.message), [])
-  const { progress: prepProgress, refresh: refreshProgress, expectRun } = useRunProgress(prepId, initialProgress, handlePollError)
 
   async function runOnServer(target: PlanTarget = localConfig) {
     const keyConfig = getApiKey()!

@@ -91,6 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   useRouter().replace("?")
   h.getApiKey.mockReturnValue(null)
+  vi.stubGlobal("EventSource", class { addEventListener() {} close() {} })
 })
 
 const openTab = (name: RegExp) => userEvent.click(screen.getByRole("tab", { name }))
@@ -334,6 +335,19 @@ describe("PrepPage draft", () => {
     const withProgress = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 }
     render(<PrepPage userId="u1" prep={draft} questions={[]} attempts={[]} assets={[]} progress={withProgress} tokensUsed={0} costUsd={0} concepts={[]} images={[]} generations={{}} rejectedGenerations={{}} />)
     expect(screen.getAllByRole("tab")).not.toHaveLength(0)
+  })
+
+  it("watches a live run from any tab, and a prep whose run just started via Prep me", async () => {
+    const sse = vi.fn()
+    vi.stubGlobal("EventSource", class { constructor(url: string) { sse(url) } addEventListener() {} close() {} })
+    const base = { runState: "idle" as const, totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0 }
+    const props = { userId: "u1", prep: draft, questions: [], attempts: [], assets: [], tokensUsed: 0, costUsd: 0, concepts: [], images: [], generations: {}, rejectedGenerations: {} }
+
+    const { rerender } = render(<PrepPage {...props} progress={base} />)
+    expect(sse).not.toHaveBeenCalled()
+
+    rerender(<PrepPage {...props} progress={{ ...base, runState: "running" }} />)
+    expect(sse).toHaveBeenCalledWith("/api/preps/p1/progress")
   })
 
   it("disables Prep me with no images, enables it with one", () => {

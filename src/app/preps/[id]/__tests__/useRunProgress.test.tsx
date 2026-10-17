@@ -55,7 +55,8 @@ describe("useRunProgress", () => {
   })
 
   it("refreshes on changed counts, throttled, and not on unchanged ticks", () => {
-    renderHook(() => useRunProgress("p1", progress(), vi.fn()))
+    const initial = progress()
+    renderHook(() => useRunProgress("p1", initial, vi.fn()))
     const source = FakeSource.last
 
     act(() => source.emit(progress()))
@@ -77,8 +78,36 @@ describe("useRunProgress", () => {
   })
 
   it("refreshes once more when the run ends", () => {
-    renderHook(() => useRunProgress("p1", progress(), vi.fn()))
+    const initial = progress()
+    renderHook(() => useRunProgress("p1", initial, vi.fn()))
     act(() => FakeSource.last.listeners.done())
     expect(mockRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it("opens no stream for a finished prep", () => {
+    const constructed = vi.fn()
+    vi.stubGlobal("EventSource", class { constructor() { constructed() } addEventListener() {} close() {} })
+    const idle = progress({ runState: "idle" })
+    renderHook(() => useRunProgress("p1", idle, vi.fn()))
+    expect(constructed).not.toHaveBeenCalled()
+  })
+
+  it("starts watching when a refresh delivers a running state, and stops when the run ends", () => {
+    const constructed = vi.fn()
+    class CountingSource extends FakeSource { constructor() { super(); constructed() } }
+    vi.stubGlobal("EventSource", CountingSource)
+
+    const { rerender, result } = renderHook(({ server }) => useRunProgress("p1", server, vi.fn()), {
+      initialProps: { server: progress({ runState: "idle", totalPages: 2 }) as PrepProgress | null },
+    })
+    expect(constructed).not.toHaveBeenCalled()
+
+    rerender({ server: progress({ runState: "running", totalPages: 2 }) })
+    expect(constructed).toHaveBeenCalledTimes(1)
+    expect(result.current.progress?.runState).toBe("running")
+
+    act(() => FakeSource.last.listeners.done())
+    expect(FakeSource.last.close).toHaveBeenCalled()
+    expect(constructed).toHaveBeenCalledTimes(1)
   })
 })
