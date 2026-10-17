@@ -20,11 +20,11 @@ const noParentImports = {
 }
 
 const runtimeAgnosticPatterns = [
-    { group: [ "next", "next/*" ], message: "Runtime-agnostic code must not depend on Next." },
-    { group: [ "@prisma/client", "@prisma/client/*" ], message: "Runtime-agnostic code must not depend on Prisma." },
-    { group: [ "@/repositories", "@/repositories/*" ], message: "Runtime-agnostic code must persist through the Store." },
-    { group: [ "@/actions", "@/actions/*" ], message: "Runtime-agnostic code must persist through the Store." },
-    { group: [ "openai", "openai/*" ], message: "Runtime-agnostic code must call models through the Llm port." },
+  { group: [ "next", "next/*" ], message: "Runtime-agnostic code must not depend on Next." },
+  { group: [ "@prisma/client", "@prisma/client/*" ], message: "Runtime-agnostic code must not depend on Prisma." },
+  { group: [ "@/repositories", "@/repositories/*" ], message: "Runtime-agnostic code must persist through the Store." },
+  { group: [ "@/actions", "@/actions/*" ], message: "Runtime-agnostic code must persist through the Store." },
+  { group: [ "openai", "openai/*" ], message: "Runtime-agnostic code must call models through the Llm port." },
 ]
 
 const layerPattern = (layer, message) => ({ group: [ `@/${layer}`, `@/${layer}/*` ], message })
