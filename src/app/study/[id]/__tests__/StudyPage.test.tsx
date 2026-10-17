@@ -62,8 +62,8 @@ describe("StudyPage — loaded with questions", () => {
 
   it("renders the Flashcards and Questions tabs", () => {
     render(<StudyPage prep={prep()} questions={questions} assets={[]} />)
-    expect(screen.getByRole("tab", { name: "Flashcards" })).toBeInTheDocument()
-    expect(screen.getByRole("tab", { name: "Questions" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /^Flashcards/ })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /^Questions/ })).toBeInTheDocument()
   })
 
   it("shows the start attempt button", () => {

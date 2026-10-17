@@ -1,17 +1,26 @@
+import type { ReactNode } from "react"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { isPrepTab, type PrepTab } from "@/types/prep"
 
-import { PREP_TAB_REGISTRY } from "./tabs/registry"
-import type { PrepTabProps } from "./tabs/types"
+export interface PrepTabEntry<D> {
+  id: PrepTab
+  label: string
+  /** Item count shown in the tab label; null hides it. */
+  count: (data: D) => number | null
+  Component: (props: D) => ReactNode
+}
 
-interface Props {
+interface Props<D> {
   tab: PrepTab
   onTabChange: (tab: PrepTab) => void
-  data: PrepTabProps
+  /** Tab order is display order. */
+  tabs: PrepTabEntry<D>[]
+  data: D
 }
 
 /** Every tab stays mounted (inactive ones hidden), so a running generation and practice progress survive tab switches. */
-export default function PrepTabs({ tab, onTabChange, data }: Props) {
+export default function PrepTabs<D extends object>({ tab, onTabChange, tabs, data }: Props<D>) {
   return (
     <Tabs
       value={tab}
@@ -21,7 +30,7 @@ export default function PrepTabs({ tab, onTabChange, data }: Props) {
       }}
     >
       <TabsList className="sticky top-0 z-10 overflow-x-auto bg-background [scrollbar-width:none]">
-        {PREP_TAB_REGISTRY.map(({ id, label, count }) => {
+        {tabs.map(({ id, label, count }) => {
           const n = count(data)
           return (
             <TabsTrigger key={id} value={id} className="min-h-11 shrink-0 px-4">
@@ -30,7 +39,7 @@ export default function PrepTabs({ tab, onTabChange, data }: Props) {
           )
         })}
       </TabsList>
-      {PREP_TAB_REGISTRY.map(({ id, Component }) => (
+      {tabs.map(({ id, Component }) => (
         <TabsContent key={id} value={id} forceMount hidden={id !== tab}>
           <Component {...data} />
         </TabsContent>

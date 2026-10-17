@@ -1,9 +1,16 @@
+import type { Asset, Question } from "@prisma/client"
+
 import PracticeFlow from "@/components/attempt/PracticeFlow"
 import GenerationCost from "@/components/GenerationCost"
+import type { JobGeneration } from "@/repositories/prepStateRepository"
 
-import type { PrepTabProps } from "./types"
+interface Props {
+  studyQuestions: Question[]
+  assets: Asset[]
+  generationOfQuestion: (question: Question) => JobGeneration | null
+}
 
-export default function QuestionsTab({ studyQuestions, assets, generationOfQuestion }: PrepTabProps) {
+export default function QuestionsTab({ studyQuestions, assets, generationOfQuestion }: Props) {
   return (
     <PracticeFlow
       questions={studyQuestions}
