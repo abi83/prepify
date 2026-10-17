@@ -74,7 +74,7 @@ describe("Prep.status", () => {
 
   it("is failed after a blocking job fails past its attempt cap, and processing again after a retry", async () => {
     const { prep, job } = await makePrepWithOcrJob()
-    await prisma.job.update({ where: { id: job.id }, data: { attempts: MAX_JOB_ATTEMPTS } })
+    await prisma.job.update({ where: { id: job.id }, data: { attempts: MAX_JOB_ATTEMPTS - 1 } })
     await store.commitJob(USER, job.id, "created", FAILED)
     expect(await statusOf(prep.id)).toBe("failed")
 

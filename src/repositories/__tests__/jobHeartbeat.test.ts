@@ -91,12 +91,25 @@ describe("running and interrupted jobs", () => {
     expect(await claimJob(job.id)).toBe(false)
   })
 
-  it("claimJob counts the attempt", async () => {
+  it("commitJob counts a failed attempt, claimJob does not", async () => {
     const { job } = await makeJob("created", null)
 
     await claimJob(job.id)
+    expect((await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).attempts).toBe(0)
 
+    await store.commitJob(USER, job.id, "running", { status: "failed", failureReason: "boom", wastedMetas: [] })
     expect((await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).attempts).toBe(1)
+  })
+
+  it("a job failing MAX_JOB_ATTEMPTS times without claims is terminal", async () => {
+    const { job } = await makeJob("created", null)
+
+    await store.commitJob(USER, job.id, "created", { status: "failed", failureReason: "boom", wastedMetas: [] })
+    for (let attempt = 2; attempt <= MAX_JOB_ATTEMPTS; attempt++) {
+      await store.commitJob(USER, job.id, "failed", { status: "failed", failureReason: "boom", wastedMetas: [] })
+    }
+
+    expect(await store.getJob(USER, job.id)).toMatchObject({ status: "failed", terminal: true })
   })
 
   it("a `failed` job below the cap resumes; at the cap it is terminal for listUnfinishedJobs and claimJob", async () => {
