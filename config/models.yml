@@ -25,6 +25,6 @@ gemini:
     default: { label: "Standard", multiplier: 1 }
   models:
     # Prices valid until 2026-12-31.
-    gemini-3.6-flash: { label: "Gemini 3.6 Flash", input: 0.75, cachedInput: 0.075, output: 3.75 }
+    gemini-3.8-flash: { label: "Gemini 3.8 Flash", input: 0.75, cachedInput: 0.075, output: 3.75 }
     gemini-3.5-flash-lite: { label: "Gemini 3.5 Flash-Lite", input: 0.30, cachedInput: 0.03, output: 2.50 }
     gemini-3.1-flash-lite: { label: "Gemini 3.1 Flash-Lite", input: 0.25, cachedInput: 0.025, output: 1.50 }
