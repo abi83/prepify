@@ -43,11 +43,11 @@ describe("disk ResultSink", () => {
   it("mirrors the cell path under results/ plus the evaluator id", async () => {
     const dir = await tempDir()
     const sink = createDiskResultSink(dir)
-    const result = { executionId: "e1", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
+    const result = { executionId: "e1", metric: "text", promptVersion: "1.0.0", promptHash: "ev", judgeModel: "judge", score: 0.5, reasoning: "ok" }
     await sink.writeSampleResult(CELL, result)
-    await sink.writeSummary(CELL, "ev", { n: 1 })
+    await sink.writeSummary(CELL, { model: "judge", promptHash: "ev" }, { n: 1 })
 
-    const resultDir = path.join(dir, "results", CELL.agent, CELL.promptHash, "org__model-x", "ev")
+    const resultDir = path.join(dir, "results", CELL.agent, CELL.promptHash, "org__model-x", "judge", "ev")
     expect((await readdir(resultDir)).sort()).toEqual([ "e1.json", "summary.json" ])
     expect(JSON.parse(await readFile(path.join(resultDir, "e1.json"), "utf-8"))).toEqual(result)
   })

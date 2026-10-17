@@ -17,6 +17,7 @@ export interface CellSummary extends CellStats {
   cell: Experiment["cell"]
   /** The evaluated agent prompt's version; its hash is `cell.promptHash`. */
   agentPromptVersion: string
+  metric: string
   /** The judge prompt. */
   promptVersion: string
   promptHash: string
@@ -63,7 +64,7 @@ function agentPromptVersion(cell: Experiment["cell"], samples: StoredSample[]): 
 /** Judges every sample of the experiment's cell, writes per-sample results and the cell summary. Judges up to `judge.concurrency` samples at once; any failure aborts. */
 export async function runExperiment(experiment: Experiment, { source, sink, llm, logger, catalog, gitSha }: RunDeps): Promise<CellSummary> {
   const { cell, judge } = experiment
-  const evaluator = getEvaluator(cell.agent)
+  const evaluator = getEvaluator(cell.agent, judge.metric)
   const judgePrompt = { promptVersion: evaluator.prompt.version, promptHash: await hashPrompt(evaluator.prompt.text) }
   const samples = await source.readCell(cell)
   if (samples.length === 0) throw new Error(`No samples for cell ${cell.agent}/${cell.promptHash}/${cell.model}`)
@@ -81,15 +82,16 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
         systemPrompt: evaluator.prompt.text,
         userContent: evaluator.buildJudgeInput(sample),
         schema: verdictSchema,
-        model: judge.llm.model,
-        tier: judge.llm.tier,
+        model: evaluator.llm.model,
+        tier: evaluator.llm.tier,
         signal,
         deps,
       })
       await sink.writeSampleResult(cell, {
         executionId: sample.executionId,
+        metric: judge.metric,
         ...judgePrompt,
-        judgeModel: judge.llm.model,
+        judgeModel: evaluator.llm.model,
         score: output.score,
         reasoning: output.reasoning,
       })
@@ -104,9 +106,9 @@ export async function runExperiment(experiment: Experiment, { source, sink, llm,
   const rows = settled.flatMap(result => (result.status === "fulfilled" ? [ result.value ] : []))
 
   const summary: CellSummary = {
-    cell, agentPromptVersion: agentVersion, ...judgePrompt,
-    judgeModel: judge.llm.model, gitSha, ...sampling, ...summarizeCell(rows),
+    cell, agentPromptVersion: agentVersion, metric: judge.metric, ...judgePrompt,
+    judgeModel: evaluator.llm.model, gitSha, ...sampling, ...summarizeCell(rows),
   }
-  await sink.writeSummary(cell, judgePrompt.promptHash, summary)
+  await sink.writeSummary(cell, { model: evaluator.llm.model, promptHash: judgePrompt.promptHash }, summary)
   return summary
 }

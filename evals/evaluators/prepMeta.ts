@@ -17,6 +17,9 @@ export const prompt: Prompt = { version: "1.0.0", text: SYSTEM_PROMPT }
 
 export const prepMetaEvaluator: Evaluator = {
   agent: "PrepMeta",
+  metric: "quality",
+  // Not yet validated against hand-reviewed verdicts.
+  llm: { model: "gpt-5.4-mini", tier: "flex" },
   prompt,
   buildJudgeInput: ({ input, output }) => ({
     textContent: `Model instructions:\n${input.textContent}\n\nModel output (JSON):\n${JSON.stringify(output, null, 2)}`,

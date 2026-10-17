@@ -14,6 +14,8 @@ export const testCatalog = parseModelCatalog({
       "m": { label: "m", input: 0.05, cachedInput: 0.005, output: 0.40 },
       "other": { label: "other", input: 0.05, cachedInput: 0.005, output: 0.40 },
       "big-judge": { label: "big-judge", input: 0.05, cachedInput: 0.005, output: 0.40 },
+      "gpt-6.1-sol": { label: "GPT-6.1 Sol", input: 2.00, cachedInput: 0.10, output: 10.00 },
+      "gpt-5.4-mini": { label: "GPT-5.4 Mini", input: 0.75, cachedInput: 0.075, output: 4.50 },
     },
   },
   gemini: {

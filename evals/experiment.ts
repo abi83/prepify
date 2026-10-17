@@ -21,7 +21,10 @@ const experimentSchema = z.strictObject({
   /** Holds `samples/`. */
   samples: locationSchema,
   judge: z.strictObject({
-    llm: z.strictObject({ baseUrl: z.url().optional(), model: z.string().min(1), tier: z.string().min(1) }),
+    /** Which of the agent's evaluators judges the cell. */
+    metric: z.string().min(1),
+    /** Overrides the OpenAI endpoint, e.g. a local server. */
+    baseUrl: z.url().optional(),
     timeoutMs: z.number().int().positive(),
     /** Max judge calls in flight. */
     concurrency: z.number().int().positive(),

@@ -94,7 +94,7 @@ export class OcrRejectedError extends Error {
   }
 }
 
-function assertAcceptable(output: z.infer<typeof ocrSchema>, logger: Logger): asserts output is OcrOutput {
+export function assertAcceptable(output: z.infer<typeof ocrSchema>, logger: Logger): asserts output is OcrOutput {
   if (output.confidence < MIN_PAGE_CONFIDENCE) {
     throw new Error(`low_confidence:${output.confidence}`)
   }
