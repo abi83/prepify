@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-import type { CatalogEntry } from "@/repositories/prepRepository"
+import type { PrepEntry } from "@/repositories/prepRepository"
 /* eslint-disable import/order */
 import { createNavigationMock } from "@/testUtils/navigationMock"
 
@@ -20,7 +20,7 @@ vi.mock("next/navigation", () => {
 import CatalogPage from "@/app/catalog/CatalogPage"
 /* eslint-enable import/order */
 
-function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
+function entry(overrides: Partial<PrepEntry>): PrepEntry {
   return {
     id: "prep-1",
     userId: "owner-1",
@@ -34,11 +34,13 @@ function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
     isActive: true,
     status: "ready",
     questionCount: 0,
+    flashcardCount: 0,
+    conceptCount: 0,
     ...overrides,
   }
 }
 
-function renderCatalog(entries: CatalogEntry[] = []) {
+function renderCatalog(entries: PrepEntry[] = []) {
   return render(<CatalogPage entries={entries} />)
 }
 
@@ -68,6 +70,8 @@ describe("CatalogPage — listing preps", () => {
       discipline: "Biology",
       createdAt: new Date("2026-01-15T00:00:00Z"),
       questionCount: 2,
+      flashcardCount: 5,
+      conceptCount: 3,
     }),
     entry({
       id: "prep-2",
@@ -99,10 +103,15 @@ describe("CatalogPage — listing preps", () => {
     expect(list.getByText("Grade 9")).toBeInTheDocument()
   })
 
-  it("renders question counts", () => {
+  it("renders question, flashcard and concept counts, 0 when empty", () => {
     renderCatalog(entries)
-    expect(screen.getByText("2 questions")).toBeInTheDocument()
-    expect(screen.getByText("1 questions")).toBeInTheDocument()
+    expect(screen.getByText("2 questions · 5 flashcards · 3 concepts")).toBeInTheDocument()
+    expect(screen.getByText("1 questions · 0 flashcards · 0 concepts")).toBeInTheDocument()
+  })
+
+  it("renders no visibility badge", () => {
+    renderCatalog(entries)
+    expect(screen.queryByText("public")).not.toBeInTheDocument()
   })
 
   it("each prep card links to the study page", () => {

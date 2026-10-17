@@ -95,7 +95,28 @@ describe("listPublicCatalog", () => {
     const catalog = await prepRepository.listPublicCatalog()
     expect(catalog.map(e => e.id)).toContain(pub.id)
     expect(catalog.map(e => e.id)).not.toContain(priv.id)
-    expect(catalog.find(e => e.id === pub.id)?.questionCount).toBe(2)
+    const entry = catalog.find(e => e.id === pub.id)
+    expect(entry?.questionCount).toBe(2)
+    expect(entry?.flashcardCount).toBe(1)
+  })
+
+  it("counts concepts through the producing job's prep, 0 for a prep without content", async () => {
+    const withConcepts = await prepRepository.createPrep(OWNER, { title: "With", language: "en" })
+    const empty = await prepRepository.createPrep(OWNER, { title: "Empty", language: "en" })
+    const job = await prisma.job.create({
+      data: { prepId: withConcepts.id, type: "concept", model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0, createdBy: OWNER },
+    })
+    await prisma.concept.createMany({
+      data: [
+        { name: "A", description: "a", importance: 1, misconceptions: [], language: "en", producedByJobId: job.id },
+        { name: "B", description: "b", importance: 1, misconceptions: [], language: "en", producedByJobId: job.id },
+      ],
+    })
+    await prisma.prep.updateMany({ where: { userId: OWNER }, data: { isActive: true } })
+
+    const owned = await prepRepository.listOwnedPreps(OWNER)
+    expect(owned.find(e => e.id === withConcepts.id)?.conceptCount).toBe(2)
+    expect(owned.find(e => e.id === empty.id)).toMatchObject({ questionCount: 0, flashcardCount: 0, conceptCount: 0 })
   })
 })
 

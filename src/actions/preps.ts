@@ -7,14 +7,14 @@ import { requireUserId } from "@/lib/currentUser"
 import { deletePrepObjects } from "@/lib/prepPageStorage"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import type { CatalogEntry, CreatePrepInput, UpdatePrepInput } from "@/repositories/prepRepository"
+import type { CreatePrepInput, PrepEntry, UpdatePrepInput } from "@/repositories/prepRepository"
 import { createPrepInputSchema, updatePrepInputSchema } from "@/types/prep"
 
-export async function listMyPreps(): Promise<Prep[]> {
+export async function listMyPreps(): Promise<PrepEntry[]> {
   return prepRepository.listOwnedPreps(await requireUserId())
 }
 
-export async function listCatalog(): Promise<CatalogEntry[]> {
+export async function listCatalog(): Promise<PrepEntry[]> {
   return prepRepository.listPublicCatalog()
 }
 
