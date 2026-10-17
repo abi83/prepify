@@ -279,6 +279,16 @@ describe("prepStateRepository", () => {
       expect(generations[concepts.id]).toMatchObject({ type: "concepts", subject: "Mitosis" })
     })
 
+    it("includes a failed job that made no calls, with its reason and update time", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
+      const job = await createJob(prep.id, { type: "question", questionType: "flashcard", difficulty: "easy" })
+      const failed = await prisma.job.update({ where: { id: job.id }, data: { status: "failed", failureReason: "429" } })
+
+      const generations = await loadJobGenerations(prep.id)
+
+      expect(generations[job.id]).toMatchObject({ status: "failed", failureReason: "429", updatedAt: failed.updatedAt, calls: [] })
+    })
+
     it("fails on an unknown job type", async () => {
       const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
       await addMeta((await createJob(prep.id, { type: "mystery" })).id)

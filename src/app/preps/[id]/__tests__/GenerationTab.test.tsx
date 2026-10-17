@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import GenerationTab from "@/app/preps/[id]/tabs/GenerationTab"
 import type { PrepTabProps } from "@/app/preps/[id]/tabs/types"
+import { formatDate } from "@/lib/format"
 import type { JobGeneration } from "@/repositories/prepStateRepository"
 
 const { mockRetryJob, mockRefresh, mockRequestServerRun } = vi.hoisted(() => ({
@@ -27,12 +28,22 @@ vi.mock("@/app/preps/[id]/GenerationPanel", () => ({ default: () => null }))
 
 const call = { promptTokens: 1, cachedTokens: 0, completionTokens: 1, costUsd: 0.001, executionMs: 1, wasted: false, generatedAt: new Date(0) }
 const gen = (jobId: string, status: JobGeneration["status"], failureReason: string | null): JobGeneration =>
-  ({ jobId, type: "question", status, failureReason, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls: [ call ] })
+  ({ jobId, type: "question", status, failureReason, updatedAt: new Date(0), subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls: [ call ] })
 
 const renderTab = (generations: Record<string, JobGeneration>) =>
   render(<GenerationTab {...{ prep: { id: "p1" }, questions: [], progress: null, generations, expectRun: vi.fn() } as unknown as PrepTabProps} />)
 
 beforeEach(() => vi.clearAllMocks())
+
+describe("GenerationTab log", () => {
+  it("lists a failed job with no calls, dated by its last update, with its reason", () => {
+    const updatedAt = new Date("2026-03-04T12:00:00Z")
+    renderTab({ a: { ...gen("a", "failed", "429 rate limited"), calls: [], updatedAt } })
+
+    expect(screen.getByText("429 rate limited")).toBeInTheDocument()
+    expect(screen.getByText(formatDate(updatedAt))).toBeInTheDocument()
+  })
+})
 
 describe("GenerationTab retry", () => {
   it("shows the failure reason and a Retry button on failed rows only", () => {

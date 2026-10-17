@@ -27,6 +27,7 @@ export interface JobGeneration {
   type: string
   status: JobStatus
   failureReason: string | null
+  updatedAt: Date // the job's last change; dates a job with no calls
   subject: string
   model: string
   tier: string
@@ -105,9 +106,9 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
   }
 }
 
-function toJobGeneration(job: { id: string; type: string; status: JobStatus; failureReason: string | null; model: string; tier: string }, subject: string, metas: GenerationCall[]): JobGeneration {
+function toJobGeneration(job: { id: string; type: string; status: JobStatus; failureReason: string | null; updatedAt: Date; model: string; tier: string }, subject: string, metas: GenerationCall[]): JobGeneration {
   const calls = metas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }))
-  return { jobId: job.id, type: job.type, status: job.status, failureReason: job.failureReason, subject, model: job.model, tier: job.tier, calls }
+  return { jobId: job.id, type: job.type, status: job.status, failureReason: job.failureReason, updatedAt: job.updatedAt, subject, model: job.model, tier: job.tier, calls }
 }
 
 /** 1-based page number of each of the prep's images, in upload order. */
@@ -150,11 +151,11 @@ function subjectOf(job: SubjectJob, pageNumbers: Map<string, number>): string {
   }
 }
 
-/** Every job of the prep that made LLM calls, keyed by job id. No ownership check — callers resolve the prep first. */
+/** Every job of the prep, keyed by job id. No ownership check — callers resolve the prep first. */
 export async function loadJobGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
   const [ jobs, pageNumbers ] = await Promise.all([
     prisma.job.findMany({
-      where: { prepId, generationMetas: { some: {} } },
+      where: { prepId },
       include: { generationMetas: true, inputs: { select: { entityId: true } }, concepts: { select: { name: true } } },
     }),
     loadPageNumbers(prepId),

@@ -26,8 +26,9 @@ export function formatTokenSplit(promptTokens: number, completionTokens: number)
   return `${promptTokens.toLocaleString()} in / ${completionTokens.toLocaleString()} out`
 }
 
-/** Date of the job's latest call. */
+/** Date of the job's latest call; a job with no calls has its last update. */
 export function generatedAtOf(generation: JobGeneration): Date {
+  if (generation.calls.length === 0) return generation.updatedAt
   return new Date(Math.max(...generation.calls.map(call => call.generatedAt.getTime())))
 }
 
