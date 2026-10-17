@@ -18,3 +18,13 @@ lmstudio:
   models:
     qwen/qwen3.8-27b: { label: "Qwen 3.8 27B (local)", input: 0, cachedInput: 0, output: 0 }
     google/gemma-4-26b-a4b: { label: "Gemma 4 26B A4B (local)", input: 0, cachedInput: 0, output: 0 }
+# Gemini API. `default` is Gemini's standard tier; flex is billed at half price.
+gemini:
+  tiers:
+    flex: { label: "Flex (cheapest, slower)", multiplier: 0.5 }
+    default: { label: "Standard", multiplier: 1 }
+  models:
+    # Prices valid until 2026-12-31.
+    gemini-3.6-flash: { label: "Gemini 3.6 Flash", input: 0.75, cachedInput: 0.075, output: 3.75 }
+    gemini-3.5-flash-lite: { label: "Gemini 3.5 Flash-Lite", input: 0.30, cachedInput: 0.03, output: 2.50 }
+    gemini-3.1-flash-lite: { label: "Gemini 3.1 Flash-Lite", input: 0.25, cachedInput: 0.025, output: 1.50 }
