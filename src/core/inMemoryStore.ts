@@ -1,4 +1,4 @@
-import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
+import { MAX_JOB_ATTEMPTS, type ExecutionConfig, type Job, type JobOutcome, type JobStatus, type QuestionSpec } from "./job"
 import type { Store } from "./ports"
 
 export function supersede(job: Job): Job {
@@ -6,10 +6,16 @@ export function supersede(job: Job): Job {
   return { id: job.id, type: job.type, status: "superseded", inputIds: job.inputIds, config: job.config, question: job.question, output: null, failureReason: job.failureReason }
 }
 
-export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
+/** `failedAttempts` counts the failed commits so far, this one included. */
+export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>, failedAttempts: number): Job<TOutput> {
   return outcome.status === "executed"
     ? { ...job, status: "executed", output: outcome.output, failureReason: null }
-    : { ...job, status: "failed", output: null, failureReason: outcome.failureReason, terminal: false }
+    : { ...job, status: "failed", output: null, failureReason: outcome.failureReason, terminal: failedAttempts >= MAX_JOB_ATTEMPTS }
+}
+
+/** The failed commits so far, plus this outcome if it is one. */
+export function countFailedAttempts(previous: number, outcome: JobOutcome<unknown>): number {
+  return outcome.status === "failed" ? previous + 1 : previous
 }
 
 /**
@@ -19,6 +25,7 @@ export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): J
  */
 export function createInMemoryStore(): Store {
   const jobs = new Map<string, Job>()
+  const failedAttempts = new Map<string, number>()
   let nextId = 0
 
   return {
@@ -53,7 +60,9 @@ export function createInMemoryStore(): Store {
     ): Promise<boolean> {
       const job = jobs.get(jobId)
       if (!job || job.status !== fromStatus) return false
-      jobs.set(jobId, applyOutcome(job, outcome))
+      const attempts = countFailedAttempts(failedAttempts.get(jobId) ?? 0, outcome)
+      failedAttempts.set(jobId, attempts)
+      jobs.set(jobId, applyOutcome(job, outcome, attempts))
       return true
     },
 

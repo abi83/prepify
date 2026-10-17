@@ -1,9 +1,12 @@
 import { mkdir, readFile, readdir, writeFile } from "fs/promises"
 import path from "path"
 
-import { applyOutcome, supersede } from "./inMemoryStore"
+import { applyOutcome, countFailedAttempts, supersede } from "./inMemoryStore"
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Store } from "./ports"
+
+/** On disk, a job file is the `Job` itself plus its failed-commit count — the CLI reads the file as a `Job`. */
+type StoredJob = Job & { failedAttempts: number }
 
 /**
  * JSON-on-disk `Store`, one file per job under `dir`. Same semantics as `createInMemoryStore`
@@ -21,18 +24,23 @@ export function createFileStore(dir: string): Store {
     return run
   }
 
-  async function read(jobId: string): Promise<Job | null> {
+  async function readStored(jobId: string): Promise<{ job: Job; failedAttempts: number } | null> {
     try {
-      return JSON.parse(await readFile(fileOf(jobId), "utf-8")) as Job
+      const { failedAttempts, ...job } = JSON.parse(await readFile(fileOf(jobId), "utf-8")) as StoredJob
+      return { job: job as Job, failedAttempts }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return null
       throw err
     }
   }
 
-  async function write(job: Job): Promise<void> {
+  async function read(jobId: string): Promise<Job | null> {
+    return (await readStored(jobId))?.job ?? null
+  }
+
+  async function write(job: Job, failedAttempts: number): Promise<void> {
     await mkdir(dir, { recursive: true })
-    await writeFile(fileOf(job.id), JSON.stringify(job))
+    await writeFile(fileOf(job.id), JSON.stringify({ ...job, failedAttempts } satisfies StoredJob))
   }
 
   async function nextId(): Promise<string> {
@@ -57,7 +65,7 @@ export function createFileStore(dir: string): Store {
           output: null,
           failureReason: null,
         }
-        await write(job)
+        await write(job, 0)
         return job
       })
     },
@@ -73,18 +81,19 @@ export function createFileStore(dir: string): Store {
 
     commitJob<TOutput>(_actorId: string, jobId: string, fromStatus: JobStatus, outcome: JobOutcome<TOutput>): Promise<boolean> {
       return exclusive(async () => {
-        const job = await read(jobId)
-        if (!job || job.status !== fromStatus) return false
-        await write(applyOutcome(job, outcome))
+        const stored = await readStored(jobId)
+        if (!stored || stored.job.status !== fromStatus) return false
+        const failedAttempts = countFailedAttempts(stored.failedAttempts, outcome)
+        await write(applyOutcome(stored.job, outcome, failedAttempts), failedAttempts)
         return true
       })
     },
 
     supersedeJob(_actorId: string, jobId: string): Promise<void> {
       return exclusive(async () => {
-        const job = await read(jobId)
-        if (!job) throw new Error(`Unknown job "${jobId}"`)
-        await write(supersede(job))
+        const stored = await readStored(jobId)
+        if (!stored) throw new Error(`Unknown job "${jobId}"`)
+        await write(supersede(stored.job), stored.failedAttempts)
       })
     },
   }

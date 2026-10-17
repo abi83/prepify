@@ -1,6 +1,6 @@
 import { Prisma, type Job as JobRow } from "@prisma/client"
 
-import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
+import { MAX_JOB_ATTEMPTS, type ExecutionConfig, type Job, type JobOutcome, type JobStatus, type QuestionSpec } from "@/core/job"
 import { resolveLanguage } from "@/core/lib/language"
 import { derivePrepStatus } from "@/core/lib/prepStatus"
 import type { Store } from "@/core/ports"
@@ -19,8 +19,7 @@ export const STALE_HEARTBEAT_MS = 5 * 60 * 1000
 
 const staleCutoff = () => new Date(Date.now() - STALE_HEARTBEAT_MS)
 
-/** Claims a job may take before a `failed` one stops being resumed. */
-export const MAX_JOB_ATTEMPTS = 3
+export { MAX_JOB_ATTEMPTS }
 
 /** Recomputes `Prep.status` from the prep's jobs — the only writer of that column. Call it from every path that creates
  *  a job or can move one to executed or into/out of terminal failure (create, commit, terminal retry). */
@@ -207,7 +206,7 @@ export function createPrismaStore(): Store {
 
       const data = checked.status === "executed"
         ? { status: "executed" as const, output: checked.output as Prisma.InputJsonValue, failureReason: null, executedBy: actorId, updatedAt: new Date() }
-        : { status: "failed" as const, output: Prisma.JsonNull, failureReason: checked.failureReason, executedBy: actorId, updatedAt: new Date() }
+        : { status: "failed" as const, output: Prisma.JsonNull, failureReason: checked.failureReason, executedBy: actorId, updatedAt: new Date(), attempts: { increment: 1 } }
 
       return prisma.$transaction(async tx => {
         // A server runner moves the job to `running` after the caller read `fromStatus`.
@@ -268,11 +267,11 @@ export async function releaseRunLease(prepId: string): Promise<void> {
   await prisma.prep.updateMany({ where: { id: prepId }, data: { runHeartbeatAt: null } })
 }
 
-/** Moves a re-executable job to `running` with a fresh heartbeat and counts the attempt; false if another runner holds it or it is terminal. */
+/** Moves a re-executable job to `running` with a fresh heartbeat; false if another runner holds it or it is terminal. */
 export async function claimJob(jobId: string): Promise<boolean> {
   const result = await prisma.job.updateMany({
     where: { id: jobId, ...RESUMABLE },
-    data: { status: "running", heartbeatAt: new Date(), attempts: { increment: 1 } },
+    data: { status: "running", heartbeatAt: new Date() },
   })
   return result.count === 1
 }

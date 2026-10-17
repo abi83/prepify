@@ -5,6 +5,9 @@
 
 import type { AgentMeta } from "./sampler"
 
+/** Failed commits after which a `failed` job stops being resumed. */
+export const MAX_JOB_ATTEMPTS = 3
+
 export type JobStatus = "created" | "running" | "interrupted" | "executed" | "failed" | "superseded"
 
 /** Statuses of a job with no outcome yet. `running` has a live runner; `interrupted` lost it. */

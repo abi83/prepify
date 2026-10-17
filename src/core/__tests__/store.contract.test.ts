@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { createFileStore } from "@/core/fileStore"
 import { createInMemoryStore } from "@/core/inMemoryStore"
-import type { ExecutionConfig } from "@/core/job"
+import { MAX_JOB_ATTEMPTS, type ExecutionConfig, type JobOutcome } from "@/core/job"
 import type { Store } from "@/core/ports"
 
 const CONFIG: ExecutionConfig = { model: "gpt-5-nano", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -82,6 +82,20 @@ describe.each(Object.entries(factories))("Store contract: %s", (_name, makeStore
     const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
     expect(await store.commitJob(ACTOR, job.id, "created", { status: "failed", failureReason: "boom", wastedMetas: [] })).toBe(true)
     expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "failed", output: null, failureReason: "boom" })
+  })
+
+  it("makes a job terminal once failed commits reach MAX_JOB_ATTEMPTS", async () => {
+    const store = await makeStore()
+    const job = await store.createJob(ACTOR, "ocr", [], CONFIG)
+    const failed: JobOutcome<unknown> = { status: "failed", failureReason: "boom", wastedMetas: [] }
+
+    await store.commitJob(ACTOR, job.id, "created", failed)
+    for (let attempt = 2; attempt <= MAX_JOB_ATTEMPTS; attempt++) {
+      expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "failed", terminal: false })
+      await store.commitJob(ACTOR, job.id, "failed", failed)
+    }
+
+    expect(await store.getJob(ACTOR, job.id)).toMatchObject({ status: "failed", terminal: true })
   })
 
   it("rejects a commit from the wrong status", async () => {
