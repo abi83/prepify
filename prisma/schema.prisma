@@ -73,6 +73,8 @@ model Prep {
   attempts    Attempt[]
   images      PrepImage[]
   jobs        Job[]
+  @@index([userId])
+  @@index([visibility, isActive, createdAt])
 }
 
 enum PrepImageStatus {
@@ -98,6 +100,7 @@ model PrepImage {
 
   prep          Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
   producedByJob Job? @relation(fields: [producedByJobId], references: [id], onDelete: SetNull)
+  @@index([prepId])
 }
 
 model Question {
@@ -115,6 +118,7 @@ model Question {
   prep          Prep    @relation(fields: [prepId], references: [id], onDelete: Cascade)
   assets        Asset[]
   producedByJob Job?    @relation(fields: [producedByJobId], references: [id], onDelete: SetNull)
+  @@index([prepId])
 }
 
 model Attempt {
@@ -126,6 +130,7 @@ model Attempt {
   createdAt DateTime @default(now())
 
   prep Prep @relation(fields: [prepId], references: [id], onDelete: Cascade)
+  @@index([prepId, userId])
 }
 
 // One row per LLM call, linked to the job it ran for; a Prep's usage/cost is the sum over its jobs (#31).
@@ -206,6 +211,7 @@ model Job {
   producedQuestions Question[]
   producedAssets    Asset[]
   generationMetas   GenerationMeta[]
+  @@index([prepId, type, status])
 }
 
 // Join table for a job's input entities (ADR point 4) — keeps the dependency graph queryable
@@ -220,6 +226,7 @@ model JobInput {
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([entityType, entityId])
+  @@index([jobId])
 }
 
 // Same shape as conceptSchema (src/types/pipeline.ts). Produced only by a `concepts` job
@@ -235,4 +242,5 @@ model Concept {
   createdAt       DateTime @default(now())
 
   producedByJob Job @relation(fields: [producedByJobId], references: [id], onDelete: Cascade)
+  @@index([producedByJobId])
 }
