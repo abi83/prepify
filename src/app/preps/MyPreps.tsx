@@ -1,44 +1,21 @@
 "use client"
 
-import type { Prep, PrepVisibility } from "@prisma/client"
 import { BookOpenIcon } from "lucide-react"
 import { useState } from "react"
 
+import { PrepEntryCard } from "@/components/prep/PrepEntryCard"
+import { PrepFilterBar, usePrepFilters } from "@/components/prep/PrepFilters"
 import { Button } from "@/components/ui/button"
-import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import UploadModal from "@/components/UploadModal"
-import { formatDate } from "@/lib/format"
-
-const VISIBILITY_BADGE: Record<PrepVisibility, { label: string; className: string }> = {
-  private: { label: "private", className: "border-border text-muted-foreground" },
-  link:    { label: "link only", className: "border-primary/40 bg-primary/10 text-primary" },
-  public:  { label: "public", className: "border-success/40 bg-success/10 text-success" },
-}
-
-function PrepCard({ prep }: { prep: Prep }) {
-  const { label, className } = VISIBILITY_BADGE[prep.visibility]
-  return (
-    <li>
-      <Card href={`/preps/${prep.id}`}>
-        <CardBadges>
-          <CardBadge className={className}>{label}</CardBadge>
-        </CardBadges>
-        <CardTitle>{prep.title}</CardTitle>
-        {prep.description && <CardSubtitle>{prep.description}</CardSubtitle>}
-        <CardFooter>
-          <span className="text-xs text-muted-foreground">{formatDate(prep.createdAt)}</span>
-        </CardFooter>
-      </Card>
-    </li>
-  )
-}
+import type { PrepEntry } from "@/repositories/prepRepository"
 
 interface Props {
-  preps: Prep[]
+  preps: PrepEntry[]
 }
 
 export default function MyPreps({ preps }: Props) {
   const [ showUpload, setShowUpload ] = useState(false)
+  const filters = usePrepFilters(preps)
 
   return (
     <>
@@ -60,11 +37,20 @@ export default function MyPreps({ preps }: Props) {
             <Button onClick={() => setShowUpload(true)}>Upload your first page</Button>
           </div>
         ) : (
-          <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {preps.map(prep => (
-              <PrepCard key={prep.id} prep={prep} />
-            ))}
-          </ul>
+          <>
+            <PrepFilterBar filters={filters} />
+            {filters.filtered.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">No preps match the selected filters.</div>
+            ) : (
+              <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filters.filtered.map(prep => (
+                  <li key={prep.id}>
+                    <PrepEntryCard entry={prep} href={`/preps/${prep.id}`} showVisibility />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </main>
 
