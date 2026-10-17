@@ -65,7 +65,7 @@ export function sanitizeLLMText(s: string): string {
     .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
 }
 
-const MAX_ATTEMPTS = 3
+const MAX_ATTEMPTS = 4
 const MAX_LOGGED_RAW_CHARS = 2000
 
 /** Bounds model output echoed into warn lines; the full text goes to debug only. */
@@ -84,9 +84,9 @@ function delay(ms: number): Promise<void> {
 }
 
 function backoffMs(attempt: number): number {
-  // Exponential backoff with jitter — adapted from python-agents retry_decorator.py
-  const base = Math.min(500 * Math.pow(1.2, attempt - 1), 8000)
-  const jitter = 0.85 + Math.random() * 0.3
+  // 1s → 10s → 100s, sized for provider rate-limit windows. ±50% jitter spreads out jobs that fail together.
+  const base = 1000 * Math.pow(10, attempt - 1)
+  const jitter = 0.5 + Math.random()
   return Math.round(base * jitter)
 }
 
