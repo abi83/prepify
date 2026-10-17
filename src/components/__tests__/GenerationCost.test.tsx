@@ -9,7 +9,7 @@ const FIRST = new Date("2026-03-04T12:00:00Z")
 const LAST = new Date("2026-03-06T12:00:00Z")
 
 const generation: JobGeneration = {
-  jobId: "j1", type: "question", status: "executed", failureReason: null, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex",
+  jobId: "j1", type: "question", status: "executed", failureReason: null, updatedAt: new Date("2026-03-07T12:00:00Z"), subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex",
   calls: [
     { promptTokens: 1000, cachedTokens: 0, completionTokens: 300, costUsd: 0.002, executionMs: 1, wasted: false, generatedAt: FIRST },
     { promptTokens: 400, cachedTokens: 0, completionTokens: 100, costUsd: 0.0005, executionMs: 1, wasted: true, generatedAt: LAST },
@@ -47,5 +47,9 @@ describe("helpers", () => {
 
   it("dates a job by its latest call", () => {
     expect(generatedAtOf(generation)).toEqual(LAST)
+  })
+
+  it("dates a job without calls by its last update", () => {
+    expect(generatedAtOf({ ...generation, calls: [] })).toEqual(generation.updatedAt)
   })
 })

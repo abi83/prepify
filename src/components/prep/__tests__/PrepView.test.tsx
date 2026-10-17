@@ -22,7 +22,7 @@ const prep: Prep = {
 
 const concept: StatedConcept = {
   id: "c1", name: "Mitosis", description: "Cell division.", importance: 0.9, misconceptions: [], language: "en", createdAt: new Date(0),
-  generation: { jobId: "j1", type: "concepts", status: "executed", failureReason: null, subject: "Mitosis", model: "gpt-5-nano", tier: "flex", calls: [ { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false, generatedAt: new Date(0) } ] },
+  generation: { jobId: "j1", type: "concepts", status: "executed", failureReason: null, updatedAt: new Date(0), subject: "Mitosis", model: "gpt-5-nano", tier: "flex", calls: [ { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false, generatedAt: new Date(0) } ] },
 }
 
 const data: SharedTabData = {

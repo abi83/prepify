@@ -63,7 +63,7 @@ const call = (promptTokens: number, completionTokens: number, costUsd: number): 
   ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false, generatedAt: CREATED_AT })
 
 function gen(jobId: string, calls: GenerationCall[], overrides: Partial<JobGeneration> = {}): JobGeneration {
-  return { jobId, type: "question", status: "executed", failureReason: null, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls, ...overrides }
+  return { jobId, type: "question", status: "executed", failureReason: null, updatedAt: new Date(0), subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls, ...overrides }
 }
 
 const flashcard = (id: string): Question =>
