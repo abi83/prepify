@@ -3,12 +3,9 @@ import { Prisma, type Job as JobRow } from "@prisma/client"
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import { resolveLanguage } from "@/core/lib/language"
 import type { Store } from "@/core/ports"
-import type { AssetOutput } from "@/lib/agents/assets/assetRouter"
-import type { OcrOutput } from "@/lib/agents/OcrAgent"
-import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
-import { parseJobOutput } from "@/types/jobOutputs"
+import { parseJobOutput, type AssetOutput, type OcrJobOutput, type PrepMetaOutput } from "@/types/jobOutputs"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/types/jobTypes"
 import type { StoredConcept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
@@ -288,7 +285,7 @@ async function writeDomainRows(tx: Prisma.TransactionClient, job: JobWithInputs,
 }
 
 /** Writes the OCR text/visual elements and detected language straight onto the target `PrepImage` row (ADR point 6, no staging). */
-function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrOutput) {
+function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: OcrJobOutput) {
   const result: OcrResult = { title: output.title, text: output.text, visual_elements: output.visual_elements }
   return tx.prepImage.update({
     where: { id: job.inputs[0].entityId },

@@ -1,30 +1,13 @@
-import { z } from "zod"
-
-import { DEFAULT_GEN_CONFIG } from "@/core/lib/generationConfig"
+import type { ServerRunRequest } from "@/core/lib/serverRunRequest"
 import { DEFAULT_CONCURRENCY, DEFAULT_JOB_SETTINGS, runGeneration } from "@/lib/jobs/generation"
 import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"
-import { difficultySchema, questionTypeSchema } from "@/types/questions"
 
 import { serverPorts } from "./serverExecution"
 import { serverPrepData } from "./serverPrepData"
 
 /** Settings for jobs this run creates; unfinished jobs keep the config they were created with. */
-export const serverRunRequestSchema = z.object({
-  apiKey: z.string().min(1),
-  prepId: z.string().min(1),
-  model: z.string().min(1).default("gpt-5-nano"),
-  tier: z.string().min(1).default("flex"),
-  target: z.object({
-    questionCount: z.number().int().min(5).max(20),
-    enabledTypes: z.array(questionTypeSchema).min(1),
-    difficultyMix: z.record(difficultySchema, z.number().min(0)).refine(mix => Object.values(mix).some(w => w > 0)),
-    additionalQuestions: z.number().int().min(1).max(20).optional(),
-  }).default(DEFAULT_GEN_CONFIG),
-})
-export type ServerRunRequest = z.infer<typeof serverRunRequestSchema>
-
 export class RunInProgressError extends Error {
   constructor(prepId: string) {
     super(`Prep ${prepId} already has a run in progress`)
