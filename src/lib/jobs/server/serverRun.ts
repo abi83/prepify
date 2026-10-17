@@ -4,6 +4,7 @@ import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"
 
+import { holdRunLease } from "./runTracker"
 import { serverPorts } from "./serverExecution"
 import { serverPrepData } from "./serverPrepData"
 
@@ -15,26 +16,17 @@ export class RunInProgressError extends Error {
   }
 }
 
-/** Preps with a run in this process; the DB heartbeat check covers other instances. */
-const activePrepIds = new Set<string>()
+export const releasePrepRun = jobRepository.releaseRunLease
 
-export function releasePrepRun(prepId: string): void {
-  activePrepIds.delete(prepId)
-}
-
-/** Takes the prep's single run slot, or throws `RunInProgressError`. */
+/** Takes the prep's run lease, or throws `RunInProgressError`. */
 export async function acquirePrepRun(prepId: string): Promise<void> {
-  if (activePrepIds.has(prepId)) throw new RunInProgressError(prepId)
-  activePrepIds.add(prepId)
-  if (!await jobRepository.hasActiveRun(prepId)) return
-  releasePrepRun(prepId)
-  throw new RunInProgressError(prepId)
+  if (!await jobRepository.acquireRunLease(prepId)) throw new RunInProgressError(prepId)
 }
 
-/** Runs the prep's job graph with the caller's key, then frees its run slot. The key lives only in this call's closure. */
+/** Runs the prep's job graph with the caller's key, then frees its run lease. The key lives only in this call's closure. */
 export async function runServerGeneration(userId: string, { apiKey, prepId, model, tier, target }: ServerRunRequest): Promise<void> {
   try {
-    await runGeneration(await serverPorts(apiKey, model, serverPrepData(userId)), {
+    await holdRunLease(prepId, async () => runGeneration(await serverPorts(apiKey, model, serverPrepData(userId)), {
       actorId: userId,
       prepId,
       apiKey,
@@ -43,11 +35,9 @@ export async function runServerGeneration(userId: string, { apiKey, prepId, mode
       concurrency: DEFAULT_CONCURRENCY,
       signal: new AbortController().signal,
       onProgress: () => {},
-    })
+    }))
   } catch (error) {
     // Nobody awaits this background task; progress and failures are already in the job rows.
     serverLogger.error("Server generation failed", { prepId, error: serializeError(error) })
-  } finally {
-    releasePrepRun(prepId)
   }
 }

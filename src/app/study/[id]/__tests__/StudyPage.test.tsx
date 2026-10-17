@@ -28,6 +28,7 @@ function prep(overrides: Partial<Prep> = {}): Prep {
     language: null,
     description: "",
     isActive: true,
+    runHeartbeatAt: null,
     status: "ready",
     ...overrides,
   }

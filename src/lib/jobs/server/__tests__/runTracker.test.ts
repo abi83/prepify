@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import type { Job } from "@/core/job"
-import { HEARTBEAT_INTERVAL_MS, trackServerRun } from "@/lib/jobs/server/runTracker"
+import { HEARTBEAT_INTERVAL_MS, holdRunLease, trackServerRun } from "@/lib/jobs/server/runTracker"
 import { prisma } from "@/lib/prisma"
 import * as prepRepository from "@/repositories/prepRepository"
 
@@ -64,6 +64,25 @@ describe("trackServerRun", () => {
   })
 })
 
+describe("holdRunLease", () => {
+  const leaseOf = async (id: string) => (await prisma.prep.findUniqueOrThrow({ where: { id } })).runHeartbeatAt
+
+  it("refreshes the lease about every 30s and releases it when the run ends, even by throwing", async () => {
+    const prep = await prepRepository.createPrep("u1", { title: "Prep", language: "en" })
+    await prisma.prep.update({ where: { id: prep.id }, data: { runHeartbeatAt: new Date(0) } })
+    vi.useFakeTimers({ toFake: [ "setInterval", "clearInterval" ] })
+
+    let fail!: () => void
+    const held = holdRunLease(prep.id, () => new Promise<void>((_, reject) => { fail = () => reject(new Error("boom")) }))
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+    await vi.waitFor(async () => expect((await leaseOf(prep.id))!.getTime()).toBeGreaterThan(0))
+
+    fail()
+    await expect(held).rejects.toThrow("boom")
+    expect(await leaseOf(prep.id)).toBeNull()
+  })
+})
+
 describe("SIGTERM", () => {
   /** A fresh module graph, so the handler installs after the spy is set. */
   async function freshTracker() {
@@ -93,6 +112,17 @@ describe("SIGTERM", () => {
 
     await vi.waitFor(async () => expect((await db.job.findUniqueOrThrow({ where: { id: mine.id } })).status).toBe("interrupted"))
     expect((await db.job.findUniqueOrThrow({ where: { id: theirs.id } })).status).toBe("running")
+    onSpy.mockRestore()
+  })
+
+  it("frees this process's run leases, including between jobs", async () => {
+    const { tracker, db, onSpy } = await freshTracker()
+    const prep = await db.prep.create({ data: { userId: "u1", title: "Prep", language: "en", runHeartbeatAt: new Date() } })
+
+    void tracker.holdRunLease(prep.id, never)
+    await tracker.interruptActiveJobs()
+
+    expect((await db.prep.findUniqueOrThrow({ where: { id: prep.id } })).runHeartbeatAt).toBeNull()
     onSpy.mockRestore()
   })
 

@@ -250,9 +250,22 @@ export async function listUnfinishedJobs(actorId: string, prepId: string): Promi
   return rows.map(row => toJob(row))
 }
 
-/** Whether a runner is alive on `prepId`: a `running` job with a fresh heartbeat. */
-export async function hasActiveRun(prepId: string): Promise<boolean> {
-  return await prisma.job.count({ where: { prepId, status: "running", heartbeatAt: { gte: staleCutoff() } } }) > 0
+/** Takes the prep's run lease unless a live runner holds it (beat within `STALE_HEARTBEAT_MS`). Covers the whole run, including the gaps between jobs where nothing is `running`. */
+export async function acquireRunLease(prepId: string): Promise<boolean> {
+  const result = await prisma.prep.updateMany({
+    where: { id: prepId, OR: [ { runHeartbeatAt: null }, { runHeartbeatAt: { lt: staleCutoff() } } ] },
+    data: { runHeartbeatAt: new Date() },
+  })
+  return result.count === 1
+}
+
+/** Only a held lease is renewed, so a late beat can't resurrect a released one. */
+export async function renewRunLease(prepId: string): Promise<void> {
+  await prisma.prep.updateMany({ where: { id: prepId, runHeartbeatAt: { not: null } }, data: { runHeartbeatAt: new Date() } })
+}
+
+export async function releaseRunLease(prepId: string): Promise<void> {
+  await prisma.prep.updateMany({ where: { id: prepId }, data: { runHeartbeatAt: null } })
 }
 
 /** Moves a re-executable job to `running` with a fresh heartbeat and counts the attempt; false if another runner holds it or it is terminal. */

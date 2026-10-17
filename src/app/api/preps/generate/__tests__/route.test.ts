@@ -192,13 +192,18 @@ describe("POST /api/preps/generate", () => {
     expect((await post({ apiKey: API_KEY, prepId: prep.id, target: TARGET })).status).toBe(202)
   })
 
-  it("rejects a run while another instance's job has a fresh heartbeat", async () => {
-    const { prep, image } = await makePrep()
-    await prisma.job.create({
-      data: { prepId: prep.id, type: "ocr", status: "running", heartbeatAt: new Date(), model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: "u1", inputs: { create: [ { entityType: "prepImage", entityId: image.id } ] } },
-    })
+  it("rejects a run while another instance holds a fresh lease, even with no running job", async () => {
+    const { prep } = await makePrep()
+    await prisma.prep.update({ where: { id: prep.id }, data: { runHeartbeatAt: new Date() } })
 
     expect((await post({ apiKey: API_KEY, prepId: prep.id })).status).toBe(409)
+  })
+
+  it("takes over a stale lease", async () => {
+    const { prep } = await makePrep()
+    await prisma.prep.update({ where: { id: prep.id }, data: { runHeartbeatAt: new Date(Date.now() - STALE_HEARTBEAT_MS - 1000) } })
+
+    expect((await post({ apiKey: API_KEY, prepId: prep.id })).status).toBe(202)
   })
 
   it("keeps the API key out of every DB row, log, and payload", async () => {

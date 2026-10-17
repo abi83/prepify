@@ -17,7 +17,7 @@ import type { PrepTab } from "@/types/prep"
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "link",
-  grade: 10, discipline: null, language: null, description: "", isActive: true, status: "ready",
+  grade: 10, discipline: null, language: null, description: "", isActive: true, status: "ready", runHeartbeatAt: null,
 }
 
 const concept: StatedConcept = {

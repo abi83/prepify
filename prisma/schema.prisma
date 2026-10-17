@@ -68,6 +68,8 @@ model Prep {
   description String          @default("")
   isActive    Boolean         @default(false)
   status      PrepStatus      @default(draft)
+  // Held while a server runner drives this prep; stale after `STALE_HEARTBEAT_MS` without a beat.
+  runHeartbeatAt DateTime?
 
   questions   Question[]
   attempts    Attempt[]
