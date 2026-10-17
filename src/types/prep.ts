@@ -8,6 +8,9 @@ export type PrepDisciplineId =
   | "Biology" | "Chemistry" | "Physics" | "Mathematics" | "ComputerScience"
   | "English" | "French" | "German" | "Spanish" | "Italian" | "Latin" | "Russian"
 
+/** Stored on `Prep.status`; mirrors the Prisma `PrepStatus` enum. */
+export type PrepStatus = "draft" | "processing" | "ready" | "failed"
+
 const languageSchema = z.enum(SUPPORTED_LANGUAGES)
 
 export const prepDisciplineSchema: z.ZodType<PrepDisciplineId> = z.enum([

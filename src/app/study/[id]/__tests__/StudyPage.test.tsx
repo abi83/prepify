@@ -29,6 +29,7 @@ function prep(overrides: Partial<Prep> = {}): Prep {
     language: null,
     description: "",
     isActive: true,
+    status: "ready",
     ...overrides,
   }
 }
