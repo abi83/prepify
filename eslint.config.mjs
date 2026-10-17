@@ -122,6 +122,19 @@ const config = [
     },
   },
   {
+    files: [ "src/core/**/*.ts" ],
+    ignores: [ "**/__tests__/**" ],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...[ "localStorage", "sessionStorage", "window", "document", "navigator" ].map(name => ({
+          name,
+          message: "core must be runtime-agnostic: no browser globals.",
+        })),
+      ],
+    },
+  },
+  {
     files: [ "src/types/**/*.ts" ],
     ignores: [ "**/__tests__/**" ],
     rules: {

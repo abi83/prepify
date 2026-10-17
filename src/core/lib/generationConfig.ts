@@ -1,7 +1,5 @@
 import type { Difficulty, QuestionType, QuizType } from "@/types/questions"
 
-const STORAGE_KEY = "prepify_gen_config"
-
 export const ALL_QUESTION_TYPES: QuizType[] = [
   "single_choice",
   "multiple_choice",
@@ -51,9 +49,9 @@ function isValidMix(mix: unknown): mix is DifficultyMix {
   return weights.every(w => typeof w === "number" && Number.isFinite(w) && w >= 0) && weights.some(w => (w as number) > 0)
 }
 
-export function getGenerationConfig(): GenerationConfig {
+/** Parses a stored config, clamping values and falling back to defaults for anything invalid. */
+export function parseGenerationConfig(raw: string | null): GenerationConfig {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultConfig()
     const parsed = JSON.parse(raw) as Partial<GenerationConfig>
     const count = Number(parsed.questionCount)
@@ -74,8 +72,4 @@ export function getGenerationConfig(): GenerationConfig {
   } catch {
     return defaultConfig()
   }
-}
-
-export function setGenerationConfig(config: GenerationConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
 }

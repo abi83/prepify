@@ -11,12 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { GenerationConfig } from "@/core/lib/generationConfig"
-import {
-  getGenerationConfig, setGenerationConfig,
-  ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS,
-} from "@/core/lib/generationConfig"
+import { ALL_QUESTION_TYPES, MAX_FLASHCARDS, TYPE_LABELS } from "@/core/lib/generationConfig"
 import { getApiKey, setApiKey, clearApiKey } from "@/lib/apiKey"
 import { getExecutionMode, setExecutionMode, type ExecutionMode } from "@/lib/executionMode"
+import { getGenerationConfig, setGenerationConfig } from "@/lib/generationConfigStorage"
 import { createLlm } from "@/lib/llm/createLlm"
 import { PROVIDERS, PROVIDER_INFO, type Provider } from "@/lib/llm/provider"
 import { providerModels } from "@/lib/modelCatalog"
