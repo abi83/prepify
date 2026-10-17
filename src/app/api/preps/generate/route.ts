@@ -4,6 +4,7 @@ import { MAX_IMAGES } from "@/core/lib/config"
 import { serverRunRequestSchema } from "@/core/lib/serverRunRequest"
 import { auth } from "@/lib/auth"
 import { acquirePrepRun, releasePrepRun, RunInProgressError, runServerGeneration } from "@/lib/jobs/server/serverRun"
+import { providerOf } from "@/lib/llm/provider"
 import { assertModelAndTier } from "@/lib/modelCatalog"
 import { loadModelCatalog } from "@/lib/modelCatalogFile"
 import { withHandler } from "@/lib/withHandler"
@@ -25,7 +26,8 @@ export const POST = withHandler(async req => {
   if (!body.success) return error("Invalid request", 400)
   const { prepId, model, tier } = body.data
   try {
-    assertModelAndTier(await loadModelCatalog(), "openai", model, tier)
+    const catalog = await loadModelCatalog()
+    assertModelAndTier(catalog, providerOf(catalog, model), model, tier)
   } catch (e) {
     return error(e instanceof Error ? e.message : "Invalid model or tier", 400)
   }
