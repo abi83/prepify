@@ -1,21 +1,21 @@
 import type { ExecutionConfig, Job } from "@/core/job"
 import { DEFAULT_TIMEOUT_MS } from "@/core/lib/config"
 import { nextJobs, type PlanTarget } from "@/core/lib/planner"
-import type { ListUnfinishedJobs, Ports, ProgressSink } from "@/core/ports"
+import type { ListUnfinishedJobs, Ports } from "@/core/ports"
 import type { JobDefinition } from "@/core/runJob"
-import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/types/jobTypes"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE, type JobStage } from "@/types/jobTypes"
 import { ocrResultSchema, type Page } from "@/types/prep"
 
 import { createAssetJobDefinition } from "./assetJob"
 import { createConceptsExtractJobDefinition } from "./conceptsExtractJob"
 import { createConceptsJobDefinition } from "./conceptsJob"
-import { createJobs, executePrep, replacementPlanner, runJobs, runQuestionJobs, type ExecutionDeps, type PlanReplacements, type RunDeps, type RunParams } from "./execution"
+import { createJobs, executeJobs, executePrep, type ExecutionDeps, type RunDeps, type RunParams } from "./execution"
 import { createOcrJobDefinition } from "./ocrJob"
 import { createPrepMetaJobDefinition } from "./prepMetaJob"
 import { createQuestionJobDefinition } from "./questionJob"
 
 /** A stage's progress: the planner's stages in order. */
-export type GenerationStage = "ocr" | "concepts" | "questions" | "assets"
+export type GenerationStage = JobStage
 export type GenerationProgress =
   | { stage: GenerationStage; done: number; total: number }
   | { stage: "done" }
@@ -24,22 +24,6 @@ export type GenerationProgress =
 export const DEFAULT_JOB_SETTINGS = { timeoutMs: DEFAULT_TIMEOUT_MS, maxRetries: 1 }
 
 export const DEFAULT_CONCURRENCY = 5
-
-const STAGE_BY_JOB_TYPE: Record<string, GenerationStage> = {
-  [OCR_JOB_TYPE]: "ocr",
-  [CONCEPTS_EXTRACT_JOB_TYPE]: "concepts",
-  [CONCEPTS_JOB_TYPE]: "concepts",
-  [PREP_META_JOB_TYPE]: "concepts",
-  [QUESTION_JOB_TYPE]: "questions",
-  [ASSET_JOB_TYPE]: "assets",
-}
-const STAGES: GenerationStage[] = [ "ocr", "concepts", "questions", "assets" ]
-
-function stageOf(jobType: string): GenerationStage {
-  const stage = STAGE_BY_JOB_TYPE[jobType]
-  if (!stage) throw new Error(`Unknown job type "${jobType}"`)
-  return stage
-}
 
 interface DefinitionOptions {
   prepId: string
@@ -120,64 +104,25 @@ export interface GenerationParams extends RunnerOptions {
 }
 
 interface Runner {
-  deps: RunDeps
+  deps: ExecutionDeps
   params: RunParams
-  startStage(stage: GenerationStage, total: number): void
 }
 
-/** Wires the runner to `ports`, with stage progress emitted through a `ProgressSink`. */
+/** Wires the engine to `ports`, forwarding its per-stage progress to `onProgress`. */
 function createRunner(ports: RunnerPorts, options: RunnerOptions): Runner {
-  let stage: GenerationStage = "ocr"
-  let done = 0
-  let total = 0
-
-  const progress: ProgressSink = {
-    report(update) {
-      done = update.done
-      total = update.total
-      options.onProgress({ stage, done, total })
-    },
-  }
-  const startStage = (next: GenerationStage, nextTotal: number) => {
-    stage = next
-    progress.report({ done: 0, total: nextTotal })
-  }
-
   const definitionFor = createDefinitionFor(options, ports)
-  const deps: RunDeps = {
+  const deps: ExecutionDeps = {
     store: ports.store,
     llm: ports.llm,
-    progress,
+    progress: { report: update => options.onProgress(update) },
+    loadState: prepId => ports.data.loadState(prepId),
     definitionFor: async job => {
       const definition = await definitionFor(job)
-      return {
-        type: definition.type,
-        async run(ctx) {
-          const result = await ports.trackRun(job, () => definition.run(ctx))
-          // Replacement jobs join a stage after it started, so the total can lag behind.
-          progress.report({ done: done + 1, total: Math.max(total, done + 1) })
-          return result
-        },
-      }
+      return { type: definition.type, run: ctx => ports.trackRun(job, () => definition.run(ctx)) }
     },
   }
   const { actorId, apiKey, signal, concurrency } = options
-  return { deps, params: { actorId, apiKey, signal, concurrency }, startStage }
-}
-
-/** Executes `jobs` stage by stage, so later stages see earlier outputs. With `replace`, failed question jobs are replaced instead of throwing. */
-async function runStaged(runner: Runner, jobs: Job[], replace?: PlanReplacements): Promise<void> {
-  for (const stage of STAGES) {
-    const stageJobs = jobs.filter(job => stageOf(job.type) === stage)
-    if (stageJobs.length === 0) continue
-    runner.startStage(stage, stageJobs.length)
-    const merges = stageJobs.filter(job => job.type === CONCEPTS_JOB_TYPE)
-    const rest = stageJobs.filter(job => !merges.includes(job))
-    if (stage === "questions" && replace) await runQuestionJobs(runner.deps, runner.params, rest, replace)
-    else await runJobs(runner.deps, runner.params, rest)
-    // Each merge reads the concepts the previous one stored, so they never overlap or skip ahead after a failure.
-    for (const merge of merges) await runJobs(runner.deps, runner.params, [ merge ])
-  }
+  return { deps, params: { actorId, apiKey, signal, concurrency } }
 }
 
 export interface CreateJobsParams {
@@ -221,7 +166,8 @@ export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedPara
   const jobs = jobIds.length === 0
     ? await ports.listUnfinishedJobs(actorId, prepId)
     : await Promise.all([ ...new Set(jobIds) ].map(id => requireUnfinished(ports.store, actorId, id)))
-  await runStaged(createRunner(ports, options), jobs)
+  const { deps, params } = createRunner(ports, options)
+  await executeJobs(deps, params, jobs)
   options.onProgress({ stage: "done" })
   return jobs
 }
@@ -229,24 +175,17 @@ export async function runCreatedJobs(ports: RunnerPorts, options: RunCreatedPara
 /** Runs OCR for the prep's images that lack it, re-executing unfinished OCR jobs first. */
 export async function runOcr(ports: RunnerPorts, options: GenerationParams): Promise<void> {
   const { config, target, ...rest } = options
-  const runner = createRunner(ports, rest)
   const { actorId, prepId } = options
-
+  const { deps, params } = createRunner(ports, rest)
   const rerun = (await ports.listUnfinishedJobs(actorId, prepId)).filter(job => job.type === OCR_JOB_TYPE)
-  await runStaged(runner, rerun)
-  const specs = nextJobs(await ports.data.loadState(prepId), target).filter(spec => spec.type === OCR_JOB_TYPE)
-  const created = await createJobs(ports.store, actorId, config, specs)
-  await runStaged(runner, created)
+  await executePrep(deps, { ...params, prepId, config, target }, { jobs: rerun, stages: [ "ocr" ] })
 }
 
-/** Plans and runs the `additionalQuestions` new question jobs; their assets follow from the normal flow. */
-async function runAdditionalQuestions(ports: RunnerPorts, runner: Runner, options: GenerationParams, replace: PlanReplacements): Promise<void> {
-  const { actorId, prepId, config, target } = options
+/** Plans and creates the `additionalQuestions` new question jobs; their assets follow from the normal flow. */
+async function createAdditionalQuestionJobs(ports: RunnerPorts, { actorId, prepId, config, target }: GenerationParams): Promise<Job[]> {
   const unfinished = await ports.listUnfinishedJobs(actorId, prepId)
   if (unfinished.length > 0) throw new Error(`${unfinished.length} unfinished job(s) exist (${unfinished.map(job => job.id).join(", ")}); resume them first`)
-  const specs = nextJobs(await ports.data.loadState(prepId), target)
-  const jobs = await createJobs(ports.store, actorId, config, specs)
-  await runStaged(runner, jobs, replace)
+  return createJobs(ports.store, actorId, config, nextJobs(await ports.data.loadState(prepId), target))
 }
 
 /**
@@ -257,23 +196,9 @@ async function runAdditionalQuestions(ports: RunnerPorts, runner: Runner, option
 export async function runGeneration(ports: RunnerPorts, options: GenerationParams): Promise<void> {
   const { config, target: requested, ...rest } = options
   const { additionalQuestions, ...target } = requested
-  const runner = createRunner(ports, rest)
-  const replace = replacementPlanner({ store: ports.store, loadState: prepId => ports.data.loadState(prepId) }, { actorId: options.actorId, prepId: options.prepId, config, target })
-  if (additionalQuestions === undefined) {
-    await runStaged(runner, await ports.listUnfinishedJobs(options.actorId, options.prepId), replace)
-  } else {
-    await runAdditionalQuestions(ports, runner, options, replace)
-  }
-
-  const deps: ExecutionDeps = {
-    ...runner.deps,
-    loadState: async prepId => {
-      const state = await ports.data.loadState(prepId)
-      const specs = nextJobs(state, target)
-      if (specs.length > 0) runner.startStage(stageOf(specs[0].type), specs.length)
-      return state
-    },
-  }
-  await executePrep(deps, { ...runner.params, prepId: options.prepId, config, target })
+  const { actorId, prepId } = options
+  const { deps, params } = createRunner(ports, rest)
+  const jobs = additionalQuestions === undefined ? await ports.listUnfinishedJobs(actorId, prepId) : await createAdditionalQuestionJobs(ports, options)
+  await executePrep(deps, { ...params, prepId, config, target }, { jobs })
   options.onProgress({ stage: "done" })
 }

@@ -1,5 +1,6 @@
 import type { ZodType } from "zod"
 
+import type { JobStage } from "@/types/jobTypes"
 import type { SupportedLanguage } from "@/types/language"
 import type { ModelCatalog } from "@/types/modelCatalog"
 import type { PrepState } from "@/types/prepState"
@@ -96,7 +97,7 @@ export interface Llm {
 }
 
 export interface ProgressSink {
-  report(update: { done: number; total: number }): void
+  report(update: { stage: JobStage; done: number; total: number }): void
 }
 
 /** The `PrepImage` fields jobs read. */
