@@ -1,6 +1,7 @@
 import type { SingleChoiceContent } from "@/types/questions"
 
 import { badgeClassName, explanationClassName, optionClassName } from "./optionStyles"
+import ReviewTag from "./ReviewTag"
 
 interface Props {
   content: SingleChoiceContent
@@ -30,6 +31,7 @@ export default function SingleChoiceQuestion({ content, selected, isReview, onCh
               {LABELS[i]}
             </span>
             <span className="flex flex-1 flex-col gap-1.5">
+              {isReview && <ReviewTag isSelected={isSelected} isCorrect={isCorrect} />}
               <span className="text-sm leading-relaxed">{answer.text}</span>
               {isReview && (isCorrect || isWrong) && (
                 <span className={explanationClassName(isCorrect)}>{answer.explanation}</span>

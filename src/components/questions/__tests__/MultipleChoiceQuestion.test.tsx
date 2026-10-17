@@ -73,4 +73,16 @@ describe("MultipleChoiceQuestion", () => {
     // The wrong pick's explanation should also be shown
     expect(screen.getByText("Secondary color.")).toBeInTheDocument()
   })
+
+  it("tags picked options and missed correct options in review", () => {
+    render(<MultipleChoiceQuestion content={content} selected={[ "a", "b" ]} isReview={true} />)
+    expect(screen.getAllByText("Your answer")).toHaveLength(2)
+    expect(screen.getAllByText("Missed")).toHaveLength(2) // 'c' and 'e'
+  })
+
+  it("shows no tags outside review", () => {
+    render(<MultipleChoiceQuestion content={content} selected={[ "a" ]} isReview={false} />)
+    expect(screen.queryByText("Your answer")).not.toBeInTheDocument()
+    expect(screen.queryByText("Missed")).not.toBeInTheDocument()
+  })
 })
