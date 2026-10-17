@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { POST } from "@/app/api/preps/generate/route"
-import { MAX_IMAGES } from "@/lib/config"
+import { MAX_IMAGES } from "@/core/lib/config"
 import { serverPorts } from "@/lib/jobs/serverExecution"
 import { prisma } from "@/lib/prisma"
 import { STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"

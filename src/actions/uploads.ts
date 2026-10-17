@@ -2,10 +2,10 @@
 
 import { Storage } from "@google-cloud/storage"
 
-import { MAX_IMAGES } from "@/lib/config"
+import { MAX_IMAGES } from "@/core/lib/config"
+import { assertPrepPageKey, prepPagesPrefix } from "@/core/lib/prepPageKey"
 import { requireUserId } from "@/lib/currentUser"
 import { config } from "@/lib/env"
-import { assertPrepPageKey, prepPagesPrefix } from "@/lib/prepPageStorage"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepRepository from "@/repositories/prepRepository"
 

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const runAgent = vi.fn()
 vi.mock("@/lib/agent", () => ({ runAgent: (...args: unknown[]) => runAgent(...args) }))
 
+import { MAX_PAGE_CHARS } from "@/core/lib/config"
 import { runConceptExtractor } from "@/lib/agents/ConceptExtractor"
-import { MAX_PAGE_CHARS } from "@/lib/config"
 import { conceptsResponseSchema } from "@/types/pipeline"
 
 const META = { model: "m", tier: "flex", temperature: 1, maxTokens: 1, promptTokens: 1, cachedTokens: 0, completionTokens: 1, totalTokens: 2, costUsd: 0, toolCalls: 0, executionMs: 1 }

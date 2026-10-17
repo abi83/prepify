@@ -2,8 +2,8 @@
 
 import { Card, CardBadge, CardBadges, CardFooter, CardSubtitle, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { LANGUAGE_LABELS } from "@/core/lib/config"
 import { DISCIPLINES, isDiscipline, type Discipline } from "@/lib/agents/PrepMeta"
-import { LANGUAGE_LABELS } from "@/lib/config"
 import { disciplineFromEnum } from "@/lib/disciplineMapping"
 import { formatDate } from "@/lib/format"
 import { useUrlParams } from "@/lib/urlState"

@@ -35,7 +35,7 @@ vi.mock("@/lib/prepImageUpload", async importActual => ({ ...await importActual<
 vi.mock("@/lib/apiKey", () => ({ getApiKey: h.getApiKey }))
 
 import PrepPage from "@/app/preps/[id]/PrepPage"
-import { BYOK_TEXT_HARD_LIMIT } from "@/lib/config"
+import { BYOK_TEXT_HARD_LIMIT } from "@/core/lib/config"
 import { formatDate } from "@/lib/format"
 import { clearUploads } from "@/lib/uploadQueue"
 import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"

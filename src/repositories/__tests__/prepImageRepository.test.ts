@@ -5,7 +5,7 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import { MAX_IMAGES } from "@/lib/config"
+import { MAX_IMAGES } from "@/core/lib/config"
 import { prisma } from "@/lib/prisma"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
