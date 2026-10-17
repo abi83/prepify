@@ -16,24 +16,25 @@ const CONCEPTS_PER_TIER: Record<Difficulty, number[]> = {
   hard: [ 2, 3 ],
 }
 
-/** Builds a type pool of exactly `count` items from `enabledTypes`, distributed round-robin. */
-export function buildTypePool(count: number, enabledTypes: QuizType[]): QuizType[] {
+/** Returns a float in [0, 1); injectable so tests can pin the draws. */
+type Random = () => number
+
+/**
+ * Builds a type pool of exactly `count` items from `enabledTypes`: each type gets `floor(count / n)`,
+ * the remainder goes to randomly chosen distinct types, so small counts are unbiased.
+ */
+export function buildTypePool(count: number, enabledTypes: QuizType[], random: Random = Math.random): QuizType[] {
   if (enabledTypes.length === 0) throw new Error("At least one question type must be enabled")
   const base = Math.floor(count / enabledTypes.length)
-  const extra = count % enabledTypes.length
-  const pool: QuizType[] = []
-  for (let i = 0; i < enabledTypes.length; i++) {
-    const n = base + (i < extra ? 1 : 0)
-    for (let j = 0; j < n; j++) pool.push(enabledTypes[i])
-  }
-  return pool
+  const extras = new Set(shuffle(enabledTypes, random).slice(0, count % enabledTypes.length))
+  return enabledTypes.flatMap(type => Array<QuizType>(base + (extras.has(type) ? 1 : 0)).fill(type))
 }
 
 /**
- * Builds a difficulty pool of exactly `count` items, split by `mix` weights
- * (largest-remainder rounding, so the total is always `count`).
+ * Builds a difficulty pool of exactly `count` items, split by `mix` weights: floors are exact, each leftover
+ * slot goes to a tier drawn with probability proportional to its remainder (at most one extra per tier).
  */
-export function buildDifficultyPool(count: number, mix: DifficultyMix): Difficulty[] {
+export function buildDifficultyPool(count: number, mix: DifficultyMix, random: Random = Math.random): Difficulty[] {
   const weights = DIFFICULTIES.map(d => mix[d])
   if (weights.some(w => !Number.isFinite(w) || w < 0)) throw new Error("Difficulty weights must be non-negative numbers")
   const total = weights.reduce((sum, w) => sum + w, 0)
@@ -41,19 +42,33 @@ export function buildDifficultyPool(count: number, mix: DifficultyMix): Difficul
 
   const exact = weights.map(w => (w / total) * count)
   const counts = exact.map(Math.floor)
-  const byRemainder = exact
-    .map((x, i) => ({ i, rem: x - counts[i] }))
-    .sort((a, b) => b.rem - a.rem)
+  const remainders = exact.map((x, i) => x - counts[i])
   const leftover = count - counts.reduce((sum, n) => sum + n, 0)
-  for (let k = 0; k < leftover; k++) counts[byRemainder[k].i]++
+  for (let k = 0; k < leftover; k++) {
+    const i = drawByWeight(remainders, random)
+    counts[i]++
+    remainders[i] = 0
+  }
 
   return DIFFICULTIES.flatMap((d, i) => Array<Difficulty>(counts[i]).fill(d))
 }
 
-export function shuffle<T>(arr: T[]): T[] {
+/** Index drawn with probability proportional to `weights`; throws when none is positive. */
+function drawByWeight(weights: number[], random: Random): number {
+  const total = weights.reduce((sum, w) => sum + w, 0)
+  if (total <= 0) throw new Error("No positive weight left to draw from")
+  let r = random() * total
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i]
+    if (r < 0) return i
+  }
+  return weights.reduce((last, w, i) => w > 0 ? i : last, -1)
+}
+
+export function shuffle<T>(arr: T[], random: Random = Math.random): T[] {
   const a = [ ...arr ]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(random() * (i + 1))
     ;[ a[i], a[j] ] = [ a[j], a[i] ]
   }
   return a

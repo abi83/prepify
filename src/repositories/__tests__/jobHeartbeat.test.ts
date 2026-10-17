@@ -170,6 +170,21 @@ describe("running and interrupted jobs", () => {
     expect(await statusOf(created.job.id)).toBe("created")
   })
 
+  it("supersedes a failed job: not resumable, not retryable, and out of the prep status", async () => {
+    const { prep, job } = await makeJob("failed", null)
+    const store = createPrismaStore()
+
+    await store.supersedeJob(USER, job.id)
+
+    expect(await statusOf(job.id)).toBe("superseded")
+    expect(await listUnfinishedJobs(USER, prep.id)).toEqual([])
+    expect(await claimJob(job.id)).toBe(false)
+    await expect(retryJob(USER, job.id)).rejects.toThrow("not failed")
+    await expect(store.supersedeJob(USER, job.id)).rejects.toThrow("not failed")
+    await expect(store.supersedeJob("someone-else", job.id)).rejects.toThrow()
+    expect((await store.getJob(USER, job.id))?.status).toBe("superseded")
+  })
+
   it("commits from `running` over the status the caller read", async () => {
     const { job } = await makeJob("created", null)
     await claimJob(job.id)

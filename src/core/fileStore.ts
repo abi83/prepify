@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from "fs/promises"
 import path from "path"
 
-import { applyOutcome } from "./inMemoryStore"
+import { applyOutcome, supersede } from "./inMemoryStore"
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Store } from "./ports"
 
@@ -77,6 +77,14 @@ export function createFileStore(dir: string): Store {
         if (!job || job.status !== fromStatus) return false
         await write(applyOutcome(job, outcome))
         return true
+      })
+    },
+
+    supersedeJob(_actorId: string, jobId: string): Promise<void> {
+      return exclusive(async () => {
+        const job = await read(jobId)
+        if (!job) throw new Error(`Unknown job "${jobId}"`)
+        await write(supersede(job))
       })
     },
   }

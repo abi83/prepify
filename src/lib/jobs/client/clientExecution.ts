@@ -18,6 +18,7 @@ const actionStore: Store = {
   getJob: async <TOutput>(_actorId: string, jobId: string) => await jobActions.getJob(jobId) as Job<TOutput> | null,
   existingIds: async (_actorId, ids) => new Set(await jobActions.existingIds(ids)),
   commitJob: (_actorId, jobId, fromStatus, outcome) => jobActions.commitJob(jobId, fromStatus, outcome),
+  supersedeJob: (_actorId, jobId) => jobActions.supersedeJob(jobId),
 }
 
 export interface GenerationParams extends Omit<generation.GenerationParams, "config" | "concurrency"> {

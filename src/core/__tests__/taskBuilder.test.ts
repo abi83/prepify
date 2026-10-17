@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 
-import { buildDifficultyPool, buildFlashcardTasks, buildQuestionTasks } from "@/core/lib/taskBuilder"
+import { buildDifficultyPool, buildFlashcardTasks, buildQuestionTasks, buildTypePool } from "@/core/lib/taskBuilder"
 import type { Concept } from "@/types/pipeline"
-import type { Difficulty } from "@/types/questions"
+import type { Difficulty, QuizType } from "@/types/questions"
 
 const MIX = { easy: 3, medium: 4, hard: 3 }
 
@@ -38,6 +38,66 @@ describe("buildDifficultyPool", () => {
     expect(() => buildDifficultyPool(10, { easy: -1, medium: 1, hard: 1 })).toThrow()
     expect(() => buildDifficultyPool(10, { easy: NaN, medium: 1, hard: 1 })).toThrow()
     expect(() => buildDifficultyPool(10, { easy: 0, medium: 0, hard: 0 })).toThrow()
+  })
+})
+
+const occurrences = <T extends string>(pool: T[]) => pool.reduce((acc, item) => ({ ...acc, [item]: (acc[item] ?? 0) + 1 }), {} as Partial<Record<T, number>>)
+
+describe("buildTypePool", () => {
+  const TYPES: QuizType[] = [ "single_choice", "multiple_choice", "fill_the_gap", "sorting" ]
+
+  it("gives every type its exact floor share", () => {
+    expect(occurrences(buildTypePool(8, TYPES))).toEqual({ single_choice: 2, multiple_choice: 2, fill_the_gap: 2, sorting: 2 })
+  })
+
+  it("returns exactly `count` items, with each extra on a distinct type", () => {
+    for (const count of [ 1, 2, 3, 5, 6, 7 ]) {
+      const pool = buildTypePool(count, TYPES)
+      expect(pool).toHaveLength(count)
+      const floor = Math.floor(count / TYPES.length)
+      for (const type of TYPES) expect([ floor, floor + 1 ]).toContain(occurrences(pool)[type] ?? 0)
+    }
+  })
+
+  it("is unbiased for count = 1: every enabled type gets drawn", () => {
+    const draws = 4000
+    const seen = occurrences(Array.from({ length: draws }, () => buildTypePool(1, TYPES)[0]))
+    for (const type of TYPES) expect((seen[type] ?? 0) / draws).toBeGreaterThan(0.2)
+  })
+
+  it("throws without enabled types", () => {
+    expect(() => buildTypePool(3, [])).toThrow()
+  })
+})
+
+describe("buildDifficultyPool remainders", () => {
+  it("draws the leftover slot with probability proportional to its remainder", () => {
+    // Exact shares for count 1: easy .3, medium .4, hard .3.
+    expect(buildDifficultyPool(1, MIX, () => 0)).toEqual([ "easy" ])
+    expect(buildDifficultyPool(1, MIX, () => 0.35)).toEqual([ "medium" ])
+    expect(buildDifficultyPool(1, MIX, () => 0.99)).toEqual([ "hard" ])
+  })
+
+  it("does not always pick the highest-weight tier for count = 1", () => {
+    const draws = 4000
+    const seen = tally(Array.from({ length: draws }, () => buildDifficultyPool(1, MIX)[0]))
+    expect(seen.easy / draws).toBeCloseTo(0.3, 1)
+    expect(seen.medium / draws).toBeCloseTo(0.4, 1)
+    expect(seen.hard / draws).toBeCloseTo(0.3, 1)
+  })
+
+  it("keeps floors exact and adds at most one extra per tier", () => {
+    for (let run = 0; run < 100; run++) {
+      const counts = tally(buildDifficultyPool(7, { easy: 1, medium: 1, hard: 1 }))
+      expect(counts.easy + counts.medium + counts.hard).toBe(7)
+      for (const n of [ counts.easy, counts.medium, counts.hard ]) expect([ 2, 3 ]).toContain(n)
+    }
+  })
+
+  it("never draws a zero-weight tier", () => {
+    for (let run = 0; run < 100; run++) {
+      expect(tally(buildDifficultyPool(3, { easy: 1, medium: 1, hard: 0 })).hard).toBe(0)
+    }
   })
 })
 

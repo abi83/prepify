@@ -24,6 +24,7 @@ export interface FilePrep {
 }
 
 const jobNumber = (job: Job) => Number(job.id.replace(/^job-/, ""))
+const isUnfinished = (job: Job) => job.status !== "executed" && job.status !== "superseded"
 
 /**
  * A prep on disk: images under `<dir>/images`, jobs (via `createFileStore`) under `<dir>/jobs`.
@@ -91,7 +92,7 @@ export function createFilePrep(dir: string): FilePrep {
         prepMetaDone: meta.length > 0,
         questionCount: allQuestions.length,
         questionJobCount: jobs.filter(job => job.type === QUESTION_JOB_TYPE).length,
-        unfinishedJobCount: jobs.filter(job => job.status !== "executed").length,
+        unfinishedJobCount: jobs.filter(isUnfinished).length,
         conceptUsage: countConceptUsage(jobs.filter(job => job.type === QUESTION_JOB_TYPE && job.status === "executed").flatMap(job => job.inputIds)),
         assetQuestionIds: allQuestions.filter(({ job, output }) => activeAssetHint(output.content) && !assetJobQuestionIds.has(job.id)).map(({ job }) => job.id),
       }
@@ -119,6 +120,6 @@ export function createFilePrep(dir: string): FilePrep {
   return {
     data,
     store,
-    listUnfinishedJobs: async () => (await readJobs()).filter(job => job.status !== "executed"),
+    listUnfinishedJobs: async () => (await readJobs()).filter(isUnfinished),
   }
 }

@@ -1,6 +1,11 @@
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "./job"
 import type { Store } from "./ports"
 
+export function supersede(job: Job): Job {
+  if (job.status !== "failed") throw new Error(`Job ${job.id} is ${job.status}, not failed`)
+  return { id: job.id, type: job.type, status: "superseded", inputIds: job.inputIds, config: job.config, question: job.question, output: null, failureReason: job.failureReason }
+}
+
 export function applyOutcome<TOutput>(job: Job, outcome: JobOutcome<TOutput>): Job<TOutput> {
   return outcome.status === "executed"
     ? { ...job, status: "executed", output: outcome.output, failureReason: null }
@@ -50,6 +55,12 @@ export function createInMemoryStore(): Store {
       if (!job || job.status !== fromStatus) return false
       jobs.set(jobId, applyOutcome(job, outcome))
       return true
+    },
+
+    async supersedeJob(_actorId: string, jobId: string): Promise<void> {
+      const job = jobs.get(jobId)
+      if (!job) throw new Error(`Unknown job "${jobId}"`)
+      jobs.set(jobId, supersede(job))
     },
   }
 }

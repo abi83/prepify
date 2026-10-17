@@ -81,10 +81,24 @@ function nextStageJobs(state: PrepState, target: PlanTarget): JobSpec[] {
     return state.assetQuestionIds.map(questionId => ({ type: ASSET_JOB_TYPE, inputIds: [ questionId ], question: null }))
   }
 
+  return planQuestionJobs(state, target, {
+    quiz: requested ?? target.questionCount,
+    flashcard: requested === undefined ? target.flashcardCount : 0,
+  })
+}
+
+/** How many question jobs of each class to plan. */
+export interface QuestionClassCounts {
+  quiz: number
+  flashcard: number
+}
+
+/** Fresh question tasks (concepts, type within the class, difficulty all drawn anew), weighted away from concepts `state` already covers. */
+export function planQuestionJobs(state: PrepState, config: Pick<GenerationConfig, "enabledTypes" | "difficultyMix">, counts: QuestionClassCounts): JobSpec[] {
   const idByConcept = new Map<Concept, string>(state.concepts.map(concept => [ concept, concept.id ]))
   const usageByName = new Map(state.concepts.map(concept => [ concept.name, state.conceptUsage[concept.id] ?? 0 ]))
-  const quizTasks = buildQuestionTasks(state.concepts, { ...target, questionCount: requested ?? target.questionCount }, usageByName)
-  const flashcardTasks = requested === undefined ? buildFlashcardTasks(state.concepts, target, usageByName) : []
+  const quizTasks = buildQuestionTasks(state.concepts, { ...config, questionCount: counts.quiz }, usageByName)
+  const flashcardTasks = buildFlashcardTasks(state.concepts, { ...config, flashcardCount: counts.flashcard }, usageByName)
   return [ ...quizTasks, ...flashcardTasks ].map(task => ({
     type: QUESTION_JOB_TYPE,
     inputIds: task.concepts.map(concept => idByConcept.get(concept)!),

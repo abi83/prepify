@@ -12,7 +12,7 @@ const TARGET = { questionCount: 1, flashcardCount: 0, enabledTypes: [ "single_ch
 const concept = { id: "c1", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], language: "en" as const }
 const PENDING_OCR: PrepState = { images: [ { id: "i1", ocrDone: false, concepts: { status: "pending" }, merge: "none" } ], concepts: [], prepMetaDone: false, questionCount: 0, questionJobCount: 0, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
 
-const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[], mergesInFlight: 0, maxMergesInFlight: 0, merged: [] as string[] }))
+const h = vi.hoisted(() => ({ llmsSeen: [] as unknown[], mergesInFlight: 0, maxMergesInFlight: 0, merged: [] as string[], questionFailures: 0 }))
 
 vi.mock("../ocrJob", () => ({
   createOcrJobDefinition: (_images: unknown, deps: { llm: unknown }) => ({
@@ -36,7 +36,13 @@ vi.mock("../conceptsJob", () => ({
 }))
 
 vi.mock("../questionJob", () => ({
-  createQuestionJobDefinition: () => ({ type: "question", run: async () => ({ output: {}, metas: [], wastedMetas: [] }) }),
+  createQuestionJobDefinition: () => ({
+    type: "question",
+    run: async () => {
+      if (h.questionFailures-- > 0) throw new Error("rejected")
+      return { output: {}, metas: [], wastedMetas: [] }
+    },
+  }),
 }))
 
 function params(): GenerationParams {
@@ -98,6 +104,20 @@ describe("generation with swapped roots", () => {
 
     expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "executed" })
     expect(createJob).not.toHaveBeenCalled()
+  })
+
+  it("replaces a resumed question job that fails again, superseding it", async () => {
+    const planned: PrepState = { images: [ { id: "i1", ocrDone: true, concepts: { status: "found", concepts: [ concept ] }, merge: "merged" } ], concepts: [ concept ], prepMetaDone: true, questionCount: 0, questionJobCount: 1, unfinishedJobCount: 0, conceptUsage: {}, assetQuestionIds: [] }
+    const ports = root({ complete: () => { throw new Error("unused") } }, planned)
+    const unfinished = await ports.store.createJob("u1", "question", [ "c1" ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
+    const createJob = vi.spyOn(ports.store, "createJob")
+    h.questionFailures = 1
+
+    await runGeneration({ ...ports, listUnfinishedJobs: async () => [ unfinished ] }, { ...params(), target: { ...TARGET, questionCount: 10 } })
+
+    expect(await ports.store.getJob("u1", unfinished.id)).toMatchObject({ status: "superseded", failureReason: expect.stringContaining("rejected") })
+    expect(createJob).toHaveBeenCalledTimes(1)
+    expect(createJob).toHaveBeenCalledWith("u1", "question", [ "c1" ], expect.anything(), { questionType: "flashcard", difficulty: "easy" })
   })
 })
 

@@ -124,7 +124,7 @@ describe("question job", () => {
     const job = await store.createJob(OWNER, "question", [ concept.id ], CONFIG, SPEC)
 
     const result = await execute(job.id)
-    expect(result).toMatchObject({ committed: true, status: "failed" })
+    expect(result).toMatchObject({ committed: true, status: "failed", failureReason: "No passing review after 2 attempt(s): Needs work" })
     expect(runBuilder).toHaveBeenCalledTimes(2)
 
     expect(await prisma.question.count()).toBe(0)
