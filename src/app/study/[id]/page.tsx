@@ -2,9 +2,11 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { listSharedAssets } from "@/actions/assets"
-import { getSharedPrep } from "@/actions/preps"
+import { getPrepCost, getPrepTokens, getSharedPrep } from "@/actions/preps"
+import { listConcepts, listJobGenerations } from "@/actions/prepState"
 import { listSharedQuestions } from "@/actions/questions"
 import { ErrorState } from "@/components/ErrorState"
+import { currentUserId } from "@/lib/currentUser"
 import { NotFoundError, ForbiddenError } from "@/repositories/errors"
 
 import StudyPage from "./StudyPage"
@@ -39,8 +41,26 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     throw e
   }
 
-  const questions = await listSharedQuestions(id)
+  const [ userId, questions, concepts, generations, tokensUsed, costUsd ] = await Promise.all([
+    currentUserId(),
+    listSharedQuestions(id),
+    listConcepts(id),
+    listJobGenerations(id),
+    getPrepTokens(id),
+    getPrepCost(id),
+  ])
   const assets = questions.length > 0 ? await listSharedAssets(questions.map(q => q.id)) : []
 
-  return <StudyPage prep={prep} questions={questions} assets={assets} />
+  return (
+    <StudyPage
+      userId={userId}
+      prep={prep}
+      questions={questions}
+      assets={assets}
+      concepts={concepts}
+      generations={generations}
+      tokensUsed={tokensUsed}
+      costUsd={costUsd}
+    />
+  )
 }
