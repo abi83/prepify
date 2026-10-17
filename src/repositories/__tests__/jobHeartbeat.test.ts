@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import { prisma } from "@/lib/prisma"
-import { claimJob, createPrismaStore, hasActiveRun, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
+import { claimJob, createPrismaStore, hasActiveRun, interruptStaleJobs, listUnfinishedJobs, markInterrupted, MAX_JOB_ATTEMPTS, retryTerminalJobs, STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import { getPrepProgress } from "@/repositories/prepStateRepository"
@@ -55,15 +55,22 @@ describe("stale heartbeat", () => {
     expect(await statusOf(job.id)).toBe("running")
   })
 
-  it("listUnfinishedJobs and getPrepProgress persist the transition too", async () => {
+  it("listUnfinishedJobs and interruptStaleJobs persist the transition too", async () => {
     const { prep, job } = await makeJob("running", ago(STALE_HEARTBEAT_MS + 1000))
 
     expect((await listUnfinishedJobs(USER, prep.id)).map(j => j.id)).toEqual([ job.id ])
     expect(await statusOf(job.id)).toBe("interrupted")
 
     const second = await makeJob("running", ago(STALE_HEARTBEAT_MS + 1000))
-    await getPrepProgress(second.prep.id)
+    await interruptStaleJobs({ prepId: second.prep.id })
     expect(await statusOf(second.job.id)).toBe("interrupted")
+  })
+
+  it("getPrepProgress is read-only: a stale job stays `running` until swept", async () => {
+    const { prep, job } = await makeJob("running", ago(STALE_HEARTBEAT_MS + 1000))
+
+    expect(await getPrepProgress(prep.id)).toMatchObject({ runState: "running" })
+    expect(await statusOf(job.id)).toBe("running")
   })
 })
 
