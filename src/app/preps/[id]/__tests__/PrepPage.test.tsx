@@ -400,7 +400,7 @@ describe("PrepPage draft", () => {
     expect(screen.getByText(/gpt-5-mini · flex · Server-assisted/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole("button", { name: /10 questions · 10 flashcards · All types/ }))
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "7" } })
+    fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "7" } })
     await userEvent.click(screen.getByRole("checkbox", { name: "Sorting" }))
     await userEvent.click(screen.getByRole("button", { name: "Done" }))
     await userEvent.click(prepMe())
@@ -408,7 +408,7 @@ describe("PrepPage draft", () => {
     await waitFor(() => expect(h.requestServerRun).toHaveBeenCalledOnce())
     expect(h.requestServerRun.mock.calls[0][0].target).toMatchObject({
       questionCount: 7,
-      enabledTypes: [ "flashcard", "single_choice", "multiple_choice", "fill_the_gap" ],
+      enabledTypes: [ "single_choice", "multiple_choice", "fill_the_gap" ],
     })
   })
 
