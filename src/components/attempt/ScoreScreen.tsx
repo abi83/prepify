@@ -1,5 +1,6 @@
 import type { Question, Asset } from "@prisma/client"
 
+import DifficultyBadge from "@/components/DifficultyBadge"
 import QuestionBody from "@/components/questions/QuestionBody"
 import { Button } from "@/components/ui/button"
 import { isAnswerCorrect } from "@/lib/scoring"
@@ -56,6 +57,7 @@ export default function ScoreScreen({ score, total, questions, answers, assets, 
                   <span className="flex-1 text-sm leading-tight font-medium">
                     {(q.content as unknown as { question?: string }).question ?? ""}
                   </span>
+                  <DifficultyBadge difficulty={q.difficulty} />
                 </div>
                 <QuestionBody question={q} answer={answer} isReview={true} asset={assetByQuestion.get(q.id)} />
               </div>
