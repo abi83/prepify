@@ -32,6 +32,7 @@ function entry(overrides: Partial<CatalogEntry>): CatalogEntry {
     language: null,
     description: "",
     isActive: true,
+    status: "ready",
     questionCount: 0,
     ...overrides,
   }

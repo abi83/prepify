@@ -42,7 +42,7 @@ import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "private",
-  grade: 10, discipline: null, language: null, description: "", isActive: true,
+  grade: 10, discipline: null, language: null, description: "", isActive: true, status: "ready",
 }
 
 const CREATED_AT = new Date("2026-03-04T12:00:00Z")

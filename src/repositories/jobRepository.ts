@@ -2,6 +2,7 @@ import { Prisma, type Job as JobRow } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
 import { resolveLanguage } from "@/core/lib/language"
+import { derivePrepStatus } from "@/core/lib/prepStatus"
 import type { Store } from "@/core/ports"
 import type { AssetOutput } from "@/lib/agents/assets/assetRouter"
 import type { OcrOutput } from "@/lib/agents/OcrAgent"
@@ -23,6 +24,13 @@ const staleCutoff = () => new Date(Date.now() - STALE_HEARTBEAT_MS)
 
 /** Claims a job may take before a `failed` one stops being resumed. */
 export const MAX_JOB_ATTEMPTS = 3
+
+/** Recomputes `Prep.status` from the prep's jobs — the only writer of that column. Call it from every path that creates
+ *  a job or can move one to executed or into/out of terminal failure (create, commit, terminal retry). */
+async function syncPrepStatus(tx: Prisma.TransactionClient, prepId: string): Promise<void> {
+  const jobs = await tx.job.findMany({ where: { prepId }, select: { type: true, status: true, attempts: true } })
+  await tx.prep.update({ where: { id: prepId }, data: { status: derivePrepStatus(jobs, MAX_JOB_ATTEMPTS) } })
+}
 
 /** Re-executable jobs: not yet run, or failed with attempts left. */
 export const RESUMABLE: Prisma.JobWhereInput = {
@@ -144,20 +152,24 @@ export function createPrismaStore(): Store {
       question?: QuestionSpec,
     ): Promise<Job<TOutput>> {
       const inputs = await assertOwnsInputs(actorId, inputIds)
-      const row = await prisma.job.create({
-        data: {
-          prepId: inputs[0].prepId,
-          type,
-          model: config.model,
-          tier: config.tier,
-          timeoutMs: config.timeoutMs,
-          maxRetries: config.maxRetries,
-          questionType: question?.questionType ?? null,
-          difficulty: question?.difficulty ?? null,
-          createdBy: actorId,
-          inputs: { create: inputs.map(({ entityType, entityId }) => ({ entityType, entityId })) },
-        },
-        include: { inputs: true },
+      const row = await prisma.$transaction(async tx => {
+        const created = await tx.job.create({
+          data: {
+            prepId: inputs[0].prepId,
+            type,
+            model: config.model,
+            tier: config.tier,
+            timeoutMs: config.timeoutMs,
+            maxRetries: config.maxRetries,
+            questionType: question?.questionType ?? null,
+            difficulty: question?.difficulty ?? null,
+            createdBy: actorId,
+            inputs: { create: inputs.map(({ entityType, entityId }) => ({ entityType, entityId })) },
+          },
+          include: { inputs: true },
+        })
+        await syncPrepStatus(tx, created.prepId)
+        return created
       })
       return toJob<TOutput>(row)
     },
@@ -202,6 +214,7 @@ export function createPrismaStore(): Store {
         if (result.count !== 1) return false
 
         await writeDomainRows(tx, job, checked)
+        await syncPrepStatus(tx, job.prepId)
         return true
       })
     },
@@ -244,11 +257,14 @@ export async function claimJob(jobId: string): Promise<boolean> {
 /** Explicit user retry: hands the prep's terminal jobs back to resume with a fresh attempt budget. Returns how many were reset. */
 export async function retryTerminalJobs(actorId: string, prepId: string): Promise<number> {
   await assertOwnsPrep(actorId, prepId)
-  const result = await prisma.job.updateMany({
-    where: { prepId, ...TERMINAL },
-    data: { status: "interrupted", attempts: 0, failureReason: null },
+  return prisma.$transaction(async tx => {
+    const result = await tx.job.updateMany({
+      where: { prepId, ...TERMINAL },
+      data: { status: "interrupted", attempts: 0, failureReason: null },
+    })
+    if (result.count > 0) await syncPrepStatus(tx, prepId)
+    return result.count
   })
-  return result.count
 }
 
 export async function touchHeartbeat(jobId: string): Promise<void> {
