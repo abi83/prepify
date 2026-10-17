@@ -104,7 +104,7 @@ describe("runAgent", () => {
     await assertion
 
     const failed = warn.mock.calls.filter(([ message ]) => String(message).includes("failed"))
-    expect(failed).toHaveLength(3)
+    expect(failed).toHaveLength(4)
     expect(failed[0][1].rawResponse).toBe(`${raw.slice(0, 2000)}… [truncated, ${raw.length} chars]`)
   })
 
@@ -169,8 +169,8 @@ describe("runAgent", () => {
     await result
 
     const fields = { model: "gpt-5-nano", tier: "flex", timeoutMs: TIMEOUT_MS, promptVersion: "1.0.0", promptHash: await hashPrompt("system") }
-    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 1/3 started", { ...fields, attempt: 1 })
-    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 2/3 started", { ...fields, attempt: 2 })
+    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 1/4 started", { ...fields, attempt: 1 })
+    expect(debug).toHaveBeenCalledWith("agent:ocr: attempt 2/4 started", { ...fields, attempt: 2 })
   })
 
   it("builds app-shaped meta from the port's token counts", async () => {
@@ -198,7 +198,7 @@ describe("runAgent", () => {
       expect(complete).toHaveBeenCalledTimes(2)
     })
 
-    it("gives up after three attempts and throws the last error", async () => {
+    it("gives up after four attempts and throws the last error", async () => {
       vi.useFakeTimers()
       complete.mockRejectedValue(new Error("503"))
 
@@ -207,7 +207,26 @@ describe("runAgent", () => {
       await drainTimers()
 
       await assertion
-      expect(complete).toHaveBeenCalledTimes(3)
+      expect(complete).toHaveBeenCalledTimes(4)
+    })
+
+    it("backs off 1s → 10s → 100s, each ±50%", async () => {
+      vi.useFakeTimers()
+      const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout")
+      complete.mockRejectedValue(new Error("429"))
+
+      const result = run("SomeAgent")
+      const assertion = expect(result).rejects.toThrow("429")
+      await drainTimers()
+      await assertion
+
+      const waits = setTimeoutSpy.mock.calls.map(([ , ms ]) => ms as number).filter(ms => ms >= 500)
+      expect(waits).toHaveLength(3)
+      waits.forEach((ms, i) => {
+        const base = 1000 * 10 ** i
+        expect(ms).toBeGreaterThanOrEqual(base * 0.5)
+        expect(ms).toBeLessThanOrEqual(base * 1.5)
+      })
     })
 
     it("does not retry a non-retryable error, and logs it", async () => {
@@ -215,7 +234,7 @@ describe("runAgent", () => {
 
       await expect(run("SomeAgent")).rejects.toBeInstanceOf(NonRetryableLlmError)
       expect(complete).toHaveBeenCalledOnce()
-      expect(warn).toHaveBeenCalledWith("agent:SomeAgent: attempt 1/3 failed (not retryable)", expect.objectContaining({ attempt: 1 }))
+      expect(warn).toHaveBeenCalledWith("agent:SomeAgent: attempt 1/4 failed (not retryable)", expect.objectContaining({ attempt: 1 }))
     })
 
     it("logs every failed attempt and names the timeout in the final error", async () => {
@@ -223,13 +242,13 @@ describe("runAgent", () => {
       complete.mockRejectedValue(new Error("Request timed out."))
 
       const result = run("ocr")
-      const assertion = expect(result).rejects.toThrow("ocr: timed out after 7s (attempt 3/3)")
+      const assertion = expect(result).rejects.toThrow("ocr: timed out after 7s (attempt 4/4)")
       await drainTimers()
 
       await assertion
-      expect(warn).toHaveBeenCalledTimes(3)
-      expect(warn).toHaveBeenLastCalledWith("agent:ocr: attempt 3/3 failed", expect.objectContaining({
-        model: "gpt-5-nano", attempt: 3, timeoutMs: TIMEOUT_MS, elapsedMs: expect.any(Number),
+      expect(warn).toHaveBeenCalledTimes(4)
+      expect(warn).toHaveBeenLastCalledWith("agent:ocr: attempt 4/4 failed", expect.objectContaining({
+        model: "gpt-5-nano", attempt: 4, timeoutMs: TIMEOUT_MS, elapsedMs: expect.any(Number),
       }))
     })
   })

@@ -8,7 +8,7 @@ import { resolveCliConfig } from "@/cli/config"
 import { createFilePrep } from "@/cli/filePrep"
 import { createCliJobs, runCli, runCliJobs } from "@/cli/root"
 import type { Job } from "@/core/job"
-import type { Llm, LlmRequest } from "@/core/ports"
+import { NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
 
 const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
 
@@ -84,7 +84,7 @@ describe("CLI root", () => {
 
     await runCli(options(dir, fakeLlm()))
 
-    expect(await readFile(path.join(dir, "logs", "run.log"), "utf-8")).toContain("attempt 1/3 started")
+    expect(await readFile(path.join(dir, "logs", "run.log"), "utf-8")).toContain("attempt 1/4 started")
   })
 
   it("writes no log below the configured log.level", async () => {
@@ -98,7 +98,7 @@ describe("CLI root", () => {
 
   it("resumes a failed job on rerun", async () => {
     const dir = await makePrepFixture()
-    const failing: Llm = { complete: () => { throw new Error("endpoint down") } }
+    const failing: Llm = { complete: () => { throw new NonRetryableLlmError("endpoint down") } }
     await expect(runCli(options(dir, failing))).rejects.toThrow()
 
     const prep = createFilePrep(dir)

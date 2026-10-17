@@ -4,7 +4,7 @@ import path from "path"
 
 import { describe, expect, it } from "vitest"
 
-import type { Llm, LlmRequest } from "@/core/ports"
+import { NonRetryableLlmError, type Llm, type LlmRequest } from "@/core/ports"
 import { hashPrompt } from "@/lib/sampler/promptHash"
 import { cellPrefix } from "@/lib/sampler/storedSample"
 import { testCatalog } from "@/test/modelCatalog"
@@ -108,7 +108,7 @@ describe("runExperiment (OCR)", () => {
     let calls = 0
     const llm: Llm = {
       async complete() {
-        if (++calls >= 2) throw new Error("boom")
+        if (++calls >= 2) throw new NonRetryableLlmError("boom")
         return { content: JSON.stringify({ score: 1, reasoning: "r" }), promptTokens: 1, cachedTokens: 0, completionTokens: 1, temperature: 1, maxTokens: 32_000 }
       },
     }
