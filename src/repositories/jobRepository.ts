@@ -264,6 +264,19 @@ export async function retryTerminalJobs(actorId: string, prepId: string): Promis
   })
 }
 
+/** Explicit user retry of one `failed` job, resumable or terminal: hands it back to resume with a fresh attempt budget. Throws if the job isn't `failed`. */
+export async function retryJob(actorId: string, jobId: string): Promise<void> {
+  const job = await assertOwnsJob(actorId, jobId)
+  await prisma.$transaction(async tx => {
+    const result = await tx.job.updateMany({
+      where: { id: jobId, status: "failed" },
+      data: { status: "interrupted", attempts: 0, failureReason: null },
+    })
+    if (result.count !== 1) throw new Error(`Job ${jobId} is not failed`)
+    await syncPrepStatus(tx, job.prepId)
+  })
+}
+
 /** Explicit user retry of failed pages: hands the OCR jobs of `imageIds` back to resume with a fresh attempt budget. Other jobs are untouched. Returns how many were reset. */
 export async function retryFailedPages(actorId: string, prepId: string, imageIds: string[]): Promise<number> {
   await assertOwnsPrep(actorId, prepId)

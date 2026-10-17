@@ -198,9 +198,9 @@ export default function GenerationPanel({
   const isServerRunning = prepProgress?.runState === "running"
   const isInterrupted = prepProgress?.runState === "interrupted"
 
-  const hasUnfinishedJobs = prepProgress !== null && (
+  // Failed jobs don't count: they're retried from the generation log.
+  const hasInFlightJobs = prepProgress !== null && (
     prepProgress.runState !== "idle"
-    || prepProgress.failedQuestions + prepProgress.failedFlashcards > 0
     || prepProgress.completedQuestions + prepProgress.failedQuestions + prepProgress.terminalQuestions < prepProgress.totalQuestions
     || prepProgress.completedFlashcards + prepProgress.failedFlashcards + prepProgress.terminalFlashcards < prepProgress.totalFlashcards
   )
@@ -222,8 +222,8 @@ export default function GenerationPanel({
               className="h-11 w-[84px]"
               aria-label="Number of questions to add"
             />
-            <Button className="h-11" disabled={hasUnfinishedJobs} onClick={handleAddMore}>Add {addCount} more</Button>
-            {hasUnfinishedJobs && <p className="text-sm text-muted-foreground">Resume the unfinished jobs first.</p>}
+            <Button className="h-11" disabled={hasInFlightJobs} onClick={handleAddMore}>Add {addCount} more</Button>
+            {hasInFlightJobs && <p className="text-sm text-muted-foreground">Generation is still in progress.</p>}
           </div>
           <RunSettingsHint returnTo={`/preps/${prepId}`} />
         </div>

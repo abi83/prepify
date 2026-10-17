@@ -9,7 +9,7 @@ const FIRST = new Date("2026-03-04T12:00:00Z")
 const LAST = new Date("2026-03-06T12:00:00Z")
 
 const generation: JobGeneration = {
-  jobId: "j1", type: "question", status: "executed", subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex",
+  jobId: "j1", type: "question", status: "executed", failureReason: null, subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex",
   calls: [
     { promptTokens: 1000, cachedTokens: 0, completionTokens: 300, costUsd: 0.002, executionMs: 1, wasted: false, generatedAt: FIRST },
     { promptTokens: 400, cachedTokens: 0, completionTokens: 100, costUsd: 0.0005, executionMs: 1, wasted: true, generatedAt: LAST },
