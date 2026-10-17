@@ -4,12 +4,12 @@ import type { ExecutionConfig, Job, QuestionSpec } from "@/core/job"
 import type { Logger } from "@/core/logger"
 import type { Store } from "@/core/ports"
 import type { Sampler } from "@/core/sampler"
+import * as generation from "@/lib/jobs/generation"
 import { OpenAiLlm } from "@/lib/llm/openAiLlm"
 
 import { browserPrepData } from "./browserPrepData"
-import * as generation from "./generation"
 
-export type { GenerationProgress, GenerationStage } from "./generation"
+export type { GenerationProgress, GenerationStage } from "@/lib/jobs/generation"
 
 /** `Store` over server actions — the actions derive the actor from the session, so `actorId` is ignored. */
 const actionStore: Store = {

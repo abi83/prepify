@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => {
 })
 
 import type { Job } from "@/core/job"
-import { HEARTBEAT_INTERVAL_MS, trackServerRun } from "@/lib/jobs/runTracker"
+import { HEARTBEAT_INTERVAL_MS, trackServerRun } from "@/lib/jobs/server/runTracker"
 import { prisma } from "@/lib/prisma"
 import * as prepRepository from "@/repositories/prepRepository"
 
@@ -69,7 +69,7 @@ describe("SIGTERM", () => {
   async function freshTracker() {
     vi.resetModules()
     const onSpy = vi.spyOn(process, "on")
-    const tracker = await import("@/lib/jobs/runTracker")
+    const tracker = await import("@/lib/jobs/server/runTracker")
     const { prisma: db } = await import("@/lib/prisma")
     const makeRunning = async (status: "created" | "running") => {
       const prep = await db.prep.create({ data: { userId: "u1", title: "Prep", language: "en" } })

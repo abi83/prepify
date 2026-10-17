@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { POST } from "@/app/api/preps/generate/route"
 import { MAX_IMAGES } from "@/core/lib/config"
-import { serverPorts } from "@/lib/jobs/serverExecution"
+import { serverPorts } from "@/lib/jobs/server/serverExecution"
 import { prisma } from "@/lib/prisma"
 import { STALE_HEARTBEAT_MS } from "@/repositories/jobRepository"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
@@ -48,8 +48,8 @@ vi.mock("@/lib/logger/server", async () => {
   return { serverLogger: createLogger({ transport: line => { h.logs.push(line) } }) }
 })
 vi.mock("@/lib/sampler/gcsSampleStore", () => ({ createGcsSampler: () => ({}) }))
-vi.mock("@/lib/jobs/serverExecution", async importOriginal => {
-  const actual = await importOriginal<typeof import("@/lib/jobs/serverExecution")>()
+vi.mock("@/lib/jobs/server/serverExecution", async importOriginal => {
+  const actual = await importOriginal<typeof import("@/lib/jobs/server/serverExecution")>()
   return { serverPorts: vi.fn(actual.serverPorts) }
 })
 

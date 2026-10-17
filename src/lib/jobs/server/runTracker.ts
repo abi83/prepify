@@ -1,8 +1,7 @@
+import type { TrackRun } from "@/lib/jobs/generation"
 import { serializeError } from "@/lib/logger"
 import { serverLogger } from "@/lib/logger/server"
 import * as jobRepository from "@/repositories/jobRepository"
-
-import type { TrackRun } from "./generation"
 
 export const HEARTBEAT_INTERVAL_MS = 30_000
 

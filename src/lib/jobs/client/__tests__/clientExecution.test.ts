@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { ExecutionConfig, Job, JobOutcome } from "@/core/job"
-import { runGeneration, runOcr, type GenerationParams, type GenerationProgress } from "@/lib/jobs/clientExecution"
+import { runGeneration, runOcr, type GenerationParams, type GenerationProgress } from "@/lib/jobs/client/clientExecution"
 import type { PrepState } from "@/types/prepState"
 
 const CONFIG: ExecutionConfig = { model: "m", tier: "flex", timeoutMs: 1000, maxRetries: 0 }
@@ -43,10 +43,10 @@ vi.mock("@/actions/uploads", () => ({ getReadSignedUrl: async () => "https://exa
 function fakeDefinition(type: string, output: unknown) {
   return () => ({ type, run: async () => { h.ran.push(type); return { output, metas: [], wastedMetas: [] } } })
 }
-vi.mock("../ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", { language: "de" }) }))
-vi.mock("../conceptsExtractJob", () => ({ createConceptsExtractJobDefinition: fakeDefinition("concepts.extract", null) }))
-vi.mock("../prepMetaJob", () => ({ createPrepMetaJobDefinition: fakeDefinition("prep.meta", null) }))
-vi.mock("../questionJob", () => ({ createQuestionJobDefinition: fakeDefinition("question", null) }))
+vi.mock("@/lib/jobs/ocrJob", () => ({ createOcrJobDefinition: fakeDefinition("ocr", { language: "de" }) }))
+vi.mock("@/lib/jobs/conceptsExtractJob", () => ({ createConceptsExtractJobDefinition: fakeDefinition("concepts.extract", null) }))
+vi.mock("@/lib/jobs/prepMetaJob", () => ({ createPrepMetaJobDefinition: fakeDefinition("prep.meta", null) }))
+vi.mock("@/lib/jobs/questionJob", () => ({ createQuestionJobDefinition: fakeDefinition("question", null) }))
 
 function job(id: string, type: string, status: "created" | "failed"): Job {
   const base = { id, type, inputIds: type === "ocr" || type === "concepts.extract" ? [ "i1" ] : [ "c1" ], config: CONFIG, question: null }
