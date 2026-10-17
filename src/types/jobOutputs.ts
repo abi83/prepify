@@ -7,19 +7,27 @@ import { pageConceptsSchema, storedConceptSchema } from "./pipeline"
 import { ocrResultSchema, prepDisciplineSchema } from "./prep"
 import { assetTypeSchema, generatedQuestionSchema } from "./questions"
 
+const ocrJobOutputSchema = ocrResultSchema.extend({ language: z.enum(SUPPORTED_LANGUAGES) })
+const prepMetaOutputSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  grade: z.number().int().nullable(),
+  discipline: prepDisciplineSchema.nullable(),
+})
+const assetOutputSchema = z.object({ type: assetTypeSchema, blob: z.string() })
+
+export type OcrJobOutput = z.infer<typeof ocrJobOutputSchema>
+export type PrepMetaOutput = z.infer<typeof prepMetaOutputSchema>
+export type AssetOutput = z.infer<typeof assetOutputSchema>
+
 /** Per-job-type shape of `JobOutcome.output`, enforced server-side before any domain writer runs. */
 const JOB_OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
-  [OCR_JOB_TYPE]: ocrResultSchema.extend({ language: z.enum(SUPPORTED_LANGUAGES) }),
+  [OCR_JOB_TYPE]: ocrJobOutputSchema,
   [CONCEPTS_EXTRACT_JOB_TYPE]: pageConceptsSchema,
   [CONCEPTS_JOB_TYPE]: z.array(storedConceptSchema),
-  [PREP_META_JOB_TYPE]: z.object({
-    title: z.string(),
-    description: z.string(),
-    grade: z.number().int().nullable(),
-    discipline: prepDisciplineSchema.nullable(),
-  }),
+  [PREP_META_JOB_TYPE]: prepMetaOutputSchema,
   [QUESTION_JOB_TYPE]: generatedQuestionSchema,
-  [ASSET_JOB_TYPE]: z.object({ type: assetTypeSchema, blob: z.string() }),
+  [ASSET_JOB_TYPE]: assetOutputSchema,
 }
 
 /** Returns `output` stripped to its job type's schema; throws on a mismatch or an unknown type. */
