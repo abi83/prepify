@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import DifficultyBadge, { countByDifficulty, DIFFICULTY_TIERS } from "@/components/DifficultyBadge"
 import { Button } from "@/components/ui/button"
 import type { StatedConcept } from "@/repositories/prepStateRepository"
 import type { PrepTab } from "@/types/prep"
@@ -32,7 +33,7 @@ export function StatTile({ label, value, status, onClick }: { label: string; val
 
 interface Props {
   flashcards: FlashcardContent[]
-  studyQuestions: unknown[]
+  studyQuestions: { difficulty: string | null }[]
   concepts: StatedConcept[]
   onStartAttempt: () => void
   onOpenTab: (tab: PrepTab) => void
@@ -48,6 +49,7 @@ interface Props {
 /** The Main tab body shared by every view: start attempt, stat tiles, concept chips. */
 export default function PrepOverview({ flashcards, studyQuestions, concepts, onStartAttempt, onOpenTab, questionsStatus, conceptsStatus, extraTiles, progress }: Props) {
   const open = (tab: PrepTab) => () => onOpenTab(tab)
+  const difficultyCounts = countByDifficulty(studyQuestions)
   const shownConcepts = concepts.slice(0, CONCEPT_CHIPS)
   return (
     <div className="flex flex-col gap-8">
@@ -62,6 +64,19 @@ export default function PrepOverview({ flashcards, studyQuestions, concepts, onS
         <StatTile label="Concepts" value={concepts.length} status={conceptsStatus} onClick={open("concepts")} />
         {extraTiles}
       </div>
+
+      {studyQuestions.length > 0 && (
+        <Section title="Difficulty">
+          <ul aria-label="Questions by difficulty" className="flex flex-wrap gap-3">
+            {DIFFICULTY_TIERS.map(tier => (
+              <li key={tier} className="flex items-center gap-2 text-sm">
+                <DifficultyBadge difficulty={tier} />
+                <span className="font-bold">{difficultyCounts[tier]}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {progress}
 
