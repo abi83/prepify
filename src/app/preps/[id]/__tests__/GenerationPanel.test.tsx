@@ -183,7 +183,7 @@ describe("GenerationPanel progress from the DB", () => {
     expect(screen.getByText(/running on the server/i)).toBeInTheDocument()
 
     await act(async () => {
-      mockSse.message(progress({ runState: "running", totalQuestions: 4, completedQuestions: 1 }))
+      mockSse.message(progress({ runState: "running", totalQuestions: 4 }))
     })
     expect(mockRefresh).not.toHaveBeenCalled()
 
