@@ -1,6 +1,5 @@
 import { getMyPrepProgress } from "@/actions/prepState"
-
-import type { ServerRunRequest } from "./serverRun"
+import type { ServerRunRequest } from "@/lib/jobs/server/serverRun"
 
 export type ServerRunOutcome = "triggered" | "already_running"
 

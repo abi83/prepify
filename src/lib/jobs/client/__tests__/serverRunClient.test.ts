@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 const { mockGetProgress } = vi.hoisted(() => ({ mockGetProgress: vi.fn() }))
 vi.mock("@/actions/prepState", () => ({ getMyPrepProgress: mockGetProgress }))
 
-import { awaitRunStart, requestServerRun } from "@/lib/jobs/serverRunClient"
+import { awaitRunStart, requestServerRun } from "@/lib/jobs/client/serverRunClient"
 
 const REQUEST = {
   apiKey: "sk-secret",

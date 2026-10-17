@@ -1,6 +1,6 @@
 "use client"
 
-import type { GenerationProgress } from "@/lib/jobs/clientExecution"
+import type { GenerationProgress } from "@/lib/jobs/client/clientExecution"
 import { cn } from "@/lib/utils"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
 

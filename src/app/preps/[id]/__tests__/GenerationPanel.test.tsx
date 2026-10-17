@@ -41,7 +41,7 @@ vi.mock("@/actions/preps", () => ({ getMyPrep: vi.fn(), getPrepTokens: vi.fn() }
 vi.mock("@/actions/jobs", () => ({ retryTerminalJobs: mockRetryTerminal }))
 vi.mock("@/actions/questions", () => ({ listMyQuestions: vi.fn() }))
 vi.mock("@/lib/sampler/clientSampler", () => ({ clientSampler: {} }))
-vi.mock("@/lib/jobs/clientExecution", () => ({ runGeneration: mockRunInBrowser }))
+vi.mock("@/lib/jobs/client/clientExecution", () => ({ runGeneration: mockRunInBrowser }))
 vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: "gpt-5-mini", tier: "flex", key: "sk-secret" }) }))
 
 import { getMyPrep } from "@/actions/preps"
