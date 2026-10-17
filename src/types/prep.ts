@@ -1,12 +1,37 @@
 import { z } from "zod"
 
-import type { SupportedLanguage } from "./language"
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "./language"
 
 /** Identifier-safe discipline values stored on `Prep.discipline`; mirrors the Prisma `PrepDiscipline` enum. */
 export type PrepDisciplineId =
   | "History" | "Geography" | "Literature" | "SocialStudies" | "Economics" | "PhilosophyEthics"
   | "Biology" | "Chemistry" | "Physics" | "Mathematics" | "ComputerScience"
   | "English" | "French" | "German" | "Spanish" | "Italian" | "Latin" | "Russian"
+
+const languageSchema = z.enum(SUPPORTED_LANGUAGES)
+
+export const prepDisciplineSchema: z.ZodType<PrepDisciplineId> = z.enum([
+  "History", "Geography", "Literature", "SocialStudies", "Economics", "PhilosophyEthics",
+  "Biology", "Chemistry", "Physics", "Mathematics", "ComputerScience",
+  "English", "French", "German", "Spanish", "Italian", "Latin", "Russian",
+])
+
+/** Client-supplied fields for a new prep; strict, so `userId`, `id`, … are rejected. */
+export const createPrepInputSchema = z.strictObject({
+  title: z.string(),
+  language: languageSchema.nullable(),
+})
+
+/** Client-supplied fields for a prep update; strict, so `userId`, `id`, … are rejected. */
+export const updatePrepInputSchema = z.strictObject({
+  title: z.string(),
+  description: z.string(),
+  visibility: z.enum([ "private", "link", "public" ]),
+  grade: z.number().int().nullable(),
+  discipline: prepDisciplineSchema.nullable(),
+  language: languageSchema.nullable(),
+  isActive: z.boolean(),
+}).partial()
 
 export const STUDY_TABS = [ "flashcards", "questions" ] as const
 export type StudyTab = (typeof STUDY_TABS)[number]

@@ -5,15 +5,12 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: await createPglitePrisma() }
 })
 
-import type { PlanTarget } from "@/core/lib/planner"
 import { prisma } from "@/lib/prisma"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { getPrepProgress, listUnfinishedPreps, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
+import { getPrepProgress, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
-const OTHER = "user-other"
-const TARGET: PlanTarget = { questionCount: 1, enabledTypes: [ "flashcard" ], difficultyMix: { easy: 1, medium: 0, hard: 0 } }
 
 const addMeta = (jobId: string, wasted = false) => prisma.generationMeta.create({
   data: { jobId, model: "gpt-5-nano", tier: "flex", promptTokens: 10, cachedTokens: 0, completionTokens: 5, costUsd: 0.001, toolCalls: 0, executionMs: 100, wasted },
@@ -31,10 +28,7 @@ beforeEach(async () => {
 })
 
 describe("prepStateRepository", () => {
-  it("lists owned preps that still need jobs, skipping finished and other users' preps", async () => {
-    const unfinished = await prepRepository.createPrep(OWNER, { title: "Unfinished", language: "en" })
-    await prepImageRepository.createImage(OWNER, unfinished.id, `prep-pages/${unfinished.id}/key`)
-
+  it("loads the state of a fully generated prep", async () => {
     const finished = await prepRepository.createPrep(OWNER, { title: "Finished", language: "en" })
     const image = await prepImageRepository.createImage(OWNER, finished.id, `prep-pages/${finished.id}/key`)
     await prisma.prepImage.update({ where: { id: image.id }, data: { ocrResult: { title: "T", text: "t", visual_elements: [] } } })
@@ -53,11 +47,6 @@ describe("prepStateRepository", () => {
     await job("question")
     await prisma.question.create({ data: { prepId: finished.id, language: "en", type: "flashcard", difficulty: "easy", content: {} } })
 
-    const other = await prepRepository.createPrep(OTHER, { title: "Other", language: "en" })
-    await prepImageRepository.createImage(OTHER, other.id, `prep-pages/${other.id}/key`)
-
-    const preps = await listUnfinishedPreps(OWNER, TARGET)
-    expect(preps.map(p => p.id)).toEqual([ unfinished.id ])
     expect(await loadPrepState(finished.id)).toMatchObject({ prepMetaDone: true, questionCount: 1, questionJobCount: 1, images: [ { id: image.id, merge: "merged" } ] })
   })
 

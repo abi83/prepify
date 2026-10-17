@@ -1,8 +1,8 @@
 import type { JobRunResult } from "@/core/job"
-import { CONCEPTS_EXTRACT_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptExtractor } from "@/lib/agents/ConceptExtractor"
+import { CONCEPTS_EXTRACT_JOB_TYPE } from "@/types/jobTypes"
 import type { PageConcepts } from "@/types/pipeline"
 import type { Page } from "@/types/prep"
 

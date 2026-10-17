@@ -21,7 +21,7 @@ const META = { model: "gpt-5-nano", tier: "flex", temperature: 1, maxTokens: 32_
 const FAILED: JobOutcome<unknown> = { status: "failed", failureReason: "boom", wastedMetas: [] }
 
 function executedOcr(text: string): Extract<JobOutcome<unknown>, { status: "executed" }> {
-  return { status: "executed", output: { title: "T", text, visual_elements: [] }, metas: [ META ], wastedMetas: [] }
+  return { status: "executed", output: { title: "T", text, visual_elements: [], language: "en" }, metas: [ META ], wastedMetas: [] }
 }
 
 const store = createPrismaStore()
@@ -129,6 +129,51 @@ describe("commitJob", () => {
 
     const question = await prisma.question.findFirstOrThrow({ where: { producedByJobId: job.id } })
     expect(question.content).toEqual(content)
+  })
+
+  describe("output validation", () => {
+    const executed = (output: unknown): Extract<JobOutcome<unknown>, { status: "executed" }> =>
+      ({ status: "executed", output, metas: [ META ], wastedMetas: [] })
+
+    it("strips extra prep-meta fields such as visibility and userId", async () => {
+      const { prep, image } = await makeImage(OWNER)
+      const job = await store.createJob(OWNER, "prep.meta", [ image.id ], CONFIG)
+      const output = { title: "T", description: "D", grade: null, discipline: null, visibility: "public", userId: OTHER }
+
+      await store.commitJob(OWNER, job.id, "created", executed(output))
+
+      expect(await prisma.prep.findUniqueOrThrow({ where: { id: prep.id } })).toMatchObject({ visibility: "private", userId: OWNER, title: "T" })
+    })
+
+    it("rejects prep-meta output that is out of range", async () => {
+      const { image } = await makeImage(OWNER)
+      const job = await store.createJob(OWNER, "prep.meta", [ image.id ], CONFIG)
+
+      await expect(store.commitJob(OWNER, job.id, "created", executed({ title: "T", description: "D", grade: 1.5, discipline: "Nope" }))).rejects.toThrow()
+      expect((await store.getJob(OWNER, job.id))?.status).toBe("created")
+    })
+
+    it("rejects a question whose content does not match its type", async () => {
+      const { concept } = await makeConcept(OWNER)
+      const job = await store.createJob(OWNER, "question", [ concept.id ], CONFIG, { questionType: "flashcard", difficulty: "easy" })
+
+      await expect(store.commitJob(OWNER, job.id, "created", executed({ type: "flashcard", content: { front: "<script>" } }))).rejects.toThrow()
+      expect(await prisma.question.count()).toBe(0)
+    })
+
+    it("rejects OCR output without a supported language", async () => {
+      const { image } = await makeImage(OWNER)
+      const job = await store.createJob(OWNER, "ocr", [ image.id ], CONFIG)
+
+      await expect(store.commitJob(OWNER, job.id, "created", executed({ title: "T", text: "x", visual_elements: [], language: "xx" }))).rejects.toThrow()
+    })
+
+    it("rejects concepts output with malformed concepts", async () => {
+      const { concept } = await makeConcept(OWNER)
+      const job = await store.createJob(OWNER, "concepts", [ concept.id ], CONFIG)
+
+      await expect(store.commitJob(OWNER, job.id, "created", executed([ { name: "x", id: "forced" } ]))).rejects.toThrow()
+    })
   })
 
   describe("asset job", () => {

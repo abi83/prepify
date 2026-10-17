@@ -1,7 +1,6 @@
 import { Prisma, type Job as JobRow } from "@prisma/client"
 
 import type { ExecutionConfig, Job, JobOutcome, JobStatus, QuestionSpec } from "@/core/job"
-import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import { resolveLanguage } from "@/core/lib/language"
 import type { Store } from "@/core/ports"
 import type { AssetOutput } from "@/lib/agents/assets/assetRouter"
@@ -9,6 +8,8 @@ import type { OcrOutput } from "@/lib/agents/OcrAgent"
 import type { PrepMetaOutput } from "@/lib/jobs/prepMetaJob"
 import { prisma } from "@/lib/prisma"
 import { toGenerationMeta } from "@/types/generationMeta"
+import { parseJobOutput } from "@/types/jobOutputs"
+import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/types/jobTypes"
 import type { StoredConcept } from "@/types/pipeline"
 import type { OcrResult } from "@/types/prep"
 import { difficultySchema, type GeneratedQuestion } from "@/types/questions"
@@ -187,16 +188,20 @@ export function createPrismaStore(): Store {
     ): Promise<boolean> {
       const job = await assertOwnsJob(actorId, jobId)
 
-      const data = outcome.status === "executed"
-        ? { status: "executed" as const, output: outcome.output as Prisma.InputJsonValue, failureReason: null, executedBy: actorId, updatedAt: new Date() }
-        : { status: "failed" as const, output: Prisma.JsonNull, failureReason: outcome.failureReason, executedBy: actorId, updatedAt: new Date() }
+      const checked: JobOutcome<unknown> = outcome.status === "executed"
+        ? { ...outcome, output: parseJobOutput(job.type, outcome.output) }
+        : outcome
+
+      const data = checked.status === "executed"
+        ? { status: "executed" as const, output: checked.output as Prisma.InputJsonValue, failureReason: null, executedBy: actorId, updatedAt: new Date() }
+        : { status: "failed" as const, output: Prisma.JsonNull, failureReason: checked.failureReason, executedBy: actorId, updatedAt: new Date() }
 
       return prisma.$transaction(async tx => {
         // A server runner moves the job to `running` after the caller read `fromStatus`.
         const result = await tx.job.updateMany({ where: { id: jobId, status: { in: [ fromStatus, "running" ] } }, data })
         if (result.count !== 1) return false
 
-        await writeDomainRows(tx, job, outcome)
+        await writeDomainRows(tx, job, checked)
         return true
       })
     },
@@ -294,13 +299,21 @@ function writeOcrOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output
 /** Creates one `Concept` row per merged concept, and records their language on the `Prep`. */
 async function writeConceptsOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: StoredConcept[]) {
   if (output.length === 0) return
-  await tx.concept.createMany({ data: output.map(c => ({ ...c, producedByJobId: job.id })) })
+  await tx.concept.createMany({ data: output.map(c => ({
+    name: c.name,
+    description: c.description,
+    importance: c.importance,
+    misconceptions: c.misconceptions,
+    language: c.language,
+    producedByJobId: job.id,
+  })) })
   await tx.prep.update({ where: { id: job.prepId }, data: { language: resolveLanguage(output) } })
 }
 
 /** Writes title/description/grade/discipline onto the job's `Prep` row. */
 function writePrepMetaOutput(tx: Prisma.TransactionClient, job: JobWithInputs, output: PrepMetaOutput) {
-  return tx.prep.update({ where: { id: job.prepId }, data: output })
+  const { title, description, grade, discipline } = output
+  return tx.prep.update({ where: { id: job.prepId }, data: { title, description, grade, discipline } })
 }
 
 /** Creates the `Question` row, typed by the job's `questionType`/`difficulty`, in its input concepts' language. */

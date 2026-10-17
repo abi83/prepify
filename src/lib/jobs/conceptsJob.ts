@@ -1,9 +1,9 @@
 import type { JobRunResult } from "@/core/job"
-import { CONCEPTS_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import { resolveLanguage } from "@/core/lib/language"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runConceptMerger } from "@/lib/agents/ConceptMerger"
+import { CONCEPTS_JOB_TYPE } from "@/types/jobTypes"
 import type { StoredConcept } from "@/types/pipeline"
 
 /**

@@ -1,10 +1,10 @@
 import type { JobRunResult } from "@/core/job"
-import { PREP_META_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import { resolveLanguage } from "@/core/lib/language"
 import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runPrepMeta } from "@/lib/agents/PrepMeta"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
+import { PREP_META_JOB_TYPE } from "@/types/jobTypes"
 import type { Page, PrepDisciplineId } from "@/types/prep"
 
 export interface PrepMetaOutput {

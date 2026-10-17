@@ -1,8 +1,8 @@
 import type { ExecutionConfig, Job } from "@/core/job"
-import { ASSET_JOB_TYPE } from "@/core/lib/jobs/jobTypes"
 import { assertConceptsFound, nextJobs, type JobSpec, type PlanTarget } from "@/core/lib/planner"
 import type { Llm, ProgressSink, Store } from "@/core/ports"
 import { runJob, type JobDefinition } from "@/core/runJob"
+import { ASSET_JOB_TYPE } from "@/types/jobTypes"
 import type { PrepState } from "@/types/prepState"
 
 export interface RunDeps {
