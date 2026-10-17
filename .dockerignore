@@ -6,7 +6,6 @@ coverage
 .env
 .env.local
 terraform
-supabase
 .github
 .claude
 README.md
