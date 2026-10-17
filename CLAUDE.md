@@ -39,6 +39,8 @@ Prefer self-documenting code — clear names for variables, functions, workflow 
 
 Setup to run the app locally: `gcloud auth login`, then `npm run dev`/`npm run db:migrate`/`npm run db:status` — each wraps the command via `scripts/with-secrets.sh`, which fetches app secrets (DB URLs, auth secret, Google OAuth creds) from Secret Manager and injects them into that child process only. No `.env.local` or direnv needed.
 
+No data migrations or backfills unless explicitly asked: pre-release, dev holds a few throwaway preps — schema changes only; existing rows get deleted, not migrated.
+
 Never edit an already-committed migration — create a new one instead. Authorization is enforced in the repository layer (e.g. `prepRepository.isReadableBy`), not Postgres RLS.
 
 ---
