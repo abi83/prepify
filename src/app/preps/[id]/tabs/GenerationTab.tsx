@@ -89,7 +89,7 @@ function GenerationLog({ generations, retrying, onRetry }: RetryProps & { genera
   )
 }
 
-export default function GenerationTab({ prep, questions, progress, generations, onTitleReady, onGenerated }: PrepTabProps) {
+export default function GenerationTab({ prep, questions, progress, refreshProgress, expectRun, generations, onTitleReady, onGenerated }: PrepTabProps) {
   const jobs = Object.values(generations)
   const [ retrying, setRetrying ] = useState(false)
   const [ error, setError ] = useState("")
@@ -120,7 +120,9 @@ export default function GenerationTab({ prep, questions, progress, generations, 
       <GenerationPanel
         prepId={prep.id}
         prepTitle={prep.title}
-        initialProgress={progress}
+        progress={progress}
+        refreshProgress={refreshProgress}
+        expectRun={expectRun}
         hasQuestions={questions.length > 0}
         onTitleReady={onTitleReady}
         onComplete={onGenerated}

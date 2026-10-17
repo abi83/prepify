@@ -46,6 +46,7 @@ vi.mock("@/lib/apiKey", () => ({ getApiKey: () => ({ provider: "openai", model: 
 
 import { getMyPrep } from "@/actions/preps"
 import GenerationPanel from "@/app/preps/[id]/GenerationPanel"
+import { useRunProgress } from "@/app/preps/[id]/useRunProgress"
 import type { PrepProgress } from "@/repositories/prepStateRepository"
 
 const fetchMock = vi.fn()
@@ -54,17 +55,24 @@ const progress = (overrides: Partial<PrepProgress> = {}): PrepProgress => ({
   runState: "idle", totalPages: 1, ocrPages: 1, rejectedPages: 0, hasConcepts: false, totalQuestions: 0, completedQuestions: 0, failedQuestions: 0, terminalQuestions: 0, totalFlashcards: 0, completedFlashcards: 0, failedFlashcards: 0, terminalFlashcards: 0, ...overrides,
 })
 
-function renderPanel(initialProgress: PrepProgress | null = null, hasQuestions = false) {
-  return render(
+function PanelWithProgress({ serverProgress, hasQuestions }: { serverProgress: PrepProgress | null; hasQuestions: boolean }) {
+  const { progress: live, refresh, expectRun } = useRunProgress("prep-1", serverProgress, vi.fn())
+  return (
     <GenerationPanel
       prepId="prep-1"
       prepTitle="Prep #1"
-      initialProgress={initialProgress}
+      progress={live}
+      refreshProgress={refresh}
+      expectRun={expectRun}
       hasQuestions={hasQuestions}
       onTitleReady={vi.fn()}
       onComplete={vi.fn()}
-    />,
+    />
   )
+}
+
+function renderPanel(serverProgress: PrepProgress | null = null, hasQuestions = false) {
+  return render(<PanelWithProgress serverProgress={serverProgress} hasQuestions={hasQuestions} />)
 }
 
 beforeEach(() => {

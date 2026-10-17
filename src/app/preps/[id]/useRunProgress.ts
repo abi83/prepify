@@ -21,14 +21,21 @@ export function shouldRefreshContent(lastSignature: string, next: PrepProgress, 
   return now - lastRefreshAt >= REFRESH_INTERVAL_MS
 }
 
-/** DB-backed progress for a server run. Streams updates via SSE while a run is live and refreshes the page as content lands and when the run ends. */
-export function useRunProgress(prepId: string, initial: PrepProgress | null, onError: (error: Error) => void) {
+/** DB-backed progress for a server run. Streams updates via SSE while the server-rendered progress says a run is live, and refreshes the page as content lands and when the run ends. Finished and interrupted preps never open a stream. */
+export function useRunProgress(prepId: string, serverProgress: PrepProgress | null, onError: (error: Error) => void) {
   const router = useRouter()
-  const [ progress, setProgress ] = useState<PrepProgress | null>(initial)
-  const [ watching, setWatching ] = useState(initial?.runState === "running")
-  const seenRunning = useRef(initial?.runState === "running")
-  const refreshedSignature = useRef(contentSignature(initial))
+  const [ progress, setProgress ] = useState<PrepProgress | null>(serverProgress)
+  const [ prevServerProgress, setPrevServerProgress ] = useState(serverProgress)
+  const [ watching, setWatching ] = useState(serverProgress?.runState === "running")
+  const seenRunning = useRef(serverProgress?.runState === "running")
+  const refreshedSignature = useRef(contentSignature(serverProgress))
   const lastRefreshAt = useRef(0)
+
+  if (serverProgress !== prevServerProgress) {
+    setPrevServerProgress(serverProgress)
+    setProgress(serverProgress)
+    if (serverProgress?.runState === "running") setWatching(true)
+  }
 
   const refreshContent = useCallback((signature: string) => {
     refreshedSignature.current = signature

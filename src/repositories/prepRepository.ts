@@ -8,21 +8,38 @@ export function isReadableBy(prep: Prep, userId: string | null): boolean {
   return prep.userId === userId || prep.visibility !== "private"
 }
 
-export async function listOwnedPreps(userId: string): Promise<Prep[]> {
-  return prisma.prep.findMany({ where: { userId, isActive: true }, orderBy: { createdAt: "desc" } })
-}
-
-export interface CatalogEntry extends Prep {
+export interface PrepEntry extends Prep {
   questionCount: number
+  flashcardCount: number
+  conceptCount: number
 }
 
-export async function listPublicCatalog(): Promise<CatalogEntry[]> {
-  const preps = await prisma.prep.findMany({
-    where: { visibility: "public", isActive: true },
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { questions: { where: { type: { not: "flashcard" } } } } } },
+async function withCounts(preps: Prep[]): Promise<PrepEntry[]> {
+  const prepIds = preps.map(p => p.id)
+  const questions = await prisma.question.findMany({ where: { prepId: { in: prepIds } }, select: { prepId: true, type: true } })
+  // Concept has no prepId — it links to a prep through the job that produced it.
+  const concepts = await prisma.concept.findMany({
+    where: { producedByJob: { prepId: { in: prepIds } } },
+    select: { producedByJob: { select: { prepId: true } } },
   })
-  return preps.map(({ _count, ...prep }) => ({ ...prep, questionCount: _count.questions }))
+  return preps.map(prep => {
+    const prepQuestions = questions.filter(q => q.prepId === prep.id)
+    const flashcardCount = prepQuestions.filter(q => q.type === "flashcard").length
+    return {
+      ...prep,
+      questionCount: prepQuestions.length - flashcardCount,
+      flashcardCount,
+      conceptCount: concepts.filter(c => c.producedByJob.prepId === prep.id).length,
+    }
+  })
+}
+
+export async function listOwnedPreps(userId: string): Promise<PrepEntry[]> {
+  return withCounts(await prisma.prep.findMany({ where: { userId, isActive: true }, orderBy: { createdAt: "desc" } }))
+}
+
+export async function listPublicCatalog(): Promise<PrepEntry[]> {
+  return withCounts(await prisma.prep.findMany({ where: { visibility: "public", isActive: true }, orderBy: { createdAt: "desc" } }))
 }
 
 export async function getPrep(userId: string | null, id: string): Promise<Prep> {

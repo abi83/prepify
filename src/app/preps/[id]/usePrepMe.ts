@@ -14,7 +14,7 @@ import { useRunTrigger, type RunRequest } from "./useRunTrigger"
 type Phase = "ocr" | "starting" | "saving" | "error"
 
 /** The "Prep me" flow of a draft prep: run trigger with OCR → activate. */
-export function usePrepMe(prepId: string, imageCount: number) {
+export function usePrepMe(prepId: string, imageCount: number, onServerRunStarted: () => void) {
   const abortRef = useRef<AbortController | null>(null)
 
   const [ phase, setPhase ] = useState<Phase | null>(null)
@@ -28,6 +28,7 @@ export function usePrepMe(prepId: string, imageCount: number) {
       setErrorMsg(message)
     },
     onFinished: () => setPhase(null),
+    onServerRunStarted,
   })
 
   async function recogniseInBrowser({ actorId, keyConfig }: Parameters<RunRequest["runInBrowser"]>[0]) {

@@ -2,6 +2,7 @@
 
 import type { Prep, Question, Attempt, Asset, PrepImage } from "@prisma/client"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import PrepHeader from "@/components/prep/PrepHeader"
 import PrepView, { PREP_MAIN_CLASS } from "@/components/prep/PrepView"
@@ -18,6 +19,7 @@ import SharePrepDialog from "./SharePrepDialog"
 import { PREP_TAB_REGISTRY } from "./tabs/registry"
 import type { PageEntry } from "./tabs/types"
 import { usePrepMe } from "./usePrepMe"
+import { useRunProgress } from "./useRunProgress"
 
 function toPageEntry(img: PrepImage, number: number, generations: Record<string, JobGeneration>, rejectedGenerations: Record<string, JobGeneration>): PageEntry | null {
   if (img.status === "failed") {
@@ -35,6 +37,8 @@ function toPages(images: PrepImage[], generations: Record<string, JobGeneration>
     .map((img, i) => toPageEntry(img, i + 1, generations, rejectedGenerations))
     .filter(entry => entry !== null)
 }
+
+const reportStreamError = (e: Error) => toast.error(e.message)
 
 interface Props {
   userId: string
@@ -58,7 +62,7 @@ export default function PrepPage({
   questions: serverQuestions,
   attempts,
   assets,
-  progress,
+  progress: serverProgress,
   tokensUsed,
   costUsd,
   concepts,
@@ -72,13 +76,14 @@ export default function PrepPage({
   const [ questions, setQuestions ] = useSyncedState(serverQuestions)
   const [ shareOpen, setShareOpen ] = useState(false)
   const [ deleteOpen, setDeleteOpen ] = useState(false)
-  const prepMe = usePrepMe(prep.id, images.length)
+  const { progress, refresh: refreshProgress, expectRun } = useRunProgress(serverPrep.id, serverProgress, reportStreamError)
+  const prepMe = usePrepMe(prep.id, images.length, expectRun)
 
   const studyQuestions = toStudyQuestions(questions)
   const flashcardQuestions = toFlashcardQuestions(questions)
   const isOwner = prep.userId === userId
   // A run in flight keeps the draft view up: activating the prep mid-run would otherwise unmount it.
-  const showDraft = (!prep.isActive && progress === null) || prepMe.phase !== null
+  const showDraft = (!prep.isActive && serverProgress === null) || prepMe.phase !== null
 
   if (showDraft) {
     return (
@@ -119,6 +124,8 @@ export default function PrepPage({
         attempts,
         assets,
         progress,
+        refreshProgress,
+        expectRun,
         concepts,
         pages: toPages(images, generations, rejectedGenerations),
         generations,
