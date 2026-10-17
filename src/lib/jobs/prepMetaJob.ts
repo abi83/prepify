@@ -4,15 +4,9 @@ import type { JobDeps } from "@/core/ports"
 import type { JobDefinition, JobRunContext } from "@/core/runJob"
 import { runPrepMeta } from "@/lib/agents/PrepMeta"
 import { disciplineToEnum } from "@/lib/disciplineMapping"
+import type { PrepMetaOutput } from "@/types/jobOutputs"
 import { PREP_META_JOB_TYPE } from "@/types/jobTypes"
-import type { Page, PrepDisciplineId } from "@/types/prep"
-
-export interface PrepMetaOutput {
-  title: string
-  description: string
-  grade: number | null
-  discipline: PrepDisciplineId | null
-}
+import type { Page } from "@/types/prep"
 
 /**
  * One job per prep — `inputIds` are the `PrepImage` ids, `pages` their OCR results in page order,

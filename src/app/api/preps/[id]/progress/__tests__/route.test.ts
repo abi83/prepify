@@ -2,16 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { GET } from "@/app/api/preps/[id]/progress/route"
 import { ForbiddenError, NotFoundError } from "@/repositories/errors"
+import * as jobRepository from "@/repositories/jobRepository"
 import * as prepRepository from "@/repositories/prepRepository"
 import * as prepStateRepository from "@/repositories/prepStateRepository"
 
 const h = vi.hoisted(() => ({ userId: "u1" as string | null }))
 
 vi.mock("@/lib/auth", () => ({ auth: async () => (h.userId ? { user: { id: h.userId } } : null) }))
+vi.mock("@/repositories/jobRepository", () => ({ interruptStaleJobs: vi.fn() }))
 vi.mock("@/repositories/prepRepository", () => ({ getPrep: vi.fn() }))
 vi.mock("@/repositories/prepStateRepository", () => ({ getPrepProgress: vi.fn() }))
 
 const getPrep = vi.mocked(prepRepository.getPrep)
+const interruptStaleJobs = vi.mocked(jobRepository.interruptStaleJobs)
 const getPrepProgress = vi.mocked(prepStateRepository.getPrepProgress)
 const progress = (runState: string) => ({ runState }) as unknown as Awaited<ReturnType<typeof getPrepProgress>>
 
@@ -35,6 +38,7 @@ describe("GET /api/preps/[id]/progress", () => {
     h.userId = "u1"
     getPrep.mockReset().mockResolvedValue({ userId: "u1" } as Awaited<ReturnType<typeof getPrep>>)
     getPrepProgress.mockReset()
+    interruptStaleJobs.mockReset()
   })
   afterEach(() => vi.useRealTimers())
 
@@ -79,7 +83,23 @@ describe("GET /api/preps/[id]/progress", () => {
     await vi.runAllTimersAsync()
 
     expect(await body).toBe(DONE)
-    expect(getPrepProgress).toHaveBeenCalledTimes(15)
+    expect(getPrepProgress).toHaveBeenCalledTimes(4)
+  })
+
+  it("sweeps stale jobs on its own slower cadence", async () => {
+    getPrepProgress.mockResolvedValue(progress("running"))
+
+    const res = await call()
+    const reader = res.body!.getReader()
+    await reader.read()
+    expect(interruptStaleJobs).toHaveBeenCalledTimes(1)
+    expect(interruptStaleJobs).toHaveBeenCalledWith({ prepId: "p1" })
+
+    await vi.advanceTimersByTimeAsync(29_000)
+    expect(interruptStaleJobs).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(interruptStaleJobs).toHaveBeenCalledTimes(2)
+    await reader.cancel()
   })
 
   it("errors the stream when the DB read fails", async () => {
@@ -100,7 +120,7 @@ describe("GET /api/preps/[id]/progress", () => {
     await reader.cancel()
     const calls = getPrepProgress.mock.calls.length
 
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(10_000)
 
     expect(getPrepProgress.mock.calls.length).toBe(calls)
   })

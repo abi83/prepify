@@ -47,6 +47,14 @@ enum PrepDiscipline {
   Russian
 }
 
+/// Derived from the prep's jobs and stored; `syncPrepStatus` (src/repositories/jobRepository.ts) is its only writer.
+enum PrepStatus {
+  draft
+  processing
+  ready
+  failed
+}
+
 model Prep {
   id         String          @id @default(uuid())
   userId     String
@@ -59,6 +67,7 @@ model Prep {
 
   description String          @default("")
   isActive    Boolean         @default(false)
+  status      PrepStatus      @default(draft)
 
   questions   Question[]
   attempts    Attempt[]

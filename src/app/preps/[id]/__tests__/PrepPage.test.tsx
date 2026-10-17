@@ -1,5 +1,5 @@
 import type { Attempt, Prep, PrepImage, Question } from "@prisma/client"
-import { act, render, screen, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useRouter } from "next/navigation"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -42,7 +42,7 @@ import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "private",
-  grade: 10, discipline: null, language: null, description: "", isActive: true,
+  grade: 10, discipline: null, language: null, description: "", isActive: true, status: "ready",
 }
 
 const CREATED_AT = new Date("2026-03-04T12:00:00Z")
@@ -391,6 +391,25 @@ describe("PrepPage draft", () => {
     expect(h.requestServerRun).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "sk-secret", prepId: "p1", model: "gpt-5-mini", tier: "flex" }))
     expect(h.runOcr).not.toHaveBeenCalled()
     expect(useRouter().refresh).toHaveBeenCalled()
+  })
+
+  it("shows the generation config and model next to Prep me, and runs with the edited config", async () => {
+    localStorage.setItem("prepify_execution_mode", "server")
+    h.getApiKey.mockReturnValue(KEY)
+    renderDraft([ imageRow("0") ])
+    expect(screen.getByText(/gpt-5-mini · flex · Server-assisted/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole("button", { name: /10 questions · 10 flashcards · All types/ }))
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "7" } })
+    await userEvent.click(screen.getByRole("checkbox", { name: "Sorting" }))
+    await userEvent.click(screen.getByRole("button", { name: "Done" }))
+    await userEvent.click(prepMe())
+
+    await waitFor(() => expect(h.requestServerRun).toHaveBeenCalledOnce())
+    expect(h.requestServerRun.mock.calls[0][0].target).toMatchObject({
+      questionCount: 7,
+      enabledTypes: [ "flashcard", "single_choice", "multiple_choice", "fill_the_gap" ],
+    })
   })
 
   it("shows the error when the server rejects the run", async () => {

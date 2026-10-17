@@ -5,7 +5,7 @@ import { useRef, useState } from "react"
 import { listMyPrepImages } from "@/actions/prepImages"
 import { updatePrep } from "@/actions/preps"
 import { BYOK_TEXT_HARD_LIMIT } from "@/core/lib/config"
-import { getGenerationConfig } from "@/core/lib/generationConfig"
+import { getGenerationConfig, type GenerationConfig } from "@/core/lib/generationConfig"
 import { getApiKey, type ApiKeyConfig } from "@/lib/apiKey"
 import { getExecutionMode, isExecutionModeSet } from "@/lib/executionMode"
 import { runOcr } from "@/lib/jobs/client/clientExecution"
@@ -26,6 +26,7 @@ export function usePrepMe(prepId: string, imageCount: number) {
   const [ ocrProgress, setOcrProgress ] = useState({ done: 0, total: 0 })
   const [ errorMsg, setErrorMsg ] = useState("")
   const [ modeDialogOpen, setModeDialogOpen ] = useState(false)
+  const [ config, setConfig ] = useState<GenerationConfig>(() => getGenerationConfig())
 
   function fail(message: string) {
     setPhase("error")
@@ -37,11 +38,11 @@ export function usePrepMe(prepId: string, imageCount: number) {
     router.refresh()
   }
 
-  async function runOnServer(config: ApiKeyConfig) {
+  async function runOnServer(keyConfig: ApiKeyConfig) {
     setPhase("starting")
     try {
       await updatePrep(prepId, { isActive: true })
-      await requestServerRun({ apiKey: config.key, prepId, model: config.model, tier: config.tier, target: getGenerationConfig() })
+      await requestServerRun({ apiKey: keyConfig.key, prepId, model: keyConfig.model, tier: keyConfig.tier, target: config })
       await awaitRunStart(prepId)
     } catch (e) {
       fail(e instanceof Error ? e.message : "Failed to start the server run")
@@ -51,8 +52,8 @@ export function usePrepMe(prepId: string, imageCount: number) {
   }
 
   async function proceedWithRecognise() {
-    const config = getApiKey()
-    if (!config) {
+    const keyConfig = getApiKey()
+    if (!keyConfig) {
       fail("No API key configured. Please set one in Settings.")
       return
     }
@@ -63,7 +64,7 @@ export function usePrepMe(prepId: string, imageCount: number) {
     }
 
     if (getExecutionMode() === "server") {
-      await runOnServer(config)
+      await runOnServer(keyConfig)
       return
     }
 
@@ -75,10 +76,10 @@ export function usePrepMe(prepId: string, imageCount: number) {
       await runOcr({
         actorId,
         prepId,
-        apiKey: config.key,
-        model: config.model,
-        tier: config.tier,
-        target: getGenerationConfig(),
+        apiKey: keyConfig.key,
+        model: keyConfig.model,
+        tier: keyConfig.tier,
+        target: config,
         signal: abortRef.current.signal,
         logger: consoleLogger,
         sampler: clientSampler,
@@ -133,5 +134,5 @@ export function usePrepMe(prepId: string, imageCount: number) {
     setErrorMsg("")
   }
 
-  return { phase, ocrProgress, errorMsg, modeDialogOpen, start, confirmMode, retry }
+  return { phase, ocrProgress, errorMsg, modeDialogOpen, config, setConfig, start, confirmMode, retry }
 }

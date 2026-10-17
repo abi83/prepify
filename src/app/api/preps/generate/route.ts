@@ -1,8 +1,9 @@
 import { after, NextResponse } from "next/server"
 
 import { MAX_IMAGES } from "@/core/lib/config"
+import { serverRunRequestSchema } from "@/core/lib/serverRunRequest"
 import { auth } from "@/lib/auth"
-import { acquirePrepRun, releasePrepRun, RunInProgressError, runServerGeneration, serverRunRequestSchema } from "@/lib/jobs/server/serverRun"
+import { acquirePrepRun, releasePrepRun, RunInProgressError, runServerGeneration } from "@/lib/jobs/server/serverRun"
 import { assertModelAndTier } from "@/lib/modelCatalog"
 import { loadModelCatalog } from "@/lib/modelCatalogFile"
 import { withHandler } from "@/lib/withHandler"
