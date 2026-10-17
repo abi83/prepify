@@ -19,6 +19,7 @@ export interface SharedTabData {
   assets: Asset[]
   concepts: StatedConcept[]
   generationOfQuestion: (question: Question) => JobGeneration | null
+  generationOfFlashcard: (index: number) => JobGeneration | null
   onStartAttempt: () => void
   onOpenTab: (tab: PrepTab) => void
 }
@@ -29,8 +30,12 @@ export function generationOf(jobId: string | null, generations: Record<string, J
   return generations[jobId] ?? null
 }
 
+export function toFlashcardQuestions(questions: Question[]): Question[] {
+  return questions.filter(q => q.type === "flashcard")
+}
+
 export function toFlashcards(questions: Question[]): FlashcardContent[] {
-  return questions.filter(q => q.type === "flashcard").map(q => q.content as unknown as FlashcardContent)
+  return toFlashcardQuestions(questions).map(q => q.content as unknown as FlashcardContent)
 }
 
 export function toStudyQuestions(questions: Question[]): Question[] {

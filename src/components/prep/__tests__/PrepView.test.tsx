@@ -22,7 +22,7 @@ const prep: Prep = {
 
 const concept: StatedConcept = {
   id: "c1", name: "Mitosis", description: "Cell division.", importance: 0.9, misconceptions: [], language: "en", createdAt: new Date(0),
-  generation: { jobId: "j1", model: "gpt-5-nano", tier: "flex", calls: [ { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false } ] },
+  generation: { jobId: "j1", type: "concepts", status: "executed", subject: "Mitosis", model: "gpt-5-nano", tier: "flex", calls: [ { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false, generatedAt: new Date(0) } ] },
 }
 
 const data: SharedTabData = {
@@ -31,6 +31,7 @@ const data: SharedTabData = {
   assets: [],
   concepts: [ concept ],
   generationOfQuestion: () => null,
+  generationOfFlashcard: () => null,
   onStartAttempt: vi.fn(),
   onOpenTab: vi.fn(),
 }
@@ -86,6 +87,6 @@ describe("PrepView", () => {
 
   it("shows concept generation cost on the Concepts tab", () => {
     renderView("readOnly", "concepts")
-    expect(screen.getByRole("heading", { name: "Concept generation" }).closest("section")).toHaveTextContent("gpt-5-nano")
+    expect(screen.getByRole("heading", { name: "Concept generation" }).closest("section")).toHaveTextContent("120 tokens · $0.010")
   })
 })

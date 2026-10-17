@@ -11,6 +11,7 @@ import { getMyPrep, getPrepTokens } from "@/actions/preps"
 import { listMyQuestions } from "@/actions/questions"
 import { ExecutionModeDialog } from "@/components/ExecutionModeDialog"
 import { GenerationConfigEditor } from "@/components/GenerationConfigEditor"
+import { formatTokens } from "@/components/GenerationCost"
 import { RunSettingsHint } from "@/components/RunSettingsHint"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -299,7 +300,7 @@ export default function GenerationPanel({
 
       {genPhase === "done" && totalTokens > 0 && (
         <div className="text-xs text-muted-foreground">
-          Generated in {(genMs / 1000).toFixed(1)}s · {totalTokens.toLocaleString()} tokens
+          Generated in {(genMs / 1000).toFixed(1)}s · {formatTokens(totalTokens)}
         </div>
       )}
 

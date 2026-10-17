@@ -5,7 +5,7 @@ import { useState } from "react"
 
 import PrepHeader from "@/components/prep/PrepHeader"
 import PrepView, { PREP_MAIN_CLASS } from "@/components/prep/PrepView"
-import { generationOf, toFlashcards, toStudyQuestions } from "@/components/prep/tabs/sharedTabs"
+import { generationOf, toFlashcardQuestions, toFlashcards, toStudyQuestions } from "@/components/prep/tabs/sharedTabs"
 import { describeOcrError } from "@/lib/ocrRejection"
 import { useUrlParams } from "@/lib/urlState"
 import { useSyncedState } from "@/lib/useSyncedState"
@@ -75,6 +75,7 @@ export default function PrepPage({
   const prepMe = usePrepMe(prep.id, images.length)
 
   const studyQuestions = toStudyQuestions(questions)
+  const flashcardQuestions = toFlashcardQuestions(questions)
   const isOwner = prep.userId === userId
   // A run in flight keeps the draft view up: activating the prep mid-run would otherwise unmount it.
   const showDraft = (!prep.isActive && progress === null) || prepMe.phase !== null
@@ -122,6 +123,7 @@ export default function PrepPage({
         pages: toPages(images, generations, rejectedGenerations),
         generations,
         generationOfQuestion: q => generationOf(q.producedByJobId, generations),
+        generationOfFlashcard: i => generationOf(flashcardQuestions[i].producedByJobId, generations),
         onTitleReady: title => setPrep(p => ({ ...p, title })),
         onGenerated: (savedQuestions, freshPrep) => {
           setQuestions(savedQuestions)

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -6,9 +6,11 @@ import type { FlashcardContent } from "@/types/questions"
 
 interface Props {
   cards: FlashcardContent[]
+  /** Rendered under the card at `index`. */
+  footer: (index: number) => ReactNode
 }
 
-export default function FlashCard({ cards }: Props) {
+export default function FlashCard({ cards, footer }: Props) {
   const [ index, setIndex ] = useState(0)
   const [ flipped, setFlipped ] = useState(false)
 
@@ -52,6 +54,8 @@ export default function FlashCard({ cards }: Props) {
           </div>
         </div>
       </div>
+
+      {footer(index)}
 
       <div className="flex w-full max-w-[560px] gap-3">
         <Button

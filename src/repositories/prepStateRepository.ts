@@ -18,11 +18,15 @@ export interface GenerationCall {
   costUsd: number
   executionMs: number
   wasted: boolean
+  generatedAt: Date
 }
 
-/** A job with all its LLM calls. */
+/** A job with all its LLM calls. `subject` says what the job worked on, e.g. "Page 2" or "single_choice · easy". */
 export interface JobGeneration {
   jobId: string
+  type: string
+  status: JobStatus
+  subject: string
   model: string
   tier: string
   calls: GenerationCall[]
@@ -42,8 +46,8 @@ async function loadConcepts(prepId: string): Promise<StatedConcept[]> {
   ])
   const metasByJob = new Map(conceptJobs.map(job => [ job.id, job.generationMetas ]))
   return concepts.map(({ id, name, description, importance, misconceptions, language, createdAt, producedByJob: job }) => {
-    const calls = (metasByJob.get(job.id) ?? []).map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
-    return { id, name, description, importance, misconceptions, language, createdAt, generation: { jobId: job.id, model: job.model, tier: job.tier, calls } }
+    const subject = concepts.filter(concept => concept.producedByJob.id === job.id).map(concept => concept.name).join(", ")
+    return { id, name, description, importance, misconceptions, language, createdAt, generation: toJobGeneration(job, subject, metasByJob.get(job.id) ?? []) }
   })
 }
 
@@ -97,25 +101,73 @@ export async function loadPrepState(prepId: string): Promise<GeneratedPrepState>
   }
 }
 
+function toJobGeneration(job: { id: string; type: string; status: JobStatus; model: string; tier: string }, subject: string, metas: GenerationCall[]): JobGeneration {
+  const calls = metas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted, generatedAt }))
+  return { jobId: job.id, type: job.type, status: job.status, subject, model: job.model, tier: job.tier, calls }
+}
+
+/** 1-based page number of each of the prep's images, in upload order. */
+async function loadPageNumbers(prepId: string): Promise<Map<string, number>> {
+  const images = await prisma.prepImage.findMany({ where: { prepId }, select: { id: true }, orderBy: { createdAt: "asc" } })
+  return new Map(images.map((image, i) => [ image.id, i + 1 ]))
+}
+
+function pageSubject(job: { type: string; inputs: { entityId: string }[] }, pageNumbers: Map<string, number>): string {
+  const pageId = job.inputs[0]?.entityId
+  const number = pageId === undefined ? undefined : pageNumbers.get(pageId)
+  if (number === undefined) throw new Error(`${job.type} job has no page input`)
+  return `Page ${number}`
+}
+
+interface SubjectJob {
+  type: string
+  questionType: string | null
+  difficulty: string | null
+  inputs: { entityId: string }[]
+  concepts: { name: string }[]
+}
+
+function subjectOf(job: SubjectJob, pageNumbers: Map<string, number>): string {
+  switch (job.type) {
+  case OCR_JOB_TYPE:
+  case CONCEPTS_EXTRACT_JOB_TYPE:
+    return pageSubject(job, pageNumbers)
+  case CONCEPTS_JOB_TYPE:
+    return job.concepts.map(concept => concept.name).join(", ")
+  case QUESTION_JOB_TYPE:
+    if (!job.questionType || !job.difficulty) throw new Error("question job has no questionType or difficulty")
+    return `${job.questionType} · ${job.difficulty}`
+  case PREP_META_JOB_TYPE:
+    return "Title and description"
+  case ASSET_JOB_TYPE:
+    return "Illustration"
+  default:
+    throw new Error(`Unknown job type "${job.type}"`)
+  }
+}
+
 /** Every job of the prep that made LLM calls, keyed by job id. No ownership check — callers resolve the prep first. */
 export async function loadJobGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
-  const jobs = await prisma.job.findMany({ where: { prepId, generationMetas: { some: {} } }, include: { generationMetas: true } })
-  return Object.fromEntries(jobs.map(job => {
-    const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
-    return [ job.id, { jobId: job.id, model: job.model, tier: job.tier, calls } ]
-  }))
+  const [ jobs, pageNumbers ] = await Promise.all([
+    prisma.job.findMany({
+      where: { prepId, generationMetas: { some: {} } },
+      include: { generationMetas: true, inputs: { select: { entityId: true } }, concepts: { select: { name: true } } },
+    }),
+    loadPageNumbers(prepId),
+  ])
+  return Object.fromEntries(jobs.map(job => [ job.id, toJobGeneration(job, subjectOf(job, pageNumbers), job.generationMetas) ]))
 }
 
 /** Wasted OCR calls of pages the prep rejected, keyed by image id. A rejected page has no `producedByJobId`, so its job is found by input; retries accumulate metas on that one job. Pages without wasted calls are absent. */
 export async function loadRejectedPageGenerations(prepId: string): Promise<Record<string, JobGeneration>> {
-  const jobs = await prisma.job.findMany({
-    where: { prepId, type: OCR_JOB_TYPE, generationMetas: { some: { wasted: true } } },
-    include: { generationMetas: { where: { wasted: true } }, inputs: { select: { entityId: true } } },
-  })
-  return Object.fromEntries(jobs.map(job => {
-    const calls = job.generationMetas.map(({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }) => ({ promptTokens, cachedTokens, completionTokens, costUsd, executionMs, wasted }))
-    return [ job.inputs[0].entityId, { jobId: job.id, model: job.model, tier: job.tier, calls } ]
-  }))
+  const [ jobs, pageNumbers ] = await Promise.all([
+    prisma.job.findMany({
+      where: { prepId, type: OCR_JOB_TYPE, generationMetas: { some: { wasted: true } } },
+      include: { generationMetas: { where: { wasted: true } }, inputs: { select: { entityId: true } } },
+    }),
+    loadPageNumbers(prepId),
+  ])
+  return Object.fromEntries(jobs.map(job => [ job.inputs[0].entityId, toJobGeneration(job, pageSubject(job, pageNumbers), job.generationMetas) ]))
 }
 
 export type RunState ="idle" | "running" | "interrupted"

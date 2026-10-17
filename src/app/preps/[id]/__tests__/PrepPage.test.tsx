@@ -38,7 +38,7 @@ import PrepPage from "@/app/preps/[id]/PrepPage"
 import { BYOK_TEXT_HARD_LIMIT } from "@/core/lib/config"
 import { formatDate } from "@/lib/format"
 import { clearUploads } from "@/lib/uploadQueue"
-import type { JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
+import type { GenerationCall, JobGeneration, PrepProgress, StatedConcept } from "@/repositories/prepStateRepository"
 
 const prep: Prep = {
   id: "p1", userId: "u1", title: "Biology", createdAt: new Date(0), visibility: "private",
@@ -51,19 +51,20 @@ function concept(overrides: Partial<StatedConcept> = {}): StatedConcept {
   return {
     id: "c1", name: "Mitosis", description: "Cell division producing two identical daughter cells.", importance: 0.9,
     misconceptions: [ "Mitosis makes gametes" ], language: "en", createdAt: CREATED_AT,
-    generation: {
-      jobId: "j1", model: "gpt-5-nano", tier: "flex",
-      calls: [
-        { promptTokens: 1000, cachedTokens: 200, completionTokens: 300, costUsd: 0.002, executionMs: 1500, wasted: false },
-        { promptTokens: 400, cachedTokens: 0, completionTokens: 100, costUsd: 0.0005, executionMs: 500, wasted: true },
-      ],
-    },
+    generation: gen("j1", [
+      { promptTokens: 1000, cachedTokens: 200, completionTokens: 300, costUsd: 0.002, executionMs: 1500, wasted: false, generatedAt: CREATED_AT },
+      { promptTokens: 400, cachedTokens: 0, completionTokens: 100, costUsd: 0.0005, executionMs: 500, wasted: true, generatedAt: CREATED_AT },
+    ], { type: "concepts", subject: "Mitosis" }),
     ...overrides,
   }
 }
 
-const call = (promptTokens: number, completionTokens: number, costUsd: number) =>
-  ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false })
+const call = (promptTokens: number, completionTokens: number, costUsd: number): GenerationCall =>
+  ({ promptTokens, cachedTokens: 0, completionTokens, costUsd, executionMs: 1, wasted: false, generatedAt: CREATED_AT })
+
+function gen(jobId: string, calls: GenerationCall[], overrides: Partial<JobGeneration> = {}): JobGeneration {
+  return { jobId, type: "question", status: "executed", subject: "single_choice · easy", model: "gpt-5-nano", tier: "flex", calls, ...overrides }
+}
 
 const flashcard = (id: string): Question =>
   ({ id, prepId: "p1", type: "flashcard", difficulty: null, language: "en", content: { front: "f", back: "b", back_explanation: "", asset_hint: { needed: false, type: null, description: null } }, producedByJobId: null, createdAt: CREATED_AT })
@@ -110,15 +111,13 @@ describe("PrepPage concepts", () => {
     expect(cards[1]).not.toHaveTextContent("Misconceptions")
   })
 
-  it("summarises concept generation over unique jobs, wasted calls included, with a per-job detail", async () => {
-    const secondJob = { jobId: "j2", model: "gpt-5-nano", tier: "flex", calls: [ call(10, 5, 0.5) ] }
+  it("summarises concept generation over unique jobs, wasted calls included, without per-card cost", async () => {
+    const secondJob = gen("j2", [ call(10, 5, 0.5) ], { type: "concepts" })
     renderPage([ concept(), concept({ id: "c2", name: "Osmosis" }), concept({ id: "c3", name: "Meiosis", generation: secondJob }) ])
     await openTab(/^Concepts/)
     const section = screen.getByRole("heading", { name: "Concept generation" }).closest("section")!
     expect(section).toHaveTextContent("1,815 tokens · $0.502")
-    expect(section).toHaveTextContent("gpt-5-nano · flex · 1,400 in / 400 out · $0.0025")
-    expect(section).toHaveTextContent("gpt-5-nano · flex · 10 in / 5 out · $0.500")
-    expect(section).not.toHaveTextContent("cached")
+    expect(within(screen.getByRole("list", { name: "Concepts" })).queryByText(/tokens|gpt-5-nano/)).not.toBeInTheDocument()
   })
 
   it("shows each page's OCR title, language and cost", async () => {
@@ -126,21 +125,30 @@ describe("PrepPage concepts", () => {
       id: "i1", prepId: "p1", gcsKey: "k", status: "done", error: null, language: "de", producedByJobId: "ocr1",
       ocrResult: { title: "Zellteilung", text: "t", visual_elements: [] }, createdAt: CREATED_AT, updatedAt: CREATED_AT,
     }
-    renderPage([], { images: [ image ], generations: { ocr1: { jobId: "ocr1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 20, 0.01) ] } } })
+    renderPage([], { images: [ image ], generations: { ocr1: gen("ocr1", [ call(100, 20, 0.01) ], { type: "ocr", subject: "Page 1" }) } })
     await openTab(/^Pages/)
     expect(screen.getByText("Zellteilung")).toBeInTheDocument()
     expect(screen.getByText("de")).toBeInTheDocument()
     expect(screen.queryByText(/^Page 1$/)).not.toBeInTheDocument()
-    expect(within(screen.getByRole("tabpanel")).getByText("120 tokens · $0.010")).toBeInTheDocument()
+    expect(within(screen.getByRole("tabpanel")).getByText("gpt-5-nano · $0.010")).toBeInTheDocument()
   })
 
   it("shows a question's generation cost on the question itself, wasted calls included", async () => {
     const generations = {
-      q1: { jobId: "q1", model: "gpt-5-nano", tier: "flex", calls: [ call(100, 10, 0.01), { ...call(50, 5, 0.005), wasted: true } ] },
+      q1: gen("q1", [ call(100, 10, 0.01), { ...call(50, 5, 0.005), wasted: true } ]),
     }
     renderPage([], { questions: [ question("a", "q1") ], generations })
     await openTab(/^Questions/)
-    expect(within(screen.getByRole("tabpanel")).getByText("165 tokens · $0.015")).toBeInTheDocument()
+    const panel = within(screen.getByRole("tabpanel"))
+    expect(panel.getByText("gpt-5-nano · $0.015")).toBeInTheDocument()
+    expect(panel.getByText(`150 in / 15 out · flex · ${formatDate(CREATED_AT)}`)).toBeInTheDocument()
+  })
+
+  it("shows a flashcard's generation cost under the card", async () => {
+    const card = { ...flashcard("f1"), producedByJobId: "f-job" }
+    renderPage([], { questions: [ card ], generations: { "f-job": gen("f-job", [ call(100, 10, 0.01) ], { subject: "flashcard · easy" }) } })
+    await openTab(/^Flashcards/)
+    expect(within(screen.getByRole("tabpanel")).getByText("gpt-5-nano · $0.010")).toBeInTheDocument()
   })
 
   it("shows an empty state when the prep has no concepts", async () => {
@@ -210,16 +218,20 @@ describe("PrepPage shell", () => {
 })
 
 describe("PrepPage generation log", () => {
-  it("lists every generation job on the Generation tab", async () => {
+  it("lists generation jobs chronologically with type, subject, status, model, cost and date, and the prep total", async () => {
+    const later = new Date("2026-03-05T12:00:00Z")
     const generations = {
-      j1: { jobId: "j1", model: "gpt-5-nano", tier: "flex", calls: [ call(10, 5, 0.5) ] },
-      j2: { jobId: "j2", model: "gpt-5-mini", tier: "flex", calls: [ call(20, 5, 0.1) ] },
+      j1: gen("j1", [ { ...call(20, 5, 0.1), generatedAt: later } ], { type: "ocr", status: "failed", subject: "Page 2", model: "gpt-5-mini" }),
+      j2: gen("j2", [ call(10, 5, 0.5) ]),
     }
     renderPage([], { generations })
     await openTab(/^Generation/)
     const log = screen.getByRole("heading", { name: "Generation log" }).closest("section")!
-    expect(log).toHaveTextContent("gpt-5-nano · flex · 10 in / 5 out · $0.500")
-    expect(log).toHaveTextContent("gpt-5-mini · flex · 20 in / 5 out · $0.100")
+    const rows = within(log).getAllByRole("row")
+    expect(rows).toHaveLength(4)
+    expect(rows[1]).toHaveTextContent(`Question · single_choice · easyexecutedgpt-5-nano · $0.50010 in / 5 out${formatDate(CREATED_AT)}`)
+    expect(rows[2]).toHaveTextContent(`OCR · Page 2failedgpt-5-mini · $0.10020 in / 5 out${formatDate(later)}`)
+    expect(rows[3]).toHaveTextContent("Total$0.60030 in / 10 out")
   })
 })
 
@@ -255,11 +267,11 @@ describe("PrepPage OCR verdicts", () => {
   })
 
   it("labels a rejected page's cost wasted, and shows none without wasted calls", async () => {
-    const wasted = { jobId: "o2", model: "gpt-5-nano", tier: "flex", calls: [ { ...call(100, 20, 0.01), wasted: true } ] }
+    const wasted = gen("o2", [ { ...call(100, 20, 0.01), wasted: true } ], { type: "ocr", status: "failed", subject: "Page 1" })
     renderPage([], { images: [ rejected("i2", REASONS[0][0]), rejected("i3", REASONS[0][0]) ], rejectedGenerations: { i2: wasted } })
     await openTab(/^Pages/)
-    expect(screen.getAllByText(/tokens ·/)).toHaveLength(1)
-    expect(screen.getByText("Wasted: 120 tokens · $0.010")).toBeInTheDocument()
+    expect(screen.getAllByText(/gpt-5-nano ·/)).toHaveLength(1)
+    expect(screen.getByText("Wasted: gpt-5-nano · $0.010")).toBeInTheDocument()
   })
 
   it.each(REASONS)("explains %s in plain words", async (error, message) => {

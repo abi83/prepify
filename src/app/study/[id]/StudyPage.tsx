@@ -4,7 +4,7 @@ import type { Prep, Question, Asset } from "@prisma/client"
 
 import PrepHeader from "@/components/prep/PrepHeader"
 import PrepView from "@/components/prep/PrepView"
-import { generationOf, SHARED_TABS, toFlashcards, toStudyQuestions, type SharedTabData } from "@/components/prep/tabs/sharedTabs"
+import { generationOf, SHARED_TABS, toFlashcardQuestions, toFlashcards, toStudyQuestions, type SharedTabData } from "@/components/prep/tabs/sharedTabs"
 import { useUrlParams } from "@/lib/urlState"
 import type { JobGeneration, StatedConcept } from "@/repositories/prepStateRepository"
 import { parseStudyTab } from "@/types/prep"
@@ -24,6 +24,7 @@ interface Props {
 export default function StudyPage({ userId, prep, questions, assets, concepts, generations, tokensUsed, costUsd }: Props) {
   const { searchParams, set: setUrlParams } = useUrlParams()
   const studyQuestions = toStudyQuestions(questions)
+  const flashcardQuestions = toFlashcardQuestions(questions)
 
   return (
     <PrepView
@@ -40,6 +41,7 @@ export default function StudyPage({ userId, prep, questions, assets, concepts, g
         assets,
         concepts,
         generationOfQuestion: q => generationOf(q.producedByJobId, generations),
+        generationOfFlashcard: i => generationOf(flashcardQuestions[i].producedByJobId, generations),
         onStartAttempt,
         onOpenTab: tab => setUrlParams({ tab }),
       })}

@@ -37,10 +37,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-const call = { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false }
+const call = { promptTokens: 100, cachedTokens: 0, completionTokens: 20, costUsd: 0.01, executionMs: 1, wasted: false, generatedAt: new Date(0) }
 const concept: StatedConcept = {
   id: "c1", name: "Mitosis", description: "Cell division.", importance: 0.9, misconceptions: [], language: "en", createdAt: new Date(0),
-  generation: { jobId: "j1", model: "gpt-5-nano", tier: "flex", calls: [ call ] },
+  generation: { jobId: "j1", type: "concepts", status: "executed", subject: "Mitosis", model: "gpt-5-nano", tier: "flex", calls: [ call ] },
 }
 
 function renderStudy(questions: Question[], overrides: Partial<ComponentProps<typeof StudyPage>> = {}) {

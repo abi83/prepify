@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma"
 import { ForbiddenError } from "@/repositories/errors"
 import * as prepImageRepository from "@/repositories/prepImageRepository"
 import * as prepRepository from "@/repositories/prepRepository"
-import { getPrepProgress, listConcepts, listJobGenerations, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
+import { getPrepProgress, listConcepts, listJobGenerations, loadJobGenerations, loadPrepState, loadRejectedPageGenerations } from "@/repositories/prepStateRepository"
 
 const OWNER = "user-owner"
 
@@ -101,7 +101,8 @@ describe("prepStateRepository", () => {
     const { concepts } = await loadPrepState(prep.id)
 
     expect(concepts).toHaveLength(1)
-    expect(concepts[0].generation).toMatchObject({ jobId: conceptsJob.id, model: "gpt-5-nano", tier: "flex" })
+    expect(concepts[0].generation).toMatchObject({ jobId: conceptsJob.id, type: "concepts", status: "executed", subject: "Mitosis", model: "gpt-5-nano", tier: "flex" })
+    expect(concepts[0].generation.calls[0].generatedAt).toBeInstanceOf(Date)
     expect(concepts[0].generation.calls.map(call => call.wasted).sort()).toEqual([ false, true ])
   })
 
@@ -222,6 +223,39 @@ describe("prepStateRepository", () => {
 
     const generations = await loadRejectedPageGenerations(prep.id)
     expect(Object.keys(generations)).toEqual([ rejected.id ])
-    expect(generations[rejected.id]).toMatchObject({ jobId: wastedJob.id, calls: [ { wasted: true }, { wasted: true } ] })
+    expect(generations[rejected.id]).toMatchObject({ jobId: wastedJob.id, type: "ocr", status: "failed", subject: "Page 1", calls: [ { wasted: true }, { wasted: true } ] })
+  })
+
+  describe("loadJobGenerations", () => {
+    const createJob = (prepId: string, data: { type: string; questionType?: string; difficulty?: string; inputs?: string[] }) => prisma.job.create({
+      data: {
+        prepId, type: data.type, questionType: data.questionType, difficulty: data.difficulty, status: "executed", model: "m", tier: "flex", timeoutMs: 1, maxRetries: 0, createdBy: OWNER,
+        inputs: { create: (data.inputs ?? []).map(entityId => ({ entityType: "prepImage", entityId })) },
+      },
+    })
+
+    it("describes each job's subject by type", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
+      await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/a`)
+      const second = await prepImageRepository.createImage(OWNER, prep.id, `prep-pages/${prep.id}/b`)
+      const ocr = await createJob(prep.id, { type: "ocr", inputs: [ second.id ] })
+      const question = await createJob(prep.id, { type: "question", questionType: "flashcard", difficulty: "easy" })
+      const concepts = await createJob(prep.id, { type: "concepts" })
+      await prisma.concept.create({ data: { language: "en", name: "Mitosis", description: "Cell division process in eukaryotes", importance: 0.9, misconceptions: [], producedByJobId: concepts.id } })
+      await Promise.all([ ocr, question, concepts ].map(job => addMeta(job.id)))
+
+      const generations = await loadJobGenerations(prep.id)
+
+      expect(generations[ocr.id]).toMatchObject({ type: "ocr", status: "executed", subject: "Page 2" })
+      expect(generations[question.id]).toMatchObject({ type: "question", subject: "flashcard · easy" })
+      expect(generations[concepts.id]).toMatchObject({ type: "concepts", subject: "Mitosis" })
+    })
+
+    it("fails on an unknown job type", async () => {
+      const prep = await prepRepository.createPrep(OWNER, { title: "P", language: "en" })
+      await addMeta((await createJob(prep.id, { type: "mystery" })).id)
+
+      await expect(loadJobGenerations(prep.id)).rejects.toThrow("Unknown job type \"mystery\"")
+    })
   })
 })
