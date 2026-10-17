@@ -1,6 +1,6 @@
 import type { Question } from "@prisma/client"
 
-import type { AnswerState } from "@/components/questions/QuestionBody"
+import type { AnswerState } from "@/types/questions"
 import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
 
 function shuffleArray<T>(arr: T[]): T[] {

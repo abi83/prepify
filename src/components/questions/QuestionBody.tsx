@@ -1,19 +1,12 @@
 import type { Question, Asset } from "@prisma/client"
 
-import type { SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
+import type { AnswerState, SingleChoiceContent, MultipleChoiceContent, FillTheGapContent, SortingContent } from "@/types/questions"
 
 import AssetFrame from "./AssetFrame"
 import FillTheGapQuestion from "./FillTheGapQuestion"
 import MultipleChoiceQuestion from "./MultipleChoiceQuestion"
 import SingleChoiceQuestion from "./SingleChoiceQuestion"
 import SortingQuestion from "./SortingQuestion"
-
-export interface AnswerState {
-  single: string | null
-  multi: string[]
-  fill: string[]
-  sort: string[]
-}
 
 export function emptyAnswer(): AnswerState {
   return { single: null, multi: [], fill: [], sort: [] }

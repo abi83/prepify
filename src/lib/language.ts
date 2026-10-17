@@ -1,4 +1,4 @@
-import type { SupportedLanguage } from "./config"
+import type { SupportedLanguage } from "@/types/language"
 
 /** The one language shared by `items`; throws on none or on a mix. */
 export function resolveLanguage(items: { language: SupportedLanguage }[]): SupportedLanguage {

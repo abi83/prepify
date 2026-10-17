@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import type { CatalogModel, CatalogTier, ModelCatalog, ModelRate } from "@/types/modelCatalog"
+
 const price = z.number().nonnegative()
 
 const modelSchema = z.strictObject({ label: z.string().min(1), input: price, cachedInput: price, output: price })
@@ -13,29 +15,6 @@ const providerSchema = z.strictObject({
 const catalogFileSchema = z.record(z.string().min(1), providerSchema).refine(file => Object.keys(file).length > 0, "no providers")
 
 export const TIERLESS_TIERS: Record<string, CatalogTier> = { default: { label: "Standard", multiplier: 1 } }
-
-export interface CatalogTier {
-  label: string
-  multiplier: number
-}
-
-export interface ModelRate {
-  input: number
-  cachedInput: number
-  output: number
-}
-
-export interface CatalogModel extends ModelRate {
-  id: string
-  label: string
-  provider: string
-  tiers: Record<string, CatalogTier>
-}
-
-/** Whitelisted models by id; every model carries its provider's tiers. */
-export interface ModelCatalog {
-  models: Record<string, CatalogModel>
-}
 
 /** Validates the raw catalog file; throws on unknown keys, bad values or a model id listed under two providers. */
 export function parseModelCatalog(raw: unknown): ModelCatalog {

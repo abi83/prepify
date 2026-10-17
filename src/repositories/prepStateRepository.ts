@@ -3,8 +3,9 @@ import type { JobStatus, Prep } from "@prisma/client"
 import { activeAssetHint } from "@/lib/assetHint"
 import { ASSET_JOB_TYPE, CONCEPTS_EXTRACT_JOB_TYPE, CONCEPTS_JOB_TYPE, OCR_JOB_TYPE, PREP_META_JOB_TYPE, QUESTION_JOB_TYPE } from "@/lib/jobs/jobTypes"
 import { indexMerges, indexPageConcepts } from "@/lib/jobs/pageConcepts"
-import { countConceptUsage, nextJobs, type PlanTarget, type PrepState } from "@/lib/planner"
+import { countConceptUsage, nextJobs, type PlanTarget } from "@/lib/planner"
 import { prisma } from "@/lib/prisma"
+import type { PrepState } from "@/types/prepState"
 
 import { interruptStaleJobs, RESUMABLE, TERMINAL } from "./jobRepository"
 

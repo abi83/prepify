@@ -1,6 +1,6 @@
 import { z, ZodSchema } from "zod"
 
-import { DEFAULT_MAX_TOKENS, NonRetryableLlmError, type AgentDeps, type LlmContentPart } from "@/core/ports"
+import { DEFAULT_MAX_TOKENS, NonRetryableLlmError, type AgentDeps, type AgentImage, type LlmContentPart } from "@/core/ports"
 import type { AgentMeta, Sampler } from "@/core/sampler"
 
 import { serializeError } from "./logger"
@@ -26,11 +26,6 @@ export const EMPTY_AGENT_META: AgentMeta = {
   costUsd: 0,
   toolCalls: 0,
   executionMs: 0,
-}
-
-export interface AgentImage {
-  base64: string
-  mimeType: string
 }
 
 export interface AgentInput {

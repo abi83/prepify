@@ -3,7 +3,7 @@
  * `src/core/` — this module must stay usable from a browser worker, a server, or a CLI.
  */
 
-import type { AgentMeta } from "@/lib/agent"
+import type { AgentMeta } from "./sampler"
 
 export type JobStatus = "created" | "running" | "interrupted" | "executed" | "failed"
 
